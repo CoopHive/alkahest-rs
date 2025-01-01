@@ -5,13 +5,11 @@ use alloy::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
         },
-        ProviderBuilder, RootProvider,
+        RootProvider,
     },
-    signers::local::PrivateKeySigner,
     transports::http::{Client, Http},
 };
 use alloy_provider::Identity;
-use std::env;
 
 pub type WalletProvider = FillProvider<
     JoinFill<
@@ -20,6 +18,16 @@ pub type WalletProvider = FillProvider<
             JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
         >,
         WalletFiller<EthereumWallet>,
+    >,
+    RootProvider<Http<Client>>,
+    Http<Client>,
+    Ethereum,
+>;
+
+pub type PublicProvider = FillProvider<
+    JoinFill<
+        Identity,
+        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
     >,
     RootProvider<Http<Client>>,
     Http<Client>,
