@@ -1,7 +1,6 @@
 use alloy::primitives::{address, keccak256, Address, U256};
 use alloy::signers::local::PrivateKeySigner;
-use alloy::signers::{Signature, Signer, SignerSync};
-use alloy::sol;
+use alloy::signers::{Signature, Signer};
 use alloy::sol_types::SolValue;
 
 use crate::{
