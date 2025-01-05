@@ -3,6 +3,7 @@ use alloy::signers::local::PrivateKeySigner;
 use alloy::signers::{Signature, Signer};
 use alloy::sol_types::SolValue;
 
+use crate::contracts::ERC20Permit;
 use crate::{
     types::{PublicProvider, WalletProvider},
     utils,
@@ -15,6 +16,7 @@ pub struct Erc20Addresses {
 }
 
 pub struct Erc20Client {
+    private_key: PrivateKeySigner,
     wallet_provider: WalletProvider,
     public_provider: PublicProvider,
 
@@ -33,14 +35,15 @@ impl Default for Erc20Addresses {
 
 impl Erc20Client {
     pub fn new(
-        private_key: impl ToString,
+        private_key: impl ToString + Clone,
         rpc_url: impl ToString + Clone,
         addresses: Option<Erc20Addresses>,
     ) -> eyre::Result<Self> {
-        let wallet_provider = utils::get_wallet_provider(private_key, rpc_url.clone())?;
+        let wallet_provider = utils::get_wallet_provider(private_key.clone(), rpc_url.clone())?;
         let public_provider = utils::get_public_provider(rpc_url)?;
 
         Ok(Erc20Client {
+            private_key: private_key.to_string().parse()?,
             wallet_provider,
             public_provider,
 
@@ -49,26 +52,26 @@ impl Erc20Client {
     }
 
     async fn get_permit_signature(
+        &self,
         token: Address,
-        private_key: impl ToString,
         spender: Address,
         value: U256,
         deadline: U256,
     ) -> eyre::Result<Signature> {
-        let signer: PrivateKeySigner = private_key.to_string().parse()?;
+        let token_contract = ERC20Permit::new(token, &self.wallet_provider);
 
         let permit_type_hash = keccak256(
             "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)",
         );
-        let owner = signer.address();
+        let owner = self.private_key.address();
 
-        let nonce = U256::from(0);
-        let domain_separator = "";
+        let nonce = token_contract.nonces(owner).call().await?._0;
+        let domain_separator = token_contract.DOMAIN_SEPARATOR().call().await?._0;
 
         let struct_hash = (permit_type_hash, owner, spender, value, nonce, deadline).abi_encode();
 
         let digest = keccak256((&[0x19, 0x01], domain_separator, struct_hash).abi_encode_packed());
-        let signature = signer.sign_message(digest.as_ref()).await?;
+        let signature = self.private_key.sign_message(digest.as_ref()).await?;
 
         Ok(signature)
     }
