@@ -1,4 +1,3 @@
-use alloy::dyn_abi::abi::Token;
 use clients::{
     attestation::AttestationClient, erc1155::Erc1155Client, erc20::Erc20Client,
     erc721::Erc721Client, token_bundle::TokenBundleClient,
@@ -7,6 +6,7 @@ use types::{PublicProvider, WalletProvider};
 
 pub mod clients;
 pub mod config;
+pub mod contracts;
 pub mod types;
 pub mod utils;
 
