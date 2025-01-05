@@ -16,7 +16,7 @@ pub struct Erc20Addresses {
 }
 
 pub struct Erc20Client {
-    private_key: PrivateKeySigner,
+    signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
     public_provider: PublicProvider,
 
@@ -43,7 +43,7 @@ impl Erc20Client {
         let public_provider = utils::get_public_provider(rpc_url)?;
 
         Ok(Erc20Client {
-            private_key: private_key.to_string().parse()?,
+            signer: private_key.to_string().parse()?,
             wallet_provider,
             public_provider,
 
@@ -63,7 +63,7 @@ impl Erc20Client {
         let permit_type_hash = keccak256(
             "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)",
         );
-        let owner = self.private_key.address();
+        let owner = self.signer.address();
 
         let nonce = token_contract.nonces(owner).call().await?._0;
         let domain_separator = token_contract.DOMAIN_SEPARATOR().call().await?._0;
@@ -71,7 +71,7 @@ impl Erc20Client {
         let struct_hash = (permit_type_hash, owner, spender, value, nonce, deadline).abi_encode();
 
         let digest = keccak256((&[0x19, 0x01], domain_separator, struct_hash).abi_encode_packed());
-        let signature = self.private_key.sign_message(digest.as_ref()).await?;
+        let signature = self.signer.sign_message(digest.as_ref()).await?;
 
         Ok(signature)
     }
