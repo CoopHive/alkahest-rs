@@ -1,4 +1,8 @@
-use alloy::primitives::{address, Address};
+use alloy::primitives::{address, keccak256, Address, U256};
+use alloy::signers::local::PrivateKeySigner;
+use alloy::signers::{Signature, Signer, SignerSync};
+use alloy::sol;
+use alloy::sol_types::SolValue;
 
 use crate::{
     types::{PublicProvider, WalletProvider},
@@ -43,5 +47,30 @@ impl Erc20Client {
 
             addresses: addresses.unwrap_or_default(),
         })
+    }
+
+    async fn get_permit_signature(
+        token: Address,
+        private_key: impl ToString,
+        spender: Address,
+        value: U256,
+        deadline: U256,
+    ) -> eyre::Result<Signature> {
+        let signer: PrivateKeySigner = private_key.to_string().parse()?;
+
+        let permit_type_hash = keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)",
+        );
+        let owner = signer.address();
+
+        let nonce = U256::from(0);
+        let domain_separator = "";
+
+        let struct_hash = (permit_type_hash, owner, spender, value, nonce, deadline).abi_encode();
+
+        let digest = keccak256((&[0x19, 0x01], domain_separator, struct_hash).abi_encode_packed());
+        let signature = signer.sign_message(digest.as_ref()).await?;
+
+        Ok(signature)
     }
 }
