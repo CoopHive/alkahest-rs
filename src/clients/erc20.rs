@@ -65,8 +65,6 @@ impl Erc20Client {
         );
         let owner = self.signer.address();
 
-        // let nonce = token_contract.nonces(owner).call().await?._0;
-        // let domain_separator = token_contract.DOMAIN_SEPARATOR().call().await?._0;
         let (nonce, domain_separator) = tokio::try_join!(
             async { Ok::<_, eyre::Error>(token_contract.nonces(owner).call().await?._0) },
             async { Ok(token_contract.DOMAIN_SEPARATOR().call().await?._0) }
