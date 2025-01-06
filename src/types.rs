@@ -1,5 +1,6 @@
 use alloy::{
     network::{Ethereum, EthereumWallet},
+    primitives::{Address, Bytes, U256},
     providers::{
         fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
@@ -33,3 +34,27 @@ pub type PublicProvider = FillProvider<
     Http<Client>,
     Ethereum,
 >;
+
+pub struct ArbiterData {
+    pub arbiter: Address,
+    pub demand: Bytes,
+}
+
+#[derive(Debug, Clone)]
+pub struct Erc20Data {
+    pub address: Address,
+    pub value: U256,
+}
+
+#[derive(Debug, Clone)]
+pub struct Erc721Data {
+    pub address: Address,
+    pub id: U256,
+}
+
+#[derive(Debug, Clone)]
+pub struct Erc1155Data {
+    pub address: Address,
+    pub id: U256,
+    pub value: U256,
+}
