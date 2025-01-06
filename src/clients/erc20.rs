@@ -8,10 +8,7 @@ use alloy::sol_types::{SolEvent, SolValue};
 
 use crate::contracts::{self, ERC20Permit};
 use crate::types::{ArbiterData, Erc1155Data, Erc20Data, Erc721Data};
-use crate::{
-    types::{PublicProvider, WalletProvider},
-    utils,
-};
+use crate::{types::WalletProvider, utils};
 
 pub struct Erc20Addresses {
     eas: Address,
@@ -23,7 +20,6 @@ pub struct Erc20Addresses {
 pub struct Erc20Client {
     signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
-    public_provider: PublicProvider,
 
     addresses: Erc20Addresses,
 }
@@ -51,7 +47,6 @@ impl Erc20Client {
         Ok(Erc20Client {
             signer: private_key.to_string().parse()?,
             wallet_provider,
-            public_provider,
 
             addresses: addresses.unwrap_or_default(),
         })
