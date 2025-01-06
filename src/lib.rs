@@ -14,11 +14,11 @@ pub struct AlkahestClient {
     wallet_provider: WalletProvider,
     public_provider: PublicProvider,
 
-    erc20: Erc20Client,
-    erc721: Erc721Client,
-    erc1155: Erc1155Client,
-    token_bundle: TokenBundleClient,
-    attestation: AttestationClient,
+    pub erc20: Erc20Client,
+    pub erc721: Erc721Client,
+    pub erc1155: Erc1155Client,
+    pub token_bundle: TokenBundleClient,
+    pub attestation: AttestationClient,
 }
 
 impl AlkahestClient {
