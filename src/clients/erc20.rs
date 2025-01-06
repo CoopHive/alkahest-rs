@@ -147,7 +147,7 @@ impl Erc20Client {
         &self,
         price: Erc20Data,
         item: ArbiterData,
-        expiration_time: u64,
+        expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let escrow_obligation_contract = contracts::ERC20EscrowObligation::new(
             self.addresses.escrow_obligation,
@@ -162,7 +162,7 @@ impl Erc20Client {
                     arbiter: item.arbiter,
                     demand: item.demand,
                 },
-                expiration_time,
+                expiration,
             )
             .send()
             .await?
@@ -176,7 +176,7 @@ impl Erc20Client {
         &self,
         price: Erc20Data,
         item: ArbiterData,
-        expiration_time: u64,
+        expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
         let permit = self
@@ -196,7 +196,7 @@ impl Erc20Client {
                 price.value,
                 item.arbiter,
                 item.demand,
-                expiration_time,
+                expiration,
                 permit.v().into(),
                 permit.r().into(),
                 permit.s().into(),
@@ -270,18 +270,12 @@ impl Erc20Client {
         &self,
         bid: Erc20Data,
         ask: Erc20Data,
-        expiration_time: u64,
+        expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let barter_utils_contract =
             contracts::ERC20BarterUtils::new(self.addresses.barter_utils, &self.wallet_provider);
         let receipt = barter_utils_contract
-            .buyErc20ForErc20(
-                bid.address,
-                bid.value,
-                ask.address,
-                ask.value,
-                expiration_time,
-            )
+            .buyErc20ForErc20(bid.address, bid.value, ask.address, ask.value, expiration)
             .send()
             .await?
             .get_receipt()
@@ -294,7 +288,7 @@ impl Erc20Client {
         &self,
         bid: Erc20Data,
         ask: Erc20Data,
-        expiration_time: u64,
+        expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
         let permit = self
@@ -314,7 +308,7 @@ impl Erc20Client {
                 bid.value,
                 ask.address,
                 ask.value,
-                expiration_time,
+                expiration,
                 permit.v().into(),
                 permit.r().into(),
                 permit.s().into(),
@@ -507,6 +501,65 @@ impl Erc20Client {
                 ask.address,
                 ask.id,
                 ask.value,
+                expiration,
+                permit.v().into(),
+                permit.r().into(),
+                permit.s().into(),
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn buy_bundle_for_erc20(
+        &self,
+        bid: Erc20Data,
+        ask: contracts::erc20_barter_cross_token::TokenBundlePaymentObligation::StatementData,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract = contracts::erc20_barter_cross_token::ERC20BarterCrossToken::new(
+            self.addresses.barter_utils,
+            &self.wallet_provider,
+        );
+
+        let receipt = barter_utils_contract
+            .buyBundleWithErc20(bid.address, bid.value, ask, expiration)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn permit_and_buy_bundle_for_erc20(
+        &self,
+        bid: Erc20Data,
+        ask: contracts::erc20_barter_cross_token::TokenBundlePaymentObligation::StatementData,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
+        let permit = self
+            .get_permit_signature(
+                self.addresses.escrow_obligation,
+                bid.clone(),
+                deadline.try_into()?,
+            )
+            .await?;
+
+        let barter_utils_contract = contracts::erc20_barter_cross_token::ERC20BarterCrossToken::new(
+            self.addresses.barter_utils,
+            &self.wallet_provider,
+        );
+
+        let receipt = barter_utils_contract
+            .permitAndBuyBundleWithErc20(
+                bid.address,
+                bid.value,
+                ask,
                 expiration,
                 permit.v().into(),
                 permit.r().into(),
