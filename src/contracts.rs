@@ -48,6 +48,18 @@ sol!(
     "src/contracts/ERC20BarterUtils.json"
 );
 
+pub mod erc20_barter_cross_token {
+    use alloy::sol;
+
+    sol!(
+        #[allow(missing_docs)]
+        #[sol(rpc)]
+        #[derive(Debug)]
+        ERC20BarterCrossToken,
+        "src/contracts/ERC20BarterCrossToken.json"
+    );
+}
+
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
@@ -120,25 +132,41 @@ sol!(
     "src/contracts/TokenBundleBarterUtils.json"
 );
 
-pub mod token_bundle_standalone {
+pub mod token_bundle {
     use alloy::sol;
 
     sol!(
         #[allow(missing_docs)]
         #[sol(rpc)]
         #[derive(Debug)]
-        AttestationBarterUtils,
-        "src/contracts/AttestationBarterUtils.json"
+        TokenBundleEscrowObligation,
+        "src/contracts/TokenBundleEscrowObligation.json"
     );
 
     sol!(
         #[allow(missing_docs)]
         #[sol(rpc)]
         #[derive(Debug)]
-        AttestationEscrowObligation,
-        "src/contracts/AttestationEscrowObligation.json"
+        TokenBundlePaymentObligation,
+        "src/contracts/TokenBundlePaymentObligation.json"
     );
 }
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    AttestationBarterUtils,
+    "src/contracts/AttestationBarterUtils.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    AttestationEscrowObligation,
+    "src/contracts/AttestationEscrowObligation.json"
+);
 
 sol!(
     #[allow(missing_docs)]
