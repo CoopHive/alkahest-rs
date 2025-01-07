@@ -42,7 +42,6 @@ impl Erc20Client {
         addresses: Option<Erc20Addresses>,
     ) -> eyre::Result<Self> {
         let wallet_provider = utils::get_wallet_provider(private_key.clone(), rpc_url.clone())?;
-        let public_provider = utils::get_public_provider(rpc_url)?;
 
         Ok(Erc20Client {
             signer: private_key.to_string().parse()?,
