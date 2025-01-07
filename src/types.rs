@@ -6,11 +6,10 @@ use alloy::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
         },
-        RootProvider,
+        Identity, RootProvider,
     },
     transports::http::{Client, Http},
 };
-use alloy_provider::Identity;
 
 pub type WalletProvider = FillProvider<
     JoinFill<
