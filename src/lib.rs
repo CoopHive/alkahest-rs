@@ -37,7 +37,7 @@ impl AlkahestClient {
             erc721: Erc721Client::new(private_key.clone(), rpc_url.clone(), None)?,
             erc1155: Erc1155Client::new(private_key.clone(), rpc_url.clone(), None)?,
             token_bundle: TokenBundleClient::new(private_key.clone(), rpc_url.clone(), None)?,
-            attestation: AttestationClient,
+            attestation: AttestationClient::new(private_key.clone(), rpc_url.clone(), None)?,
         })
     }
 }
