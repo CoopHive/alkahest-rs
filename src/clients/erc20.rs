@@ -7,7 +7,7 @@ use alloy::signers::{Signature, Signer};
 use alloy::sol_types::{SolEvent, SolValue};
 
 use crate::contracts::{self, ERC20Permit};
-use crate::types::{ArbiterData, Erc1155Data, Erc20Data, Erc721Data};
+use crate::types::{ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData};
 use crate::{types::WalletProvider, utils};
 
 pub struct Erc20Addresses {
@@ -522,7 +522,7 @@ impl Erc20Client {
     pub async fn buy_bundle_for_erc20(
         &self,
         bid: Erc20Data,
-        ask: contracts::erc20_barter_cross_token::TokenBundlePaymentObligation::StatementData,
+        ask: TokenBundleData,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let barter_utils_contract = contracts::erc20_barter_cross_token::ERC20BarterCrossToken::new(
@@ -531,7 +531,12 @@ impl Erc20Client {
         );
 
         let receipt = barter_utils_contract
-            .buyBundleWithErc20(bid.address, bid.value, ask, expiration)
+            .buyBundleWithErc20(
+                bid.address,
+                bid.value,
+                (ask, self.signer.address()).into(),
+                expiration,
+            )
             .send()
             .await?
             .get_receipt()
@@ -543,7 +548,8 @@ impl Erc20Client {
     pub async fn permit_and_buy_bundle_for_erc20(
         &self,
         bid: Erc20Data,
-        ask: contracts::erc20_barter_cross_token::TokenBundlePaymentObligation::StatementData,
+        ask: TokenBundleData,
+        payee: Address,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
@@ -564,7 +570,7 @@ impl Erc20Client {
             .permitAndBuyBundleWithErc20(
                 bid.address,
                 bid.value,
-                ask,
+                (ask, payee).into(),
                 expiration,
                 deadline.try_into()?,
                 permit.v().into(),
