@@ -1,4 +1,5 @@
-use alloy::primitives::{address, Address, Bytes, FixedBytes, U256};
+use alloy::primitives::FixedBytes;
+use alloy::primitives::{address, Address};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 
@@ -11,7 +12,7 @@ pub struct AttestationAddresses {
     eas_schema_registry: Address,
     barter_utils: Address,
     escrow_obligation: Address,
-    payment_obligation: Address,
+    escrow_obligation_2: Address,
 }
 
 pub struct AttestationClient {
@@ -28,7 +29,7 @@ impl Default for AttestationAddresses {
             eas_schema_registry: address!("4200000000000000000000000000000000000020"),
             barter_utils: address!("3A40F65D2589a43Dc057bf820D8626F87D95307c"),
             escrow_obligation: address!("248cd93922eBDf962c9ea10286E6566C75081948"),
-            payment_obligation: address!("702fab66515b3313dFd41E7CE70C2aF0033E2356"),
+            escrow_obligation_2: address!("702fab66515b3313dFd41E7CE70C2aF0033E2356"),
         }
     }
 }
@@ -55,8 +56,10 @@ impl AttestationClient {
         resolver: Address,
         revocable: bool,
     ) -> eyre::Result<TransactionReceipt> {
-        let schema_registry_contract =
-            contracts::ISchemaRegistry::new(self.addresses.eas, &self.wallet_provider);
+        let schema_registry_contract = contracts::ISchemaRegistry::new(
+            self.addresses.eas_schema_registry,
+            &self.wallet_provider,
+        );
 
         let receipt = schema_registry_contract
             .register(schema, resolver, revocable)
@@ -84,9 +87,65 @@ impl AttestationClient {
         Ok(receipt)
     }
 
+    pub async fn create_escrow(
+        &self,
+        attestation: contracts::AttestationEscrowObligation::AttestationRequest,
+        demand: ArbiterData,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let attestation_escrow_obligation_contract = contracts::AttestationEscrowObligation::new(
+            self.addresses.escrow_obligation,
+            &self.wallet_provider,
+        );
+
+        let receipt = attestation_escrow_obligation_contract
+            .makeStatement(
+                contracts::AttestationEscrowObligation::StatementData {
+                    attestation,
+                    arbiter: demand.arbiter,
+                    demand: demand.demand,
+                },
+                expiration,
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn create_escrow_2(
+        &self,
+        attestation: FixedBytes<32>,
+        demand: ArbiterData,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let attestation_escrow_obligation_2_contract = contracts::AttestationEscrowObligation2::new(
+            self.addresses.escrow_obligation_2,
+            &self.wallet_provider,
+        );
+
+        let receipt = attestation_escrow_obligation_2_contract
+            .makeStatement(
+                contracts::AttestationEscrowObligation2::StatementData {
+                    attestationUid: attestation,
+                    arbiter: demand.arbiter,
+                    demand: demand.demand,
+                },
+                expiration,
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
     pub async fn attest_and_create_escrow(
         &self,
-        request: IEAS::AttestationRequest,
+        attestation: IEAS::AttestationRequest,
         demand: ArbiterData,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
@@ -97,12 +156,12 @@ impl AttestationClient {
 
         let receipt = barter_utils_contract
             .attestAndCreateEscrow(
-                request.schema,
-                request.data.recipient,
-                request.data.expirationTime,
-                request.data.revocable,
-                request.data.refUID,
-                request.data.data,
+                attestation.schema,
+                attestation.data.recipient,
+                attestation.data.expirationTime,
+                attestation.data.revocable,
+                attestation.data.refUID,
+                attestation.data.data,
                 demand.arbiter,
                 demand.demand,
                 expiration,
