@@ -12,6 +12,14 @@ sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
     #[derive(Debug)]
+    ISchemaRegistry,
+    "src/contracts/ISchemaRegistry.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
     IERC20,
     "src/contracts/IERC20.json"
 );
