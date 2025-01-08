@@ -73,12 +73,12 @@ impl AttestationClient {
 
     pub async fn attest(
         &self,
-        request: IEAS::AttestationRequest,
+        attestation: IEAS::AttestationRequest,
     ) -> eyre::Result<TransactionReceipt> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
         let receipt = eas_contract
-            .attest(request)
+            .attest(attestation)
             .send()
             .await?
             .get_receipt()
@@ -89,7 +89,7 @@ impl AttestationClient {
 
     pub async fn create_escrow(
         &self,
-        attestation: contracts::AttestationEscrowObligation::AttestationRequest,
+        attestation: IEAS::AttestationRequest,
         demand: ArbiterData,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
@@ -101,7 +101,7 @@ impl AttestationClient {
         let receipt = attestation_escrow_obligation_contract
             .makeStatement(
                 contracts::AttestationEscrowObligation::StatementData {
-                    attestation,
+                    attestation: attestation.into(),
                     arbiter: demand.arbiter,
                     demand: demand.demand,
                 },
