@@ -3,7 +3,7 @@ use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 
 use crate::contracts::{self};
-use crate::types::Erc721Data;
+use crate::types::{ArbiterData, Erc721Data};
 use crate::{types::WalletProvider, utils};
 
 pub struct Erc721Addresses {
@@ -45,6 +45,59 @@ impl Erc721Client {
 
             addresses: addresses.unwrap_or_default(),
         })
+    }
+
+    pub async fn buy_with_erc721(
+        &self,
+        price: Erc721Data,
+        item: ArbiterData,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let escrow_obligation_contract = contracts::ERC721EscrowObligation::new(
+            self.addresses.escrow_obligation,
+            &self.wallet_provider,
+        );
+
+        let receipt = escrow_obligation_contract
+            .makeStatement(
+                contracts::ERC721EscrowObligation::StatementData {
+                    token: price.address,
+                    tokenId: price.id,
+                    arbiter: item.arbiter,
+                    demand: item.demand,
+                },
+                expiration,
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn pay_with_erc721(
+        &self,
+        price: Erc721Data,
+        payee: Address,
+    ) -> eyre::Result<TransactionReceipt> {
+        let payment_obligation_contract = contracts::ERC721PaymentObligation::new(
+            self.addresses.payment_obligation,
+            &self.wallet_provider,
+        );
+
+        let receipt = payment_obligation_contract
+            .makeStatement(contracts::ERC721PaymentObligation::StatementData {
+                token: price.address,
+                tokenId: price.id,
+                payee,
+            })
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
     }
 
     pub async fn buy_erc_721_for_erc_721(
