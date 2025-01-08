@@ -1,8 +1,8 @@
 const fs = require("fs");
 const path = require("path");
 
-const inputDir = "contracts";
-const outputDir = "contracts/json";
+const inputDir = "src/contracts";
+const outputDir = "src/contracts/json";
 
 // Create output directory if it doesn't exist
 if (!fs.existsSync(outputDir)) {
