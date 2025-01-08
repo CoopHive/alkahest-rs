@@ -3,6 +3,7 @@ use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 
 use crate::contracts::{self};
+use crate::types::{ArbiterData, TokenBundleData};
 use crate::{types::WalletProvider, utils};
 
 pub struct TokenBundleAddresses {
@@ -44,6 +45,48 @@ impl TokenBundleClient {
 
             addresses: addresses.unwrap_or_default(),
         })
+    }
+
+    pub async fn buy_with_bundle(
+        &self,
+        price: TokenBundleData,
+        item: ArbiterData,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let escrow_obligation_contract = contracts::token_bundle::TokenBundleEscrowObligation::new(
+            self.addresses.escrow_obligation,
+            &self.wallet_provider,
+        );
+
+        let receipt = escrow_obligation_contract
+            .makeStatement((price, item).into(), expiration)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn pay_with_erc1155(
+        &self,
+        price: TokenBundleData,
+        payee: Address,
+    ) -> eyre::Result<TransactionReceipt> {
+        let payment_obligation_contract =
+            contracts::token_bundle::TokenBundlePaymentObligation::new(
+                self.addresses.payment_obligation,
+                &self.wallet_provider,
+            );
+
+        let receipt = payment_obligation_contract
+            .makeStatement((price, payee).into())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
     }
 
     pub async fn buy_bundle_for_bundle(
