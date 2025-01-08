@@ -183,3 +183,25 @@ sol!(
     AttestationEscrowObligation2,
     "src/contracts/AttestationEscrowObligation2.json"
 );
+
+impl From<IEAS::AttestationRequestData> for AttestationEscrowObligation::AttestationRequestData {
+    fn from(data: IEAS::AttestationRequestData) -> Self {
+        Self {
+            recipient: data.recipient,
+            expirationTime: data.expirationTime,
+            revocable: data.revocable,
+            refUID: data.refUID,
+            data: data.data,
+            value: data.value,
+        }
+    }
+}
+
+impl From<IEAS::AttestationRequest> for AttestationEscrowObligation::AttestationRequest {
+    fn from(request: IEAS::AttestationRequest) -> Self {
+        Self {
+            schema: request.schema,
+            data: request.data.into(),
+        }
+    }
+}
