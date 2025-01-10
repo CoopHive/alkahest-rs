@@ -156,12 +156,7 @@ impl AttestationClient {
 
         let receipt = barter_utils_contract
             .attestAndCreateEscrow(
-                attestation.schema,
-                attestation.data.recipient,
-                attestation.data.expirationTime,
-                attestation.data.revocable,
-                attestation.data.refUID,
-                attestation.data.data,
+                attestation.into(),
                 demand.arbiter,
                 demand.demand,
                 expiration,
