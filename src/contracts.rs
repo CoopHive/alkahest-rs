@@ -92,6 +92,18 @@ sol!(
     "src/contracts/ERC721BarterUtils.json"
 );
 
+pub mod erc721_barter_cross_token {
+    use alloy::sol;
+
+    sol!(
+        #[allow(missing_docs)]
+        #[sol(rpc)]
+        #[derive(Debug)]
+        ERC721BarterCrossToken,
+        "src/contracts/ERC721BarterCrossToken.json"
+    );
+}
+
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
@@ -115,6 +127,18 @@ sol!(
     ERC1155BarterUtils,
     "src/contracts/ERC1155BarterUtils.json"
 );
+
+pub mod erc1155_barter_cross_token {
+    use alloy::sol;
+
+    sol!(
+        #[allow(missing_docs)]
+        #[sol(rpc)]
+        #[derive(Debug)]
+        ERC1155BarterCrossToken,
+        "src/contracts/ERC1155BarterCrossToken.json"
+    );
+}
 
 sol!(
     #[allow(missing_docs)]
