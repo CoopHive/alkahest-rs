@@ -1,8 +1,7 @@
 use alloy::{
-    primitives::{Address, FixedBytes, Log, B256, U256},
-    providers::{Provider, ProviderBuilder},
+    primitives::{Address, FixedBytes, Log},
+    providers::Provider,
     rpc::types::Filter,
-    sol,
     sol_types::SolEvent,
 };
 use clients::{
