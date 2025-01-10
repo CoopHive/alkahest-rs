@@ -1,12 +1,22 @@
+use alloy::{
+    primitives::{Address, FixedBytes, Log, B256, U256},
+    providers::{Provider, ProviderBuilder},
+    rpc::types::Filter,
+    sol,
+    sol_types::SolEvent,
+};
 use clients::{
     attestation::AttestationClient, erc1155::Erc1155Client, erc20::Erc20Client,
     erc721::Erc721Client, token_bundle::TokenBundleClient,
 };
+use futures_util::StreamExt;
+use sol_types::EscrowClaimed;
 use types::{PublicProvider, WalletProvider};
 
 pub mod clients;
 pub mod config;
 pub mod contracts;
+pub mod sol_types;
 pub mod types;
 pub mod utils;
 
@@ -39,5 +49,30 @@ impl AlkahestClient {
             token_bundle: TokenBundleClient::new(private_key.clone(), rpc_url.clone(), None)?,
             attestation: AttestationClient::new(private_key.clone(), rpc_url.clone(), None)?,
         })
+    }
+
+    pub async fn wait_for_fulfillment(
+        &self,
+        contract_address: Address,
+        buy_attestation: FixedBytes<32>,
+        from_block: Option<u64>,
+    ) -> eyre::Result<Log<EscrowClaimed>> {
+        let filter = Filter::new()
+            .from_block(from_block.unwrap_or(0))
+            .address(contract_address)
+            .event_signature(EscrowClaimed::SIGNATURE_HASH)
+            .topic1(buy_attestation);
+
+        let logs = self.public_provider.get_logs(&filter).await?;
+        if let Some(event) = logs
+            .iter()
+            .collect::<Vec<_>>()
+            .first()
+            .map(|log| log.log_decode::<EscrowClaimed>())
+        {
+            return Ok(event?.inner);
+        }
+
+        Err(eyre::eyre!("No EscrowClaimed event found"))
     }
 }
