@@ -3,7 +3,7 @@ use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 
 use crate::contracts::{self};
-use crate::types::{ArbiterData, Erc1155Data};
+use crate::types::{ApprovalPurpose, ArbiterData, Erc1155Data};
 use crate::{types::WalletProvider, utils};
 
 pub struct Erc1155Addresses {
@@ -45,6 +45,50 @@ impl Erc1155Client {
 
             addresses: addresses.unwrap_or_default(),
         })
+    }
+
+    pub async fn approve_all(
+        &self,
+        token_contract: Address,
+        purpose: ApprovalPurpose,
+    ) -> eyre::Result<TransactionReceipt> {
+        let erc1155_contract = contracts::IERC1155::new(token_contract, &self.wallet_provider);
+
+        let to = match purpose {
+            ApprovalPurpose::Escrow => self.addresses.escrow_obligation,
+            ApprovalPurpose::Payment => self.addresses.payment_obligation,
+        };
+
+        let receipt = erc1155_contract
+            .setApprovalForAll(to, true)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn revoke_all(
+        &self,
+        token_contract: Address,
+        purpose: ApprovalPurpose,
+    ) -> eyre::Result<TransactionReceipt> {
+        let erc1155_contract = contracts::IERC1155::new(token_contract, &self.wallet_provider);
+
+        let to = match purpose {
+            ApprovalPurpose::Escrow => self.addresses.escrow_obligation,
+            ApprovalPurpose::Payment => self.addresses.payment_obligation,
+        };
+
+        let receipt = erc1155_contract
+            .setApprovalForAll(to, false)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
     }
 
     pub async fn buy_with_erc1155(

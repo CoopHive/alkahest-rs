@@ -179,3 +179,8 @@ impl From<(TokenBundleData, ArbiterData)>
         }
     }
 }
+
+pub enum ApprovalPurpose {
+    Escrow,
+    Payment,
+}
