@@ -3,7 +3,9 @@ use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 
 use crate::contracts::{self};
-use crate::types::{ApprovalPurpose, ArbiterData, Erc1155Data};
+use crate::types::{
+    ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData,
+};
 use crate::{types::WalletProvider, utils};
 
 pub struct Erc1155Addresses {
@@ -182,6 +184,92 @@ impl Erc1155Client {
 
         let receipt = barter_utils_contract
             .payErc1155ForErc1155(buy_attestation)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn buy_erc20_with_erc1155(
+        &self,
+        bid: Erc1155Data,
+        ask: Erc20Data,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract =
+            contracts::erc1155_barter_cross_token::ERC1155BarterCrossToken::new(
+                self.addresses.barter_utils,
+                &self.wallet_provider,
+            );
+
+        let receipt = barter_utils_contract
+            .buyErc20WithErc1155(
+                bid.address,
+                bid.id,
+                bid.value,
+                ask.address,
+                ask.value,
+                expiration,
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn buy_erc721_with_erc1155(
+        &self,
+        bid: Erc1155Data,
+        ask: Erc721Data,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract =
+            contracts::erc1155_barter_cross_token::ERC1155BarterCrossToken::new(
+                self.addresses.barter_utils,
+                &self.wallet_provider,
+            );
+
+        let receipt = barter_utils_contract
+            .buyErc721WithErc1155(
+                bid.address,
+                bid.id,
+                bid.value,
+                ask.address,
+                ask.id,
+                expiration,
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn buy_bundle_with_erc1155(
+        &self,
+        bid: Erc1155Data,
+        ask: TokenBundleData,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract =
+            contracts::erc1155_barter_cross_token::ERC1155BarterCrossToken::new(
+                self.addresses.barter_utils,
+                &self.wallet_provider,
+            );
+
+        let receipt = barter_utils_contract
+            .buyBundleWithErc1155(
+                bid.address,
+                bid.id,
+                bid.value,
+                (ask, self.signer.address()).into(),
+                expiration,
+            )
             .send()
             .await?
             .get_receipt()
