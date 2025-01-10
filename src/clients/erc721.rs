@@ -3,7 +3,9 @@ use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 
 use crate::contracts::{self};
-use crate::types::{ApprovalPurpose, ArbiterData, Erc721Data};
+use crate::types::{
+    ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData,
+};
 use crate::{types::WalletProvider, utils};
 
 pub struct Erc721Addresses {
@@ -194,6 +196,84 @@ impl Erc721Client {
 
         let receipt = barter_utils_contract
             .payErc721ForErc721(buy_attestation)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn buy_erc20_with_erc721(
+        &self,
+        bid: Erc721Data,
+        ask: Erc20Data,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract =
+            contracts::erc721_barter_cross_token::ERC721BarterCrossToken::new(
+                self.addresses.barter_utils,
+                &self.wallet_provider,
+            );
+
+        let receipt = barter_utils_contract
+            .buyErc20WithErc721(bid.address, bid.id, ask.address, ask.value, expiration)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn buy_erc1155_with_erc721(
+        &self,
+        bid: Erc721Data,
+        ask: Erc1155Data,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract =
+            contracts::erc721_barter_cross_token::ERC721BarterCrossToken::new(
+                self.addresses.barter_utils,
+                &self.wallet_provider,
+            );
+
+        let receipt = barter_utils_contract
+            .buyErc1155WithErc721(
+                bid.address,
+                bid.id,
+                ask.address,
+                ask.id,
+                ask.value,
+                expiration,
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn buy_bundle_with_erc721(
+        &self,
+        bid: Erc721Data,
+        ask: TokenBundleData,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract =
+            contracts::erc721_barter_cross_token::ERC721BarterCrossToken::new(
+                self.addresses.barter_utils,
+                &self.wallet_provider,
+            );
+
+        let receipt = barter_utils_contract
+            .buyBundleWithErc721(
+                bid.address,
+                bid.id,
+                (ask, self.signer.address()).into(),
+                expiration,
+            )
             .send()
             .await?
             .get_receipt()
