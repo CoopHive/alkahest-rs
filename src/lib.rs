@@ -64,13 +64,21 @@ impl AlkahestClient {
             .topic1(buy_attestation);
 
         let logs = self.public_provider.get_logs(&filter).await?;
-        if let Some(event) = logs
+        if let Some(log) = logs
             .iter()
             .collect::<Vec<_>>()
             .first()
             .map(|log| log.log_decode::<EscrowClaimed>())
         {
-            return Ok(event?.inner);
+            return Ok(log?.inner);
+        }
+
+        let sub = self.public_provider.subscribe_logs(&filter).await?;
+        let mut stream = sub.into_stream();
+
+        while let Some(log) = stream.next().await {
+            let log = log.log_decode::<EscrowClaimed>()?;
+            return Ok(log.inner);
         }
 
         Err(eyre::eyre!("No EscrowClaimed event found"))
