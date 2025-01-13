@@ -6,6 +6,7 @@ use crate::contracts::{self};
 use crate::types::{ArbiterData, TokenBundleData};
 use crate::{types::WalletProvider, utils};
 
+#[derive(Debug, Clone)]
 pub struct TokenBundleAddresses {
     eas: Address,
     barter_utils: Address,

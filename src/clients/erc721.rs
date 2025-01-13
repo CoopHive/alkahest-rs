@@ -8,6 +8,7 @@ use crate::types::{
 };
 use crate::{types::WalletProvider, utils};
 
+#[derive(Debug, Clone)]
 pub struct Erc721Addresses {
     eas: Address,
     barter_utils: Address,

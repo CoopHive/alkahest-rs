@@ -10,6 +10,7 @@ use crate::contracts::{self, ERC20Permit};
 use crate::types::{ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData};
 use crate::{types::WalletProvider, utils};
 
+#[derive(Debug, Clone)]
 pub struct Erc20Addresses {
     eas: Address,
     barter_utils: Address,

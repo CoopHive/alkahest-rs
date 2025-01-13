@@ -7,6 +7,7 @@ use crate::contracts::{self, IEAS};
 use crate::types::ArbiterData;
 use crate::{types::WalletProvider, utils};
 
+#[derive(Debug, Clone)]
 pub struct AttestationAddresses {
     eas: Address,
     eas_schema_registry: Address,
