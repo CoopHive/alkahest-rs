@@ -142,6 +142,45 @@ impl Erc20Client {
         Ok(Some(receipt))
     }
 
+    pub async fn collect_payment(
+        &self,
+        buy_attestation: FixedBytes<32>,
+        fulfillment: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let escrow_contract = contracts::ERC20EscrowObligation::new(
+            self.addresses.escrow_obligation,
+            &self.wallet_provider,
+        );
+
+        let receipt = escrow_contract
+            .collectPayment(buy_attestation, fulfillment)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn collect_expired(
+        &self,
+        buy_attestation: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let escrow_contract = contracts::ERC20EscrowObligation::new(
+            self.addresses.escrow_obligation,
+            &self.wallet_provider,
+        );
+
+        let receipt = escrow_contract
+            .collectExpired(buy_attestation)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
     pub async fn buy_with_erc20(
         &self,
         price: Erc20Data,

@@ -87,6 +87,46 @@ impl AttestationClient {
         Ok(receipt)
     }
 
+    pub async fn collect_payment(
+        &self,
+        buy_attestation: FixedBytes<32>,
+        fulfillment: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let escrow_contract = contracts::AttestationEscrowObligation::new(
+            self.addresses.escrow_obligation,
+            &self.wallet_provider,
+        );
+
+        let receipt = escrow_contract
+            .collectPayment(buy_attestation, fulfillment)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn collect_payment_2(
+        &self,
+        buy_attestation: FixedBytes<32>,
+        fulfillment: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let escrow_contract = contracts::AttestationEscrowObligation2::new(
+            self.addresses.escrow_obligation_2,
+            &self.wallet_provider,
+        );
+
+        let receipt = escrow_contract
+            .collectPayment(buy_attestation, fulfillment)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
     pub async fn create_escrow(
         &self,
         attestation: IEAS::AttestationRequest,
