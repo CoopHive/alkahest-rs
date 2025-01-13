@@ -1,4 +1,4 @@
-use alloy::primitives::{address, Address, FixedBytes};
+use alloy::primitives::{address, Address, Bytes, FixedBytes};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 
@@ -68,7 +68,7 @@ impl TokenBundleClient {
         Ok(receipt)
     }
 
-    pub async fn pay_with_erc1155(
+    pub async fn pay_with_bundle(
         &self,
         price: TokenBundleData,
         payee: Address,
@@ -91,8 +91,8 @@ impl TokenBundleClient {
 
     pub async fn buy_bundle_for_bundle(
         &self,
-        bid: contracts::TokenBundleEscrowObligation::StatementData,
-        ask: contracts::TokenBundlePaymentObligation::StatementData,
+        bid: TokenBundleData,
+        ask: TokenBundleData,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let barter_utils_contract = contracts::TokenBundleBarterUtils::new(
@@ -100,8 +100,17 @@ impl TokenBundleClient {
             &self.wallet_provider,
         );
 
+        let zero_arbiter = ArbiterData {
+            arbiter: Address::ZERO,
+            demand: Bytes::new(),
+        };
+
         let receipt = barter_utils_contract
-            .buyBundleForBundle(bid, ask, expiration)
+            .buyBundleForBundle(
+                (bid, zero_arbiter).into(),
+                (ask, self.signer.address()).into(),
+                expiration,
+            )
             .send()
             .await?
             .get_receipt()
