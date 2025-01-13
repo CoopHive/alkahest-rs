@@ -64,24 +64,26 @@ macro_rules! impl_payment_obligation {
     };
 }
 
-impl From<(TokenBundleData, ArbiterData)>
-    for contracts::token_bundle::TokenBundleEscrowObligation::StatementData
-{
-    fn from((bundle, arbiter_data): (TokenBundleData, ArbiterData)) -> Self {
-        let components = bundle.into_bundle_components();
+macro_rules! impl_escrow_obligation {
+    ($target:path) => {
+        impl From<(TokenBundleData, ArbiterData)> for $target {
+            fn from((bundle, arbiter_data): (TokenBundleData, ArbiterData)) -> Self {
+                let components = bundle.into_bundle_components();
 
-        Self {
-            erc20Tokens: components.0,
-            erc20Amounts: components.1,
-            erc721Tokens: components.2,
-            erc721TokenIds: components.3,
-            erc1155Tokens: components.4,
-            erc1155TokenIds: components.5,
-            erc1155Amounts: components.6,
-            arbiter: arbiter_data.arbiter,
-            demand: arbiter_data.demand,
+                Self {
+                    erc20Tokens: components.0,
+                    erc20Amounts: components.1,
+                    erc721Tokens: components.2,
+                    erc721TokenIds: components.3,
+                    erc1155Tokens: components.4,
+                    erc1155TokenIds: components.5,
+                    erc1155Amounts: components.6,
+                    arbiter: arbiter_data.arbiter,
+                    demand: arbiter_data.demand,
+                }
+            }
         }
-    }
+    };
 }
 
 impl_payment_obligation!(contracts::token_bundle::TokenBundlePaymentObligation::StatementData);
@@ -94,6 +96,10 @@ impl_payment_obligation!(
 impl_payment_obligation!(
     contracts::erc1155_barter_cross_token::TokenBundlePaymentObligation::StatementData
 );
+impl_payment_obligation!(contracts::TokenBundlePaymentObligation::StatementData);
+
+impl_escrow_obligation!(contracts::token_bundle::TokenBundleEscrowObligation::StatementData);
+impl_escrow_obligation!(contracts::TokenBundleEscrowObligation::StatementData);
 
 macro_rules! impl_attestation_request {
     ($target:ident) => {
