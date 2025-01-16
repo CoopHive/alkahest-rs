@@ -189,7 +189,7 @@ impl Erc1155Client {
         Ok(receipt)
     }
 
-    pub async fn buy_erc_1155_for_erc_1155(
+    pub async fn buy_erc1155_for_erc1155(
         &self,
         bid: Erc1155Data,
         ask: Erc1155Data,
@@ -216,7 +216,7 @@ impl Erc1155Client {
         Ok(receipt)
     }
 
-    pub async fn pay_erc_1155_for_erc_1155(
+    pub async fn pay_erc1155_for_erc1155(
         &self,
         buy_attestation: FixedBytes<32>,
     ) -> eyre::Result<TransactionReceipt> {
