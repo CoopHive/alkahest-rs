@@ -9,13 +9,14 @@ use crate::{types::WalletProvider, utils};
 
 #[derive(Debug, Clone)]
 pub struct AttestationAddresses {
-    eas: Address,
-    eas_schema_registry: Address,
-    barter_utils: Address,
-    escrow_obligation: Address,
-    escrow_obligation_2: Address,
+    pub eas: Address,
+    pub eas_schema_registry: Address,
+    pub barter_utils: Address,
+    pub escrow_obligation: Address,
+    pub escrow_obligation_2: Address,
 }
 
+#[derive(Clone)]
 pub struct AttestationClient {
     signer: PrivateKeySigner,
     wallet_provider: WalletProvider,

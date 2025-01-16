@@ -12,12 +12,13 @@ use crate::{types::WalletProvider, utils};
 
 #[derive(Debug, Clone)]
 pub struct Erc20Addresses {
-    eas: Address,
-    barter_utils: Address,
-    escrow_obligation: Address,
-    payment_obligation: Address,
+    pub eas: Address,
+    pub barter_utils: Address,
+    pub escrow_obligation: Address,
+    pub payment_obligation: Address,
 }
 
+#[derive(Clone)]
 pub struct Erc20Client {
     signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
@@ -589,7 +590,6 @@ impl Erc20Client {
         &self,
         bid: Erc20Data,
         ask: TokenBundleData,
-        payee: Address,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
@@ -610,7 +610,7 @@ impl Erc20Client {
             .permitAndBuyBundleWithErc20(
                 bid.address,
                 bid.value,
-                (ask, payee).into(),
+                (ask, self.signer.address()).into(),
                 expiration,
                 deadline.try_into()?,
                 permit.v().into(),

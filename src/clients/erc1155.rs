@@ -10,12 +10,13 @@ use crate::{types::WalletProvider, utils};
 
 #[derive(Debug, Clone)]
 pub struct Erc1155Addresses {
-    eas: Address,
-    barter_utils: Address,
-    escrow_obligation: Address,
-    payment_obligation: Address,
+    pub eas: Address,
+    pub barter_utils: Address,
+    pub escrow_obligation: Address,
+    pub payment_obligation: Address,
 }
 
+#[derive(Clone)]
 pub struct Erc1155Client {
     signer: PrivateKeySigner,
     wallet_provider: WalletProvider,

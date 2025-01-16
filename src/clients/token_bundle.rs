@@ -8,12 +8,13 @@ use crate::{types::WalletProvider, utils};
 
 #[derive(Debug, Clone)]
 pub struct TokenBundleAddresses {
-    eas: Address,
-    barter_utils: Address,
-    escrow_obligation: Address,
-    payment_obligation: Address,
+    pub eas: Address,
+    pub barter_utils: Address,
+    pub escrow_obligation: Address,
+    pub payment_obligation: Address,
 }
 
+#[derive(Clone)]
 pub struct TokenBundleClient {
     signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
