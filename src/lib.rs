@@ -31,6 +31,7 @@ pub struct AddressConfig {
     pub attestation_addresses: Option<AttestationAddresses>,
 }
 
+#[derive(Clone)]
 pub struct AlkahestClient {
     wallet_provider: WalletProvider,
     public_provider: PublicProvider,
