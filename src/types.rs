@@ -8,11 +8,8 @@ use alloy::{
         },
         Identity, RootProvider,
     },
-    sol,
     transports::http::{Client, Http},
 };
-
-use crate::contracts;
 
 pub type WalletProvider = FillProvider<
     JoinFill<
