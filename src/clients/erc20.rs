@@ -7,7 +7,9 @@ use alloy::signers::{Signature, Signer};
 use alloy::sol_types::{SolEvent, SolValue};
 
 use crate::contracts::{self, ERC20Permit};
-use crate::types::{ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData};
+use crate::types::{
+    ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData,
+};
 use crate::{types::WalletProvider, utils};
 
 #[derive(Debug, Clone)]
@@ -105,12 +107,17 @@ impl Erc20Client {
 
     pub async fn approve(
         &self,
-        spender: Address,
         token: Erc20Data,
+        purpose: ApprovalPurpose,
     ) -> eyre::Result<TransactionReceipt> {
+        let to = match purpose {
+            ApprovalPurpose::Payment => self.addresses.payment_obligation,
+            ApprovalPurpose::Escrow => self.addresses.escrow_obligation,
+        };
+
         let token_contract = ERC20Permit::new(token.address, &self.wallet_provider);
         let receipt = token_contract
-            .approve(spender, token.value)
+            .approve(to, token.value)
             .send()
             .await?
             .get_receipt()
@@ -120,12 +127,17 @@ impl Erc20Client {
 
     pub async fn approve_if_less(
         &self,
-        spender: Address,
         token: Erc20Data,
+        purpose: ApprovalPurpose,
     ) -> eyre::Result<Option<TransactionReceipt>> {
+        let to = match purpose {
+            ApprovalPurpose::Payment => self.addresses.payment_obligation,
+            ApprovalPurpose::Escrow => self.addresses.escrow_obligation,
+        };
+
         let token_contract = ERC20Permit::new(token.address, &self.wallet_provider);
         let current_allowance = token_contract
-            .allowance(self.signer.address(), spender)
+            .allowance(self.signer.address(), to)
             .call()
             .await?
             ._0;
@@ -135,7 +147,7 @@ impl Erc20Client {
         }
 
         let receipt = token_contract
-            .approve(spender, token.value)
+            .approve(to, token.value)
             .send()
             .await?
             .get_receipt()
