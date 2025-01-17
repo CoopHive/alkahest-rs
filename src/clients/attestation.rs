@@ -29,9 +29,9 @@ impl Default for AttestationAddresses {
         Self {
             eas: address!("4200000000000000000000000000000000000021"),
             eas_schema_registry: address!("4200000000000000000000000000000000000020"),
-            barter_utils: address!("3A40F65D2589a43Dc057bf820D8626F87D95307c"),
-            escrow_obligation: address!("248cd93922eBDf962c9ea10286E6566C75081948"),
-            escrow_obligation_2: address!("702fab66515b3313dFd41E7CE70C2aF0033E2356"),
+            barter_utils: address!("907b9cf8faA5d1cBF052bCE82DFA22eB8E1431c9"),
+            escrow_obligation: address!("D181642bccb8D74c18C15cCd308Bd5618F7dE528"),
+            escrow_obligation_2: address!("A4F18f0aa351DD2FF67CA29b1329bd21a9Ee0C92"),
         }
     }
 }

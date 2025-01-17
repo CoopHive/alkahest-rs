@@ -28,9 +28,9 @@ impl Default for Erc721Addresses {
     fn default() -> Self {
         Self {
             eas: address!("4200000000000000000000000000000000000021"),
-            barter_utils: address!("3A40F65D2589a43Dc057bf820D8626F87D95307c"),
-            escrow_obligation: address!("248cd93922eBDf962c9ea10286E6566C75081948"),
-            payment_obligation: address!("702fab66515b3313dFd41E7CE70C2aF0033E2356"),
+            barter_utils: address!("AfBaacEA69961C892797ceA7A8457dBA57568Ebb"),
+            escrow_obligation: address!("868e59ecd79067087Cac7447061b1436eD6C9417"),
+            payment_obligation: address!("0F13f5c62D88BE6C85205A1A010511BF54269615"),
         }
     }
 }

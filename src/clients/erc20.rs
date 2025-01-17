@@ -32,9 +32,9 @@ impl Default for Erc20Addresses {
     fn default() -> Self {
         Self {
             eas: address!("4200000000000000000000000000000000000021"),
-            barter_utils: address!("3A40F65D2589a43Dc057bf820D8626F87D95307c"),
-            escrow_obligation: address!("248cd93922eBDf962c9ea10286E6566C75081948"),
-            payment_obligation: address!("702fab66515b3313dFd41E7CE70C2aF0033E2356"),
+            barter_utils: address!("E352c64993D891719873a36B4225e31085794fde"),
+            escrow_obligation: address!("66F9e3Fa7CFc472fB61a3F61bE42558c80C0FC72"),
+            payment_obligation: address!("417b73fF013c5E47639816c037e89aE053FD4A63"),
         }
     }
 }

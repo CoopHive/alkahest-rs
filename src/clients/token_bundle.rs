@@ -26,9 +26,9 @@ impl Default for TokenBundleAddresses {
     fn default() -> Self {
         Self {
             eas: address!("4200000000000000000000000000000000000021"),
-            barter_utils: address!("3A40F65D2589a43Dc057bf820D8626F87D95307c"),
-            escrow_obligation: address!("248cd93922eBDf962c9ea10286E6566C75081948"),
-            payment_obligation: address!("702fab66515b3313dFd41E7CE70C2aF0033E2356"),
+            barter_utils: address!("95E18d489c60404e6D659584f51457c3744ba8f8"),
+            escrow_obligation: address!("7cCE97b9552dFf0105eC96A46f5721764a24D9AC"),
+            payment_obligation: address!("678f5601fe66485CEeD3d41D7385983881411c70"),
         }
     }
 }
