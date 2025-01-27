@@ -89,22 +89,6 @@ impl Erc20Client {
         Ok(signature)
     }
 
-    pub fn get_attested_event(
-        receipt: TransactionReceipt,
-    ) -> eyre::Result<Log<contracts::IEAS::Attested>> {
-        let attested_event = receipt
-            .inner
-            .logs()
-            .iter()
-            .filter(|log| log.topic0() == Some(&contracts::IEAS::Attested::SIGNATURE_HASH))
-            .collect::<Vec<_>>()
-            .first()
-            .map(|log| log.log_decode::<contracts::IEAS::Attested>())
-            .ok_or_else(|| eyre::eyre!("No Attested event found"))??;
-
-        Ok(attested_event.inner)
-    }
-
     pub async fn approve(
         &self,
         token: Erc20Data,
@@ -503,6 +487,77 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    pub async fn pay_erc20_for_erc721(
+        &self,
+        buy_attestation: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract = contracts::erc20_barter_cross_token::ERC20BarterCrossToken::new(
+            self.addresses.barter_utils,
+            &self.wallet_provider,
+        );
+
+        let receipt = barter_utils_contract
+            .payErc20ForErc721(buy_attestation)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn permit_and_pay_erc20_for_erc721(
+        &self,
+        buy_attestation: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+        let barter_utils_contract = contracts::erc20_barter_cross_token::ERC20BarterCrossToken::new(
+            self.addresses.barter_utils,
+            &self.wallet_provider,
+        );
+
+        let buy_attestation_data = eas_contract
+            .getAttestation(buy_attestation)
+            .call()
+            .await?
+            ._0;
+        let buy_attestation_data = contracts::ERC721EscrowObligation::StatementData::abi_decode(
+            buy_attestation_data.data.as_ref(),
+            true,
+        )?;
+        let demand_data = contracts::ERC20PaymentObligation::StatementData::abi_decode(
+            buy_attestation_data.demand.as_ref(),
+            true,
+        )?;
+
+        let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
+        let permit = self
+            .get_permit_signature(
+                self.addresses.payment_obligation,
+                Erc20Data {
+                    address: demand_data.token,
+                    value: demand_data.amount,
+                },
+                deadline.try_into()?,
+            )
+            .await?;
+
+        let receipt = barter_utils_contract
+            .permitAndPayErc20ForErc721(
+                buy_attestation,
+                deadline.try_into()?,
+                permit.v().into(),
+                permit.r().into(),
+                permit.s().into(),
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
     pub async fn buy_erc1155_for_erc20(
         &self,
         bid: Erc20Data,
@@ -572,6 +627,77 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    pub async fn pay_erc20_for_erc1155(
+        &self,
+        buy_attestation: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract = contracts::erc20_barter_cross_token::ERC20BarterCrossToken::new(
+            self.addresses.barter_utils,
+            &self.wallet_provider,
+        );
+
+        let receipt = barter_utils_contract
+            .payErc20ForErc1155(buy_attestation)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn permit_and_pay_erc20_for_erc1155(
+        &self,
+        buy_attestation: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+        let barter_utils_contract = contracts::erc20_barter_cross_token::ERC20BarterCrossToken::new(
+            self.addresses.barter_utils,
+            &self.wallet_provider,
+        );
+
+        let buy_attestation_data = eas_contract
+            .getAttestation(buy_attestation)
+            .call()
+            .await?
+            ._0;
+        let buy_attestation_data = contracts::ERC1155EscrowObligation::StatementData::abi_decode(
+            buy_attestation_data.data.as_ref(),
+            true,
+        )?;
+        let demand_data = contracts::ERC20PaymentObligation::StatementData::abi_decode(
+            buy_attestation_data.demand.as_ref(),
+            true,
+        )?;
+
+        let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
+        let permit = self
+            .get_permit_signature(
+                self.addresses.payment_obligation,
+                Erc20Data {
+                    address: demand_data.token,
+                    value: demand_data.amount,
+                },
+                deadline.try_into()?,
+            )
+            .await?;
+
+        let receipt = barter_utils_contract
+            .permitAndPayErc20ForErc1155(
+                buy_attestation,
+                deadline.try_into()?,
+                permit.v().into(),
+                permit.r().into(),
+                permit.s().into(),
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
     pub async fn buy_bundle_for_erc20(
         &self,
         bid: Erc20Data,
@@ -624,6 +750,78 @@ impl Erc20Client {
                 bid.value,
                 (ask, self.signer.address()).into(),
                 expiration,
+                deadline.try_into()?,
+                permit.v().into(),
+                permit.r().into(),
+                permit.s().into(),
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn pay_erc20_for_bundle(
+        &self,
+        buy_attestation: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract = contracts::erc20_barter_cross_token::ERC20BarterCrossToken::new(
+            self.addresses.barter_utils,
+            &self.wallet_provider,
+        );
+
+        let receipt = barter_utils_contract
+            .payErc20ForBundle(buy_attestation)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn permit_and_pay_erc20_for_bundle(
+        &self,
+        buy_attestation: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+        let barter_utils_contract = contracts::erc20_barter_cross_token::ERC20BarterCrossToken::new(
+            self.addresses.barter_utils,
+            &self.wallet_provider,
+        );
+
+        let buy_attestation_data = eas_contract
+            .getAttestation(buy_attestation)
+            .call()
+            .await?
+            ._0;
+        let buy_attestation_data =
+            contracts::TokenBundleEscrowObligation::StatementData::abi_decode(
+                buy_attestation_data.data.as_ref(),
+                true,
+            )?;
+        let demand_data = contracts::ERC20PaymentObligation::StatementData::abi_decode(
+            buy_attestation_data.demand.as_ref(),
+            true,
+        )?;
+
+        let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
+        let permit = self
+            .get_permit_signature(
+                self.addresses.payment_obligation,
+                Erc20Data {
+                    address: demand_data.token,
+                    value: demand_data.amount,
+                },
+                deadline.try_into()?,
+            )
+            .await?;
+
+        let receipt = barter_utils_contract
+            .permitAndPayErc20ForBundle(
+                buy_attestation,
                 deadline.try_into()?,
                 permit.v().into(),
                 permit.r().into(),
