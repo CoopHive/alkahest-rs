@@ -267,6 +267,26 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    pub async fn pay_erc721_for_erc20(
+        &self,
+        buy_attestation: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract =
+            contracts::erc721_barter_cross_token::ERC721BarterCrossToken::new(
+                self.addresses.barter_utils,
+                &self.wallet_provider,
+            );
+
+        let receipt = barter_utils_contract
+            .payErc721ForErc20(buy_attestation)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
     pub async fn buy_erc1155_with_erc721(
         &self,
         bid: Erc721Data,
@@ -296,6 +316,26 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    pub async fn pay_erc721_for_erc1155(
+        &self,
+        buy_attestation: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract =
+            contracts::erc721_barter_cross_token::ERC721BarterCrossToken::new(
+                self.addresses.barter_utils,
+                &self.wallet_provider,
+            );
+
+        let receipt = barter_utils_contract
+            .payErc721ForErc1155(buy_attestation)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
     pub async fn buy_bundle_with_erc721(
         &self,
         bid: Erc721Data,
@@ -315,6 +355,26 @@ impl Erc721Client {
                 (ask, self.signer.address()).into(),
                 expiration,
             )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn pay_erc721_for_bundle(
+        &self,
+        buy_attestation: FixedBytes<32>,
+    ) -> eyre::Result<TransactionReceipt> {
+        let barter_utils_contract =
+            contracts::erc721_barter_cross_token::ERC721BarterCrossToken::new(
+                self.addresses.barter_utils,
+                &self.wallet_provider,
+            );
+
+        let receipt = barter_utils_contract
+            .payErc721ForBundle(buy_attestation)
             .send()
             .await?
             .get_receipt()
