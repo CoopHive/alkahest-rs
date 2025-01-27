@@ -1,7 +1,7 @@
 use alloy::{
     primitives::{Address, FixedBytes, Log},
     providers::Provider,
-    rpc::types::Filter,
+    rpc::types::{Filter, TransactionReceipt},
     sol_types::SolEvent,
 };
 use clients::{
@@ -74,6 +74,22 @@ impl AlkahestClient {
         })
     }
 
+    pub fn get_attested_event(
+        receipt: TransactionReceipt,
+    ) -> eyre::Result<Log<contracts::IEAS::Attested>> {
+        let attested_event = receipt
+            .inner
+            .logs()
+            .iter()
+            .filter(|log| log.topic0() == Some(&contracts::IEAS::Attested::SIGNATURE_HASH))
+            .collect::<Vec<_>>()
+            .first()
+            .map(|log| log.log_decode::<contracts::IEAS::Attested>())
+            .ok_or_else(|| eyre::eyre!("No Attested event found"))??;
+
+        Ok(attested_event.inner)
+    }
+
     pub async fn wait_for_fulfillment(
         &self,
         contract_address: Address,
@@ -99,7 +115,7 @@ impl AlkahestClient {
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let mut stream = sub.into_stream();
 
-        while let Some(log) = stream.next().await {
+        if let Some(log) = stream.next().await {
             let log = log.log_decode::<EscrowClaimed>()?;
             return Ok(log.inner);
         }
