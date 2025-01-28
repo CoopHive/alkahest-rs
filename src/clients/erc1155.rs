@@ -27,10 +27,10 @@ pub struct Erc1155Client {
 impl Default for Erc1155Addresses {
     fn default() -> Self {
         Self {
-            eas: address!("4200000000000000000000000000000000000021"),
-            barter_utils: address!("8a7373437dCD3D4448a663600Be058Bd3239245F"),
-            escrow_obligation: address!("93B7D9cdD97887a8f7603c77F12938bf3d1331F6"),
-            payment_obligation: address!("1395A7b129503E23eDAa7823b5F5994D65a26BF0"),
+            eas: address!("0x4200000000000000000000000000000000000021"),
+            barter_utils: address!("0x44171612Cc538Df11ebc1F69d12F4368D101F7C9"),
+            escrow_obligation: address!("0xcE130d800E247e483d28bc445aDE604304Ee79Db"),
+            payment_obligation: address!("0x2A219299071E6065C98c0c8f9de46D251b156275"),
         }
     }
 }

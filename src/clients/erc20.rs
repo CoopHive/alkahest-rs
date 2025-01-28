@@ -31,10 +31,10 @@ pub struct Erc20Client {
 impl Default for Erc20Addresses {
     fn default() -> Self {
         Self {
-            eas: address!("4200000000000000000000000000000000000021"),
-            barter_utils: address!("e73248934009d9eb2482f47eD99BC79D56FA4099"),
-            escrow_obligation: address!("66F9e3Fa7CFc472fB61a3F61bE42558c80C0FC72"),
-            payment_obligation: address!("417b73fF013c5E47639816c037e89aE053FD4A63"),
+            eas: address!("0x4200000000000000000000000000000000000021"),
+            barter_utils: address!("0xCE27f70e9506e89E537E6e1458169f1Af72f7436"),
+            escrow_obligation: address!("0xCfcC19597F0566B2cfD4F317D7A4081Ef406a0b4"),
+            payment_obligation: address!("0xF61D0386563Fc8C1F7fEe1B7e0DaD126DE74CD1f"),
         }
     }
 }
@@ -833,5 +833,60 @@ impl Erc20Client {
             .await?;
 
         Ok(receipt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use crate::{
+        types::{ApprovalPurpose, Erc20Data},
+        AlkahestClient,
+    };
+
+    use alloy::primitives::address;
+    use eyre::Result;
+
+    #[tokio::test]
+    async fn test_erc20_escrow() -> Result<()> {
+        let client = AlkahestClient::new(
+            env::var("PRIVATE_KEY")?.as_str(),
+            env::var("RPC_URL")?.as_str(),
+            None,
+        )?;
+
+        let usdc = address!("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
+
+        client
+            .erc20
+            .approve(
+                Erc20Data {
+                    address: usdc,
+                    value: 100.try_into()?,
+                },
+                ApprovalPurpose::Escrow,
+            )
+            .await?;
+
+        let receipt = client
+            .erc20
+            .buy_erc20_for_erc20(
+                Erc20Data {
+                    address: usdc,
+                    value: 100.try_into()?,
+                },
+                Erc20Data {
+                    address: usdc,
+                    value: 100.try_into()?,
+                },
+                0,
+            )
+            .await?;
+
+        let attested = AlkahestClient::get_attested_event(receipt);
+        println!("{:?}", attested);
+
+        Ok(())
     }
 }

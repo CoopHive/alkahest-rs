@@ -27,11 +27,11 @@ pub struct AttestationClient {
 impl Default for AttestationAddresses {
     fn default() -> Self {
         Self {
-            eas: address!("4200000000000000000000000000000000000021"),
-            eas_schema_registry: address!("4200000000000000000000000000000000000020"),
-            barter_utils: address!("907b9cf8faA5d1cBF052bCE82DFA22eB8E1431c9"),
-            escrow_obligation: address!("D181642bccb8D74c18C15cCd308Bd5618F7dE528"),
-            escrow_obligation_2: address!("A4F18f0aa351DD2FF67CA29b1329bd21a9Ee0C92"),
+            eas: address!("0x4200000000000000000000000000000000000021"),
+            eas_schema_registry: address!("0x4200000000000000000000000000000000000020"),
+            barter_utils: address!("0x98438Ad9CeAfbc52d11A4fac4a33103386217D55"),
+            escrow_obligation: address!("0x1B95DF3Ffe9b4fFcE4468517632DB91add0C6561"),
+            escrow_obligation_2: address!("0x4D8ec7fb17ed40B461fAa224FA107b99F7A489D1"),
         }
     }
 }
