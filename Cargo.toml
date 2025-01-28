@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Rust SDK to Alkahest contracts for decentralized escrow and exchange"
 license = "MIT"
+repository = "https://github.com/CoopHive/alkahest-rs"
 
 [dependencies]
 alloy = { version = "0.9.2", features = ["full"] }
