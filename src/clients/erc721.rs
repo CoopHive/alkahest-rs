@@ -21,27 +21,28 @@ pub struct Erc721Client {
     signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
 
-    addresses: Erc721Addresses,
+    pub addresses: Erc721Addresses,
 }
 
 impl Default for Erc721Addresses {
     fn default() -> Self {
         Self {
             eas: address!("0x4200000000000000000000000000000000000021"),
-            barter_utils: address!("0xedCc946e6a77B2c6482c2273a2Ac88F9Cd4B99B8"),
-            escrow_obligation: address!("0x40Ca80068204B1461258123d9421c06f823B081F"),
-            payment_obligation: address!("0x3F626c34A26CEE9df17485a7264a0C0D9A8ED2ce"),
+            barter_utils: address!("0xf6F3902bA8b2C45F0dde04EDA14D39045249d867"),
+            escrow_obligation: address!("0x73BE84B7cfc60Cea4E953A20ABf138b08B718127"),
+            payment_obligation: address!("0x252424a080BA400196Bd3e7Aa7e2e8118e916bf7"),
         }
     }
 }
 
 impl Erc721Client {
-    pub fn new(
+    pub async fn new(
         private_key: impl ToString + Clone,
         rpc_url: impl ToString + Clone,
         addresses: Option<Erc721Addresses>,
     ) -> eyre::Result<Self> {
-        let wallet_provider = utils::get_wallet_provider(private_key.clone(), rpc_url.clone())?;
+        let wallet_provider =
+            utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
 
         Ok(Erc721Client {
             signer: private_key.to_string().parse()?,

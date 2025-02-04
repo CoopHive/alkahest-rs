@@ -19,27 +19,28 @@ pub struct TokenBundleClient {
     signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
 
-    addresses: TokenBundleAddresses,
+    pub addresses: TokenBundleAddresses,
 }
 
 impl Default for TokenBundleAddresses {
     fn default() -> Self {
         Self {
             eas: address!("0x4200000000000000000000000000000000000021"),
-            barter_utils: address!("0xAcdACcEb54E1C35718aAeeA2bf6efd9bDAAe22cc"),
-            escrow_obligation: address!("0x45216668f26FDD653B255Ae1F8fc66b2ba7835aD"),
-            payment_obligation: address!("0x3f61a744f6a60D2B798D234b9b8aB744dA56c225"),
+            barter_utils: address!("0x013C2c98Be06b48f271BdF0469eFa6e89d37BA7A"),
+            escrow_obligation: address!("0xc282ec5E2585dc1696471adf4A9f5b3a151359c9"),
+            payment_obligation: address!("0x797C365B6A1300c13001a6D0FDF2ea0684b5BCcD"),
         }
     }
 }
 
 impl TokenBundleClient {
-    pub fn new(
+    pub async fn new(
         private_key: impl ToString + Clone,
         rpc_url: impl ToString + Clone,
         addresses: Option<TokenBundleAddresses>,
     ) -> eyre::Result<Self> {
-        let wallet_provider = utils::get_wallet_provider(private_key.clone(), rpc_url.clone())?;
+        let wallet_provider =
+            utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
 
         Ok(TokenBundleClient {
             signer: private_key.to_string().parse()?,

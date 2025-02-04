@@ -3,6 +3,7 @@ use alloy::primitives::{address, Address};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 
+use crate::contracts::IEAS::Attestation;
 use crate::contracts::{self, IEAS};
 use crate::types::ArbiterData;
 use crate::{types::WalletProvider, utils};
@@ -21,7 +22,7 @@ pub struct AttestationClient {
     signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
 
-    addresses: AttestationAddresses,
+    pub addresses: AttestationAddresses,
 }
 
 impl Default for AttestationAddresses {
@@ -29,20 +30,21 @@ impl Default for AttestationAddresses {
         Self {
             eas: address!("0x4200000000000000000000000000000000000021"),
             eas_schema_registry: address!("0x4200000000000000000000000000000000000020"),
-            barter_utils: address!("0x98438Ad9CeAfbc52d11A4fac4a33103386217D55"),
-            escrow_obligation: address!("0x1B95DF3Ffe9b4fFcE4468517632DB91add0C6561"),
-            escrow_obligation_2: address!("0x4D8ec7fb17ed40B461fAa224FA107b99F7A489D1"),
+            barter_utils: address!("0x3C905a7121fb72a4D69Ca8860a93530A88E92f87"),
+            escrow_obligation: address!("0x63E8031DA08f6852Abe7bDc4C056903C7863cb7c"),
+            escrow_obligation_2: address!("0x4200637A112ba709Fe4a5fe315128879a8Bf4082"),
         }
     }
 }
 
 impl AttestationClient {
-    pub fn new(
+    pub async fn new(
         private_key: impl ToString + Clone,
         rpc_url: impl ToString + Clone,
         addresses: Option<AttestationAddresses>,
     ) -> eyre::Result<Self> {
-        let wallet_provider = utils::get_wallet_provider(private_key.clone(), rpc_url.clone())?;
+        let wallet_provider =
+            utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
 
         Ok(AttestationClient {
             signer: private_key.to_string().parse()?,
@@ -50,6 +52,13 @@ impl AttestationClient {
 
             addresses: addresses.unwrap_or_default(),
         })
+    }
+
+    pub async fn get_attestation(&self, uid: FixedBytes<32>) -> eyre::Result<Attestation> {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+
+        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        Ok(attestation)
     }
 
     pub async fn register_schema(
