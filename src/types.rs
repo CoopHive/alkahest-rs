@@ -8,7 +8,7 @@ use alloy::{
         },
         Identity, RootProvider,
     },
-    transports::http::{Client, Http},
+    pubsub::PubSubFrontend,
 };
 
 pub type WalletProvider = FillProvider<
@@ -19,8 +19,8 @@ pub type WalletProvider = FillProvider<
         >,
         WalletFiller<EthereumWallet>,
     >,
-    RootProvider<Http<Client>>,
-    Http<Client>,
+    RootProvider<PubSubFrontend>,
+    PubSubFrontend,
     Ethereum,
 >;
 
@@ -29,8 +29,8 @@ pub type PublicProvider = FillProvider<
         Identity,
         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
     >,
-    RootProvider<Http<Client>>,
-    Http<Client>,
+    RootProvider<PubSubFrontend>,
+    PubSubFrontend,
     Ethereum,
 >;
 
