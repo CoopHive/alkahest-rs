@@ -2,6 +2,7 @@ use alloy::{
     primitives::{Address, FixedBytes, Log},
     providers::Provider,
     rpc::types::{Filter, TransactionReceipt},
+    signers::local::PrivateKeySigner,
     sol_types::SolEvent,
 };
 use clients::{
@@ -33,9 +34,10 @@ pub struct AddressConfig {
 
 #[derive(Clone)]
 pub struct AlkahestClient {
-    wallet_provider: WalletProvider,
-    public_provider: PublicProvider,
+    pub wallet_provider: WalletProvider,
+    pub public_provider: PublicProvider,
 
+    pub address: Address,
     pub erc20: Erc20Client,
     pub erc721: Erc721Client,
     pub erc1155: Erc1155Client,
@@ -44,13 +46,15 @@ pub struct AlkahestClient {
 }
 
 impl AlkahestClient {
-    pub fn new(
+    pub async fn new(
         private_key: impl ToString + Clone,
         rpc_url: impl ToString + Clone,
         addresses: Option<AddressConfig>,
     ) -> eyre::Result<Self> {
-        let wallet_provider = utils::get_wallet_provider(private_key.clone(), rpc_url.clone())?;
-        let public_provider = utils::get_public_provider(rpc_url.clone())?;
+        let wallet_provider =
+            utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
+        let public_provider = utils::get_public_provider(rpc_url.clone()).await?;
+        let signer: PrivateKeySigner = private_key.to_string().parse()?;
 
         macro_rules! make_client {
             ($client:ident, $addresses:ident) => {
@@ -66,11 +70,12 @@ impl AlkahestClient {
             wallet_provider: wallet_provider.clone(),
             public_provider: public_provider.clone(),
 
-            erc20: make_client!(Erc20Client, erc20_addresses)?,
-            erc721: make_client!(Erc721Client, erc721_addresses)?,
-            erc1155: make_client!(Erc1155Client, erc1155_addresses)?,
-            token_bundle: make_client!(TokenBundleClient, token_bundle_addresses)?,
-            attestation: make_client!(AttestationClient, attestation_addresses)?,
+            address: signer.address(),
+            erc20: make_client!(Erc20Client, erc20_addresses).await?,
+            erc721: make_client!(Erc721Client, erc721_addresses).await?,
+            erc1155: make_client!(Erc1155Client, erc1155_addresses).await?,
+            token_bundle: make_client!(TokenBundleClient, token_bundle_addresses).await?,
+            attestation: make_client!(AttestationClient, attestation_addresses).await?,
         })
     }
 
@@ -103,6 +108,7 @@ impl AlkahestClient {
             .topic1(buy_attestation);
 
         let logs = self.public_provider.get_logs(&filter).await?;
+        println!("initial logs: {:?}", logs);
         if let Some(log) = logs
             .iter()
             .collect::<Vec<_>>()
