@@ -23,6 +23,8 @@ pub mod sol_types;
 pub mod types;
 pub mod utils;
 
+/// Configuration for contract addresses used by the AlkahestClient.
+/// Each field is optional and will use default addresses if not provided.
 #[derive(Debug, Clone)]
 pub struct AddressConfig {
     pub erc20_addresses: Option<Erc20Addresses>,
@@ -32,6 +34,14 @@ pub struct AddressConfig {
     pub attestation_addresses: Option<AttestationAddresses>,
 }
 
+/// The main client for interacting with token trading and attestation functionality.
+///
+/// This client provides a unified interface for:
+/// - Trading ERC20, ERC721, and ERC1155 tokens
+/// - Managing token bundles
+/// - Creating and managing attestations
+/// - Setting up escrow arrangements
+/// - Handling trade fulfillment
 #[derive(Clone)]
 pub struct AlkahestClient {
     pub wallet_provider: WalletProvider,
@@ -46,6 +56,15 @@ pub struct AlkahestClient {
 }
 
 impl AlkahestClient {
+    /// Creates a new AlkahestClient instance.
+    ///
+    /// # Arguments
+    /// * `private_key` - The private key for signing transactions
+    /// * `rpc_url` - The RPC endpoint URL
+    /// * `addresses` - Optional custom contract addresses, uses defaults if None
+    ///
+    /// # Returns
+    /// * `Result<Self>` - The initialized client instance with all sub-clients configured
     pub async fn new(
         private_key: impl ToString + Clone,
         rpc_url: impl ToString + Clone,
@@ -79,6 +98,13 @@ impl AlkahestClient {
         })
     }
 
+    /// Extracts an Attested event from a transaction receipt.
+    ///
+    /// # Arguments
+    /// * `receipt` - The transaction receipt to extract the event from
+    ///
+    /// # Returns
+    /// * `Result<Log<Attested>>` - The decoded Attested event log
     pub fn get_attested_event(
         receipt: TransactionReceipt,
     ) -> eyre::Result<Log<contracts::IEAS::Attested>> {
@@ -95,6 +121,19 @@ impl AlkahestClient {
         Ok(attested_event.inner)
     }
 
+    /// Waits for a fulfillment event for a specific escrow arrangement.
+    ///
+    /// This function will:
+    /// 1. Check for existing fulfillment events from the specified block
+    /// 2. If none found, subscribe to new events and wait for fulfillment
+    ///
+    /// # Arguments
+    /// * `contract_address` - The address of the contract to monitor
+    /// * `buy_attestation` - The attestation UID of the buy order
+    /// * `from_block` - Optional block number to start searching from
+    ///
+    /// # Returns
+    /// * `Result<Log<EscrowClaimed>>` - The fulfillment event log when found
     pub async fn wait_for_fulfillment(
         &self,
         contract_address: Address,
