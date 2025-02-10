@@ -14,6 +14,13 @@ pub struct TokenBundleAddresses {
     pub payment_obligation: Address,
 }
 
+/// Client for interacting with token bundle trading and escrow functionality.
+///
+/// This client provides methods for:
+/// - Trading token bundles for other token bundles
+/// - Creating escrow arrangements with custom demands
+/// - Managing token bundle payments
+/// - Collecting payments from fulfilled trades
 #[derive(Clone)]
 pub struct TokenBundleClient {
     signer: PrivateKeySigner,
@@ -34,6 +41,15 @@ impl Default for TokenBundleAddresses {
 }
 
 impl TokenBundleClient {
+    /// Creates a new TokenBundleClient instance.
+    ///
+    /// # Arguments
+    /// * `private_key` - The private key for signing transactions
+    /// * `rpc_url` - The RPC endpoint URL
+    /// * `addresses` - Optional custom contract addresses, uses defaults if None
+    ///
+    /// # Returns
+    /// * `Result<Self>` - The initialized client instance
     pub async fn new(
         private_key: impl ToString + Clone,
         rpc_url: impl ToString + Clone,
@@ -50,6 +66,14 @@ impl TokenBundleClient {
         })
     }
 
+    /// Collects payment from a fulfilled trade.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    /// * `fulfillment` - The attestation UID of the fulfillment
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn collect_payment(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -70,6 +94,13 @@ impl TokenBundleClient {
         Ok(receipt)
     }
 
+    /// Collects expired escrow funds after expiration time has passed.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the expired escrow
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn collect_expired(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -89,6 +120,15 @@ impl TokenBundleClient {
         Ok(receipt)
     }
 
+    /// Creates an escrow arrangement with token bundles for a custom demand.
+    ///
+    /// # Arguments
+    /// * `price` - The token bundle data for payment
+    /// * `item` - The arbiter and demand data
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_with_bundle(
         &self,
         price: TokenBundleData,
@@ -110,6 +150,14 @@ impl TokenBundleClient {
         Ok(receipt)
     }
 
+    /// Makes a direct payment with token bundles.
+    ///
+    /// # Arguments
+    /// * `price` - The token bundle data for payment
+    /// * `payee` - The address of the payment recipient
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_with_bundle(
         &self,
         price: TokenBundleData,
@@ -131,6 +179,15 @@ impl TokenBundleClient {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade token bundles for other token bundles.
+    ///
+    /// # Arguments
+    /// * `bid` - The token bundle data being offered
+    /// * `ask` - The token bundle data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_bundle_for_bundle(
         &self,
         bid: TokenBundleData,
@@ -161,6 +218,13 @@ impl TokenBundleClient {
         Ok(receipt)
     }
 
+    /// Fulfills an existing bundle-for-bundle trade escrow.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_bundle_for_bundle(
         &self,
         buy_attestation: FixedBytes<32>,
