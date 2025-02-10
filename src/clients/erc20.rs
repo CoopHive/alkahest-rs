@@ -1,10 +1,10 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use alloy::primitives::{address, keccak256, Address, FixedBytes, Log, U256};
+use alloy::primitives::{address, keccak256, Address, FixedBytes, U256};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::signers::{Signature, Signer};
-use alloy::sol_types::{SolEvent, SolValue};
+use alloy::sol_types::SolValue;
 
 use crate::contracts::{self, ERC20Permit};
 use crate::types::{
