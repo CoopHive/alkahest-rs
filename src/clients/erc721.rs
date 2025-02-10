@@ -16,6 +16,13 @@ pub struct Erc721Addresses {
     pub payment_obligation: Address,
 }
 
+/// Client for interacting with ERC721 token trading and escrow functionality.
+///
+/// This client provides methods for:
+/// - Trading ERC721 tokens for other ERC721, ERC20, and ERC1155 tokens
+/// - Creating escrow arrangements with custom demands
+/// - Managing token approvals
+/// - Collecting payments from fulfilled trades
 #[derive(Clone)]
 pub struct Erc721Client {
     signer: PrivateKeySigner,
@@ -36,6 +43,15 @@ impl Default for Erc721Addresses {
 }
 
 impl Erc721Client {
+    /// Creates a new ERC721Client instance.
+    ///
+    /// # Arguments
+    /// * `private_key` - The private key for signing transactions
+    /// * `rpc_url` - The RPC endpoint URL
+    /// * `addresses` - Optional custom contract addresses, uses defaults if None
+    ///
+    /// # Returns
+    /// * `Result<Self>` - The initialized client instance
     pub async fn new(
         private_key: impl ToString + Clone,
         rpc_url: impl ToString + Clone,
@@ -52,6 +68,14 @@ impl Erc721Client {
         })
     }
 
+    /// Approves a specific token for trading.
+    ///
+    /// # Arguments
+    /// * `token` - The ERC721 token data including address and token ID
+    /// * `purpose` - Whether the approval is for payment or escrow
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn approve(
         &self,
         token: Erc721Data,
@@ -74,6 +98,14 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Approves all tokens from a contract for trading.
+    ///
+    /// # Arguments
+    /// * `token_contract` - The ERC721 contract address
+    /// * `purpose` - Whether the approval is for payment or escrow
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn approve_all(
         &self,
         token_contract: Address,
@@ -96,6 +128,14 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Revokes approval for all tokens from a contract.
+    ///
+    /// # Arguments
+    /// * `token_contract` - The ERC721 contract address
+    /// * `purpose` - Whether to revoke payment or escrow approval
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn revoke_all(
         &self,
         token_contract: Address,
@@ -118,6 +158,14 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Collects payment from a fulfilled trade.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    /// * `fulfillment` - The attestation UID of the fulfillment
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn collect_payment(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -138,6 +186,13 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Collects expired escrow funds after expiration time has passed.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the expired escrow
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn collect_expired(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -157,6 +212,15 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow arrangement with ERC721 tokens for a custom demand.
+    ///
+    /// # Arguments
+    /// * `price` - The ERC721 token data for payment
+    /// * `item` - The arbiter and demand data
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_with_erc721(
         &self,
         price: Erc721Data,
@@ -186,6 +250,14 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Makes a direct payment with ERC721 tokens.
+    ///
+    /// # Arguments
+    /// * `price` - The ERC721 token data for payment
+    /// * `payee` - The address of the payment recipient
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_with_erc721(
         &self,
         price: Erc721Data,
@@ -210,6 +282,15 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC721 tokens for other ERC721 tokens.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC721 token data being offered
+    /// * `ask` - The ERC721 token data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc_721_for_erc_721(
         &self,
         bid: Erc721Data,
@@ -229,6 +310,13 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing ERC721-for-ERC721 trade escrow.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_erc_721_for_erc_721(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -246,6 +334,15 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC721 tokens for ERC20 tokens.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC721 token data being offered
+    /// * `ask` - The ERC20 token data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc20_with_erc721(
         &self,
         bid: Erc721Data,
@@ -268,6 +365,13 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing ERC721-for-ERC20 trade escrow.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_erc721_for_erc20(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -288,6 +392,15 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC721 tokens for ERC1155 tokens.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC721 token data being offered
+    /// * `ask` - The ERC1155 token data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc1155_with_erc721(
         &self,
         bid: Erc721Data,
@@ -317,6 +430,13 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing ERC721-for-ERC1155 trade escrow.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_erc721_for_erc1155(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -337,6 +457,15 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC721 tokens for a bundle of tokens.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC721 token data being offered
+    /// * `ask` - The token bundle data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_bundle_with_erc721(
         &self,
         bid: Erc721Data,
@@ -364,6 +493,13 @@ impl Erc721Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing ERC721-for-bundle trade escrow.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_erc721_for_bundle(
         &self,
         buy_attestation: FixedBytes<32>,
