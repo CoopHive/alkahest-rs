@@ -20,6 +20,13 @@ pub struct Erc20Addresses {
     pub payment_obligation: Address,
 }
 
+/// Client for interacting with ERC20 token trading and escrow functionality.
+///
+/// This client provides methods for:
+/// - Trading ERC20 tokens for other ERC20, ERC721, and ERC1155 tokens
+/// - Creating escrow arrangements with custom demands
+/// - Managing token approvals and permits
+/// - Collecting payments from fulfilled trades
 #[derive(Clone)]
 pub struct Erc20Client {
     signer: PrivateKeySigner,
@@ -40,6 +47,15 @@ impl Default for Erc20Addresses {
 }
 
 impl Erc20Client {
+    /// Creates a new ERC20Client instance.
+    ///
+    /// # Arguments
+    /// * `private_key` - The private key for signing transactions
+    /// * `rpc_url` - The RPC endpoint URL
+    /// * `addresses` - Optional custom contract addresses, uses defaults if None
+    ///
+    /// # Returns
+    /// * `Result<Self>` - The initialized client instance
     pub async fn new(
         private_key: impl ToString + Clone,
         rpc_url: impl ToString + Clone,
@@ -56,6 +72,15 @@ impl Erc20Client {
         })
     }
 
+    /// Gets a permit signature for token approval.
+    ///
+    /// # Arguments
+    /// * `spender` - The address being approved to spend tokens
+    /// * `token` - The token data including address and amount
+    /// * `deadline` - The timestamp until which the permit is valid
+    ///
+    /// # Returns
+    /// * `Result<Signature>` - The permit signature
     async fn get_permit_signature(
         &self,
         spender: Address,
@@ -92,6 +117,14 @@ impl Erc20Client {
         Ok(signature)
     }
 
+    /// Approves token spending for payment or escrow purposes.
+    ///
+    /// # Arguments
+    /// * `token` - The token data including address and amount
+    /// * `purpose` - Whether the approval is for payment or escrow
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn approve(
         &self,
         token: Erc20Data,
@@ -112,6 +145,14 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Approves token spending if current allowance is less than required amount.
+    ///
+    /// # Arguments
+    /// * `token` - The token data including address and amount
+    /// * `purpose` - Whether the approval is for payment or escrow
+    ///
+    /// # Returns
+    /// * `Result<Option<TransactionReceipt>>` - The transaction receipt if approval was needed
     pub async fn approve_if_less(
         &self,
         token: Erc20Data,
@@ -143,6 +184,14 @@ impl Erc20Client {
         Ok(Some(receipt))
     }
 
+    /// Collects payment from a fulfilled trade.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    /// * `fulfillment` - The attestation UID of the fulfillment
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn collect_payment(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -163,6 +212,13 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Collects expired escrow funds after expiration time has passed.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the expired escrow
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn collect_expired(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -182,6 +238,15 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow arrangement with ERC20 tokens for a custom demand.
+    ///
+    /// # Arguments
+    /// * `price` - The ERC20 token data for payment
+    /// * `item` - The arbiter and demand data
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_with_erc20(
         &self,
         price: Erc20Data,
@@ -211,44 +276,14 @@ impl Erc20Client {
         Ok(receipt)
     }
 
-    pub async fn permit_and_buy_with_erc20(
-        &self,
-        price: Erc20Data,
-        item: ArbiterData,
-        expiration: u64,
-    ) -> eyre::Result<TransactionReceipt> {
-        let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
-        let permit = self
-            .get_permit_signature(
-                self.addresses.escrow_obligation,
-                price.clone(),
-                deadline.try_into()?,
-            )
-            .await?;
-
-        let barter_utils_contract =
-            contracts::ERC20BarterUtils::new(self.addresses.barter_utils, &self.wallet_provider);
-
-        let receipt = barter_utils_contract
-            .permitAndBuyWithErc20(
-                price.address,
-                price.value,
-                item.arbiter,
-                item.demand,
-                expiration,
-                deadline.try_into()?,
-                if permit.v() { 27 } else { 28 },
-                permit.r().into(),
-                permit.s().into(),
-            )
-            .send()
-            .await?
-            .get_receipt()
-            .await?;
-
-        Ok(receipt)
-    }
-
+    /// Makes a direct payment with ERC20 tokens.
+    ///
+    /// # Arguments
+    /// * `price` - The ERC20 token data for payment
+    /// * `payee` - The address of the payment recipient
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_with_erc20(
         &self,
         price: Erc20Data,
@@ -273,6 +308,22 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Makes a direct payment with ERC20 tokens using permit signature.
+    ///
+    /// # Arguments
+    /// * `price` - The ERC20 token data for payment
+    /// * `payee` - The address of the payment recipient
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
+    /// Makes a direct payment with ERC20 tokens using permit signature.
+    ///
+    /// # Arguments
+    /// * `price` - The ERC20 token data for payment
+    /// * `payee` - The address of the payment recipient
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn permit_and_pay_with_erc20(
         &self,
         price: Erc20Data,
@@ -307,6 +358,15 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC20 tokens for other ERC20 tokens.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC20 token data being offered
+    /// * `ask` - The ERC20 token data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc20_for_erc20(
         &self,
         bid: Erc20Data,
@@ -325,6 +385,24 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC20 tokens for other ERC20 tokens using permit signature.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC20 token data being offered
+    /// * `ask` - The ERC20 token data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
+    /// Creates an escrow to trade ERC20 tokens for other ERC20 tokens using permit signature.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC20 token data being offered
+    /// * `ask` - The ERC20 token data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn permit_and_buy_erc20_for_erc20(
         &self,
         bid: Erc20Data,
@@ -363,6 +441,13 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing ERC20-for-ERC20 trade escrow.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_erc20_for_erc20(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -379,6 +464,20 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing ERC20-for-ERC20 trade escrow using permit signature.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
+    /// Fulfills an existing ERC20-for-ERC20 trade escrow using permit signature.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn permit_and_pay_erc20_for_erc20(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -429,6 +528,15 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC20 tokens for an ERC721 token.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC20 token data being offered
+    /// * `ask` - The ERC721 token data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc721_for_erc20(
         &self,
         bid: Erc20Data,
@@ -450,6 +558,15 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC20 tokens for ERC721 tokens using permit signature.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC20 token data being offered
+    /// * `ask` - The ERC721 token data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn permit_and_buy_erc721_for_erc20(
         &self,
         bid: Erc20Data,
@@ -490,6 +607,13 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing ERC721-for-ERC20 trade escrow.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_erc20_for_erc721(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -509,6 +633,13 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing ERC721-for-ERC20 trade escrow using permit signature.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn permit_and_pay_erc20_for_erc721(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -561,6 +692,15 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC20 tokens for an ERC1155 token.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC20 token data being offered
+    /// * `ask` - The ERC1155 token data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc1155_for_erc20(
         &self,
         bid: Erc20Data,
@@ -589,6 +729,15 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC20 tokens for ERC1155 tokens using permit signature.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC20 token data being offered
+    /// * `ask` - The ERC1155 token data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn permit_and_buy_erc1155_for_erc20(
         &self,
         bid: Erc20Data,
@@ -630,6 +779,13 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing ERC1155-for-ERC20 trade escrow.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_erc20_for_erc1155(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -649,6 +805,13 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing ERC1155-for-ERC20 trade escrow using permit signature.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn permit_and_pay_erc20_for_erc1155(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -701,6 +864,15 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC20 tokens for a bundle of tokens.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC20 token data being offered
+    /// * `ask` - The token bundle data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_bundle_for_erc20(
         &self,
         bid: Erc20Data,
@@ -727,6 +899,15 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Creates an escrow to trade ERC20 tokens for a bundle of tokens using permit signature.
+    ///
+    /// # Arguments
+    /// * `bid` - The ERC20 token data being offered
+    /// * `ask` - The token bundle data being requested
+    /// * `expiration` - The expiration timestamp
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn permit_and_buy_bundle_for_erc20(
         &self,
         bid: Erc20Data,
@@ -766,6 +947,13 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing bundle-for-ERC20 trade escrow.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_erc20_for_bundle(
         &self,
         buy_attestation: FixedBytes<32>,
@@ -785,6 +973,13 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    /// Fulfills an existing bundle-for-ERC20 trade escrow using permit signature.
+    ///
+    /// # Arguments
+    /// * `buy_attestation` - The attestation UID of the buy order
+    ///
+    /// # Returns
+    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn permit_and_pay_erc20_for_bundle(
         &self,
         buy_attestation: FixedBytes<32>,
