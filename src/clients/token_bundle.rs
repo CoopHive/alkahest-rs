@@ -1,6 +1,7 @@
 use alloy::primitives::{address, Address, Bytes, FixedBytes};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
+use alloy::sol_types::SolValue as _;
 
 use crate::contracts::{self};
 use crate::types::{ArbiterData, TokenBundleData};
@@ -64,6 +65,23 @@ impl TokenBundleClient {
 
             addresses: addresses.unwrap_or_default(),
         })
+    }
+
+    /// Decodes TokenBundleEscrowObligation.StatementData from bytes.
+    ///
+    /// # Arguments
+    /// * `statement_data` - The statement data
+    ///
+    /// # Returns
+    /// * `Result<contracts::TokenBundleEscrowObligation::StatementData>` - The decoded statement data
+    pub fn decode_escrow_statement(
+        statement_data: Bytes,
+    ) -> eyre::Result<contracts::TokenBundleEscrowObligation::StatementData> {
+        let statement_data = contracts::TokenBundleEscrowObligation::StatementData::abi_decode(
+            statement_data.as_ref(),
+            true,
+        )?;
+        return Ok(statement_data);
     }
 
     /// Collects payment from a fulfilled trade.
