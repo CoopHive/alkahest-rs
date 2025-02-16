@@ -1,3 +1,4 @@
+pub mod arbiters;
 pub mod attestation;
 pub mod erc1155;
 pub mod erc20;
