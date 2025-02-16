@@ -1,6 +1,7 @@
-use alloy::primitives::{address, Address, FixedBytes};
+use alloy::primitives::{address, Address, Bytes, FixedBytes};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
+use alloy::sol_types::SolValue as _;
 
 use crate::contracts::{self};
 use crate::types::{
@@ -66,6 +67,23 @@ impl Erc1155Client {
 
             addresses: addresses.unwrap_or_default(),
         })
+    }
+
+    /// Decodes ERC1155EscrowObligation.StatementData from bytes.
+    ///
+    /// # Arguments
+    /// * `statement_data` - The statement data
+    ///
+    /// # Returns
+    /// * `Result<contracts::ERC1155EscrowObligation::StatementData>` - The decoded statement data
+    pub fn decode_escrow_statement(
+        statement_data: Bytes,
+    ) -> eyre::Result<contracts::ERC1155EscrowObligation::StatementData> {
+        let statement_data = contracts::ERC1155EscrowObligation::StatementData::abi_decode(
+            statement_data.as_ref(),
+            true,
+        )?;
+        return Ok(statement_data);
     }
 
     /// Approves all tokens from a contract for trading.

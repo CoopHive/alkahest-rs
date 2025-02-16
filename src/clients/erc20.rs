@@ -1,10 +1,10 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use alloy::primitives::{address, keccak256, Address, FixedBytes, U256};
+use alloy::primitives::{address, keccak256, Address, Bytes, FixedBytes, U256};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::signers::{Signature, Signer};
-use alloy::sol_types::SolValue;
+use alloy::sol_types::SolValue as _;
 
 use crate::contracts::{self, ERC20Permit};
 use crate::types::{
@@ -115,6 +115,23 @@ impl Erc20Client {
         let signature = self.signer.sign_hash(&digest).await?;
 
         Ok(signature)
+    }
+
+    /// Decodes ERC20EscrowObligation.StatementData from bytes.
+    ///
+    /// # Arguments
+    /// * `statement_data` - The statement data
+    ///
+    /// # Returns
+    /// * `Result<contracts::ERC20EscrowObligation::StatementData>` - The decoded statement data
+    pub fn decode_escrow_statement(
+        statement_data: Bytes,
+    ) -> eyre::Result<contracts::ERC20EscrowObligation::StatementData> {
+        let statement_data = contracts::ERC20EscrowObligation::StatementData::abi_decode(
+            statement_data.as_ref(),
+            true,
+        )?;
+        return Ok(statement_data);
     }
 
     /// Approves token spending for payment or escrow purposes.
@@ -1039,7 +1056,10 @@ mod tests {
     use std::env;
 
     use crate::{
-        contracts,
+        clients::{
+            arbiters::{ArbitersClient, TrustedPartyDemandData},
+            erc20::Erc20Client,
+        },
         types::{ApprovalPurpose, ArbiterData, Erc20Data},
         AlkahestClient,
     };
@@ -1167,21 +1187,14 @@ mod tests {
         // if the baseDemand were something other than TrivialArbiter,
         // it would be an additional check on the fulfillment.
         // many arbiters can be stacked according to this pattern.
-        sol! {
-            struct TrustedPartyDemandData {
-                address creator;
-                address baseArbiter;
-                bytes baseDemand;
-            }
-        }
+        // if using a custom Arbiter not supported by the SDK, you can use the sol! macro and abi_encode
+        // directly, like we did for the base_demand
 
-        let trival_arbiter = address!("0x8fdbf9C22Ce0B83aFEe8da63F14467663D150b5d");
-        let demand = TrustedPartyDemandData {
+        let demand = ArbitersClient::encode_trusted_party_demand(TrustedPartyDemandData {
             creator: client_seller.address,
-            baseArbiter: trival_arbiter,
+            baseArbiter: client_seller.arbiters.addresses.trivial_arbiter,
             baseDemand: base_demand.into(),
-        }
-        .abi_encode();
+        })?;
 
         // approve escrow contract to spend tokens
         let usdc = address!("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
@@ -1199,7 +1212,6 @@ mod tests {
         // make escrow with generic escrow function,
         // passing in TrustedPartyArbiter's address and our custom demand,
         // and no expiration
-        let trusted_party_arbiter = address!("0x82FaE516dE4912C382FBF7D9D6d0194b7f532738");
         let escrow = client_buyer
             .erc20
             .buy_with_erc20(
@@ -1208,8 +1220,8 @@ mod tests {
                     value: 10.try_into()?,
                 },
                 ArbiterData {
-                    arbiter: trusted_party_arbiter,
-                    demand: demand.into(),
+                    arbiter: client_seller.arbiters.addresses.trusted_party_arbiter,
+                    demand,
                 },
                 0,
             )
@@ -1224,12 +1236,9 @@ mod tests {
             .attestation
             .get_attestation(escrow.uid)
             .await?;
-        let buy_statement = contracts::ERC20EscrowObligation::StatementData::abi_decode(
-            buy_statement.data.as_ref(),
-            true,
-        )?;
-        let decoded_demand =
-            TrustedPartyDemandData::abi_decode(buy_statement.demand.as_ref(), true)?;
+        let buy_statement = Erc20Client::decode_escrow_statement(buy_statement.data)?;
+
+        let decoded_demand = ArbitersClient::decode_trusted_party_demand(buy_statement.demand)?;
         let decoded_base_demand =
             ResultDemandData::abi_decode(decoded_demand.baseDemand.as_ref(), true);
 

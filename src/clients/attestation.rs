@@ -1,7 +1,8 @@
-use alloy::primitives::FixedBytes;
 use alloy::primitives::{address, Address};
+use alloy::primitives::{Bytes, FixedBytes};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
+use alloy::sol_types::SolValue as _;
 
 use crate::contracts::IEAS::Attestation;
 use crate::contracts::{self, IEAS};
@@ -58,6 +59,40 @@ impl AttestationClient {
 
             addresses: addresses.unwrap_or_default(),
         })
+    }
+
+    /// Decodes AttestationEscrowObligation.StatementData from bytes.
+    ///
+    /// # Arguments
+    /// * `statement_data` - The statement data
+    ///
+    /// # Returns
+    /// * `Result<contracts::AttestationEscrowObligation::StatementData>` - The decoded statement data
+    pub fn decode_escrow_statement(
+        statement_data: Bytes,
+    ) -> eyre::Result<contracts::AttestationEscrowObligation::StatementData> {
+        let statement_data = contracts::AttestationEscrowObligation::StatementData::abi_decode(
+            statement_data.as_ref(),
+            true,
+        )?;
+        return Ok(statement_data);
+    }
+
+    /// Decodes AttestationEscrowObligation2.StatementData from bytes.
+    ///
+    /// # Arguments
+    /// * `statement_data` - The statement data
+    ///
+    /// # Returns
+    /// * `Result<contracts::AttestationEscrowObligation2::StatementData>` - The decoded statement data
+    pub fn decode_escrow_statement_2(
+        statement_data: Bytes,
+    ) -> eyre::Result<contracts::AttestationEscrowObligation2::StatementData> {
+        let statement_data = contracts::AttestationEscrowObligation2::StatementData::abi_decode(
+            statement_data.as_ref(),
+            true,
+        )?;
+        return Ok(statement_data);
     }
 
     /// Retrieves an attestation by its UID.
