@@ -6,6 +6,7 @@ use alloy::{
     sol_types::SolEvent,
 };
 use clients::{
+    arbiters::{ArbitersAddresses, ArbitersClient},
     attestation::{AttestationAddresses, AttestationClient},
     erc1155::{Erc1155Addresses, Erc1155Client},
     erc20::{Erc20Addresses, Erc20Client},
@@ -27,6 +28,7 @@ pub mod utils;
 /// Each field is optional and will use default addresses if not provided.
 #[derive(Debug, Clone)]
 pub struct AddressConfig {
+    pub arbiters_addresses: Option<ArbitersAddresses>,
     pub erc20_addresses: Option<Erc20Addresses>,
     pub erc721_addresses: Option<Erc721Addresses>,
     pub erc1155_addresses: Option<Erc1155Addresses>,
@@ -46,8 +48,9 @@ pub struct AddressConfig {
 pub struct AlkahestClient {
     pub wallet_provider: WalletProvider,
     pub public_provider: PublicProvider,
-
     pub address: Address,
+
+    pub arbiters: ArbitersClient,
     pub erc20: Erc20Client,
     pub erc721: Erc721Client,
     pub erc1155: Erc1155Client,
@@ -88,8 +91,8 @@ impl AlkahestClient {
         Ok(AlkahestClient {
             wallet_provider: wallet_provider.clone(),
             public_provider: public_provider.clone(),
-
             address: signer.address(),
+            arbiters: make_client!(ArbitersClient, arbiters_addresses).await?,
             erc20: make_client!(Erc20Client, erc20_addresses).await?,
             erc721: make_client!(Erc721Client, erc721_addresses).await?,
             erc1155: make_client!(Erc1155Client, erc1155_addresses).await?,
