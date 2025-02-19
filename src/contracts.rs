@@ -1,5 +1,6 @@
 use alloy::sol;
 
+// Core
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
@@ -48,6 +49,7 @@ sol!(
     "src/contracts/ERC20Permit.json"
 );
 
+// Statements
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
@@ -206,4 +208,37 @@ sol!(
     #[derive(Debug)]
     AttestationEscrowObligation2,
     "src/contracts/AttestationEscrowObligation2.json"
+);
+
+// Arbiters
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    TrivialArbiter,
+    "src/contracts/TrivialArbiter.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    TrustedPartyArbiter,
+    "src/contracts/TrustedPartyArbiter.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    SpecificAttestationArbiter,
+    "src/contracts/SpecificAttestationArbiter.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    TrustedOracleArbiter,
+    "src/contracts/TrustedOracleArbiter.json"
 );
