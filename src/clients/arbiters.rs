@@ -87,10 +87,8 @@ impl ArbitersClient {
         })
     }
 
-    pub fn encode_trusted_party_demand(
-        demand: TrustedPartyArbiter::DemandData,
-    ) -> eyre::Result<Bytes> {
-        Ok(demand.abi_encode().into())
+    pub fn encode_trusted_party_demand(demand: TrustedPartyArbiter::DemandData) -> Bytes {
+        demand.abi_encode().into()
     }
 
     pub fn decode_trusted_party_demand(
@@ -104,8 +102,8 @@ impl ArbitersClient {
 
     pub fn encode_specific_attestation_demand(
         demand: SpecificAttestationArbiter::DemandData,
-    ) -> eyre::Result<Bytes> {
-        Ok(demand.abi_encode().into())
+    ) -> Bytes {
+        demand.abi_encode().into()
     }
 
     pub fn decode_specific_attestation_demand(
@@ -117,10 +115,8 @@ impl ArbitersClient {
         )?)
     }
 
-    pub fn encode_trusted_oracle_demand(
-        demand: TrustedOracleArbiter::DemandData,
-    ) -> eyre::Result<Bytes> {
-        Ok(demand.abi_encode().into())
+    pub fn encode_trusted_oracle_demand(demand: TrustedOracleArbiter::DemandData) -> Bytes {
+        demand.abi_encode().into()
     }
 
     pub fn decode_trusted_oracle_demand(
