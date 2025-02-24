@@ -210,6 +210,14 @@ sol!(
     "src/contracts/AttestationEscrowObligation2.json"
 );
 
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    StringObligation,
+    "src/contracts/StringObligation.json"
+);
+
 // Arbiters
 sol!(
     #[allow(missing_docs)]
