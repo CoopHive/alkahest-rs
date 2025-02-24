@@ -1057,7 +1057,7 @@ mod tests {
 
     use crate::{
         clients::{
-            arbiters::{ArbitersClient, TrustedPartyDemandData},
+            arbiters::{ArbitersClient, TrustedPartyArbiter},
             erc20::Erc20Client,
         },
         types::{ApprovalPurpose, ArbiterData, Erc20Data},
@@ -1190,11 +1190,12 @@ mod tests {
         // if using a custom Arbiter not supported by the SDK, you can use the sol! macro and abi_encode
         // directly, like we did for the base_demand
 
-        let demand = ArbitersClient::encode_trusted_party_demand(TrustedPartyDemandData {
-            creator: client_seller.address,
-            baseArbiter: client_seller.arbiters.addresses.trivial_arbiter,
-            baseDemand: base_demand.into(),
-        })?;
+        let demand =
+            ArbitersClient::encode_trusted_party_demand(TrustedPartyArbiter::DemandData {
+                creator: client_seller.address,
+                baseArbiter: client_seller.arbiters.addresses.trivial_arbiter,
+                baseDemand: base_demand.into(),
+            })?;
 
         // approve escrow contract to spend tokens
         let usdc = address!("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
