@@ -11,6 +11,7 @@ use clients::{
     erc1155::{Erc1155Addresses, Erc1155Client},
     erc20::{Erc20Addresses, Erc20Client},
     erc721::{Erc721Addresses, Erc721Client},
+    string_obligation::{StringObligationAddresses, StringObligationClient},
     token_bundle::{TokenBundleAddresses, TokenBundleClient},
 };
 use futures_util::StreamExt;
@@ -34,6 +35,7 @@ pub struct AddressConfig {
     pub erc1155_addresses: Option<Erc1155Addresses>,
     pub token_bundle_addresses: Option<TokenBundleAddresses>,
     pub attestation_addresses: Option<AttestationAddresses>,
+    pub string_obligation_addresses: Option<StringObligationAddresses>,
 }
 
 /// The main client for interacting with token trading and attestation functionality.
@@ -56,6 +58,7 @@ pub struct AlkahestClient {
     pub erc1155: Erc1155Client,
     pub token_bundle: TokenBundleClient,
     pub attestation: AttestationClient,
+    pub string_obligation: StringObligationClient,
 }
 
 impl AlkahestClient {
@@ -98,6 +101,8 @@ impl AlkahestClient {
             erc1155: make_client!(Erc1155Client, erc1155_addresses).await?,
             token_bundle: make_client!(TokenBundleClient, token_bundle_addresses).await?,
             attestation: make_client!(AttestationClient, attestation_addresses).await?,
+            string_obligation: make_client!(StringObligationClient, string_obligation_addresses)
+                .await?,
         })
     }
 
