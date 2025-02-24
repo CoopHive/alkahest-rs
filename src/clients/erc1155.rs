@@ -86,6 +86,25 @@ impl Erc1155Client {
         return Ok(statement_data);
     }
 
+    /// Decodes ERC1155PaymentObligation.StatementData from bytes.
+    ///
+    /// # Arguments
+    ///
+    /// * `statement_data` - The statement data
+    ///
+    /// # Returns
+    ///
+    /// * `eyre::Result<contracts::ERC1155PaymentObligation::StatementData>` - The decoded statement data
+    pub fn decode_payment_statement(
+        statement_data: Bytes,
+    ) -> eyre::Result<contracts::ERC1155PaymentObligation::StatementData> {
+        let statement_data = contracts::ERC1155PaymentObligation::StatementData::abi_decode(
+            statement_data.as_ref(),
+            true,
+        )?;
+        return Ok(statement_data);
+    }
+
     /// Approves all tokens from a contract for trading.
     ///
     /// # Arguments

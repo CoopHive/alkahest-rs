@@ -134,6 +134,25 @@ impl Erc20Client {
         return Ok(statement_data);
     }
 
+    /// Decodes ERC20PaymentObligation.StatementData from bytes.
+    ///
+    /// # Arguments
+    ///
+    /// * `statement_data` - The statement data
+    ///
+    /// # Returns
+    ///
+    /// * `eyre::Result<contracts::ERC20PaymentObligation::StatementData>` - The decoded statement data
+    pub fn decode_payment_statement(
+        statement_data: Bytes,
+    ) -> eyre::Result<contracts::ERC20PaymentObligation::StatementData> {
+        let statement_data = contracts::ERC20PaymentObligation::StatementData::abi_decode(
+            statement_data.as_ref(),
+            true,
+        )?;
+        return Ok(statement_data);
+    }
+
     /// Approves token spending for payment or escrow purposes.
     ///
     /// # Arguments

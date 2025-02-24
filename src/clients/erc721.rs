@@ -86,6 +86,25 @@ impl Erc721Client {
         return Ok(statement_data);
     }
 
+    /// Decodes ERC721PaymentObligation.StatementData from bytes.
+    ///
+    /// # Arguments
+    ///
+    /// * `statement_data` - The statement data
+    ///
+    /// # Returns
+    ///
+    /// * `eyre::Result<contracts::ERC721PaymentObligation::StatementData>` - The decoded statement data
+    pub fn decode_payment_statement(
+        statement_data: Bytes,
+    ) -> eyre::Result<contracts::ERC721PaymentObligation::StatementData> {
+        let statement_data = contracts::ERC721PaymentObligation::StatementData::abi_decode(
+            statement_data.as_ref(),
+            true,
+        )?;
+        return Ok(statement_data);
+    }
+
     /// Approves a specific token for trading.
     ///
     /// # Arguments

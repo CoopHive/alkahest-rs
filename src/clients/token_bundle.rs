@@ -84,6 +84,25 @@ impl TokenBundleClient {
         return Ok(statement_data);
     }
 
+    /// Decodes TokenBundlePaymentObligation.StatementData from bytes.
+    ///
+    /// # Arguments
+    ///
+    /// * `statement_data` - The statement data
+    ///
+    /// # Returns
+    ///
+    /// * `eyre::Result<contracts::TokenBundlePaymentObligation::StatementData>` - The decoded statement data
+    pub fn decode_payment_statement(
+        statement_data: Bytes,
+    ) -> eyre::Result<contracts::TokenBundlePaymentObligation::StatementData> {
+        let statement_data = contracts::TokenBundlePaymentObligation::StatementData::abi_decode(
+            statement_data.as_ref(),
+            true,
+        )?;
+        return Ok(statement_data);
+    }
+
     /// Collects payment from a fulfilled trade.
     ///
     /// # Arguments
