@@ -1,7 +1,7 @@
 use alloy::{
     primitives::{address, Address, Bytes, FixedBytes, Log},
     providers::Provider as _,
-    rpc::types::{Filter, TransactionReceipt, ValueOrArray},
+    rpc::types::{Filter, TransactionReceipt},
     signers::local::PrivateKeySigner,
     sol,
     sol_types::{SolEvent as _, SolValue as _},
