@@ -1,0 +1,1 @@
+- get decoded StatementData from attestation uid
