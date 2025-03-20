@@ -6,6 +6,7 @@ use alloy::signers::local::PrivateKeySigner;
 use alloy::signers::{Signature, Signer};
 use alloy::sol_types::SolValue as _;
 
+use crate::addresses::FILECOIN_CALIBRATION_ADDRESSES;
 use crate::contracts::{self, ERC20Permit};
 use crate::types::{
     ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData,
@@ -37,12 +38,7 @@ pub struct Erc20Client {
 
 impl Default for Erc20Addresses {
     fn default() -> Self {
-        Self {
-            eas: address!("0x4200000000000000000000000000000000000021"),
-            barter_utils: address!("0xeb7daF691b03A906c563c3aa7FD6b8eFef55D13f"),
-            escrow_obligation: address!("0xa34CD115800aA79758Ee5A781a4A3C02915c8602"),
-            payment_obligation: address!("0x97128f9ea2cB1C1b49b778Db7df9fd921901B89c"),
-        }
+        FILECOIN_CALIBRATION_ADDRESSES.erc20_addresses.unwrap()
     }
 }
 

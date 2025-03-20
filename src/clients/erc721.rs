@@ -3,6 +3,7 @@ use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
 
+use crate::addresses::FILECOIN_CALIBRATION_ADDRESSES;
 use crate::contracts::{self};
 use crate::types::{
     ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData,
@@ -34,12 +35,7 @@ pub struct Erc721Client {
 
 impl Default for Erc721Addresses {
     fn default() -> Self {
-        Self {
-            eas: address!("0x4200000000000000000000000000000000000021"),
-            barter_utils: address!("0xf6F3902bA8b2C45F0dde04EDA14D39045249d867"),
-            escrow_obligation: address!("0x73BE84B7cfc60Cea4E953A20ABf138b08B718127"),
-            payment_obligation: address!("0x252424a080BA400196Bd3e7Aa7e2e8118e916bf7"),
-        }
+        FILECOIN_CALIBRATION_ADDRESSES.erc721_addresses.unwrap()
     }
 }
 

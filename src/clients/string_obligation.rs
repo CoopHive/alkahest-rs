@@ -6,7 +6,7 @@ use alloy::{
 };
 use serde::de::DeserializeOwned;
 
-use crate::{contracts, types::WalletProvider};
+use crate::{addresses::FILECOIN_CALIBRATION_ADDRESSES, contracts, types::WalletProvider};
 
 #[derive(Debug, Clone)]
 pub struct StringObligationAddresses {
@@ -24,10 +24,9 @@ pub struct StringObligationClient {
 
 impl Default for StringObligationAddresses {
     fn default() -> Self {
-        Self {
-            eas: address!("0x4200000000000000000000000000000000000021"),
-            obligation: address!("0xb4692f27f3Ef6968394F12eb5843e7C494a0Ed72"),
-        }
+        FILECOIN_CALIBRATION_ADDRESSES
+            .string_obligation_addresses
+            .unwrap()
     }
 }
 
