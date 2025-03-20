@@ -18,8 +18,8 @@ use futures_util::StreamExt;
 use sol_types::EscrowClaimed;
 use types::{PublicProvider, WalletProvider};
 
+pub mod addresses;
 pub mod clients;
-pub mod config;
 pub mod contracts;
 pub mod fixtures;
 pub mod sol_types;
