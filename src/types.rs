@@ -1,14 +1,13 @@
 use alloy::{
-    network::{Ethereum, EthereumWallet},
+    network::EthereumWallet,
     primitives::{Address, Bytes, U256},
     providers::{
+        Identity, RootProvider,
         fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
         },
-        Identity, RootProvider,
     },
-    pubsub::PubSubFrontend,
 };
 
 pub type WalletProvider = FillProvider<
