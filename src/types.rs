@@ -19,9 +19,7 @@ pub type WalletProvider = FillProvider<
         >,
         WalletFiller<EthereumWallet>,
     >,
-    RootProvider<PubSubFrontend>,
-    PubSubFrontend,
-    Ethereum,
+    RootProvider,
 >;
 
 pub type PublicProvider = FillProvider<
@@ -29,9 +27,7 @@ pub type PublicProvider = FillProvider<
         Identity,
         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
     >,
-    RootProvider<PubSubFrontend>,
-    PubSubFrontend,
-    Ethereum,
+    RootProvider,
 >;
 
 pub struct ArbiterData {
