@@ -1,16 +1,17 @@
 use std::env;
 
 use alkahest_rs::{
+    AlkahestClient,
     clients::{
         arbiters::{ArbitersClient, TrustedPartyArbiter},
         erc20::Erc20Client,
     },
     types::{ApprovalPurpose, ArbiterData, Erc20Data},
-    AlkahestClient,
 };
 
 use alloy::{
-    primitives::{address, FixedBytes},
+    primitives::{FixedBytes, address},
+    signers::local::PrivateKeySigner,
     sol,
     sol_types::SolValue,
 };
@@ -18,48 +19,33 @@ use eyre::Result;
 
 #[tokio::test]
 async fn test_trade_erc20_for_erc20() -> Result<()> {
-    let client_buyer = AlkahestClient::new(
-        env::var("PRIVKEY_ALICE")?.as_str(),
-        env::var("RPC_URL")?.as_str(),
-        None,
-    )
-    .await?;
+    let alice: PrivateKeySigner = env::var("PRIVKEY_ALICE")?.parse()?;
+    let client_buyer = AlkahestClient::new(alice, env::var("RPC_URL")?.as_str(), None).await?;
 
-    let client_seller = AlkahestClient::new(
-        env::var("PRIVKEY_BOB")?.as_str(),
-        env::var("RPC_URL")?.as_str(),
-        None,
-    )
-    .await?;
+    let bob = env::var("PRIVKEY_BOB")?.parse()?;
+    let client_seller = AlkahestClient::new(bob, env::var("RPC_URL")?.as_str(), None).await?;
 
     let usdc = address!("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
     let eurc = address!("0x808456652fdb597867f38412077A9182bf77359F");
 
+    let bid = Erc20Data {
+        address: usdc,
+        value: 10.try_into()?,
+    };
+    let ask = Erc20Data {
+        address: eurc,
+        value: 10.try_into()?,
+    };
+
     client_buyer
         .erc20
-        .approve(
-            Erc20Data {
-                address: usdc,
-                value: 10.try_into()?,
-            },
-            ApprovalPurpose::Escrow,
-        )
+        .approve(&bid, ApprovalPurpose::Escrow)
         .await?;
 
     // buy 10 eurc for 10 usdc
     let receipt = client_buyer
         .erc20
-        .buy_erc20_for_erc20(
-            Erc20Data {
-                address: usdc,
-                value: 10.try_into()?,
-            },
-            Erc20Data {
-                address: eurc,
-                value: 10.try_into()?,
-            },
-            0,
-        )
+        .buy_erc20_for_erc20(&bid, &ask, 0)
         .await?;
 
     let attested = AlkahestClient::get_attested_event(receipt)?;
@@ -67,13 +53,7 @@ async fn test_trade_erc20_for_erc20() -> Result<()> {
 
     client_seller
         .erc20
-        .approve(
-            Erc20Data {
-                address: eurc,
-                value: 10.try_into()?,
-            },
-            ApprovalPurpose::Payment,
-        )
+        .approve(&ask, ApprovalPurpose::Payment)
         .await?;
 
     let receipt = client_seller
@@ -87,19 +67,11 @@ async fn test_trade_erc20_for_erc20() -> Result<()> {
 
 #[tokio::test]
 async fn test_trade_erc20_for_custom() -> Result<()> {
-    let client_buyer = AlkahestClient::new(
-        env::var("PRIVKEY_ALICE")?.as_str(),
-        env::var("RPC_URL")?.as_str(),
-        None,
-    )
-    .await?;
+    let alice: PrivateKeySigner = env::var("PRIVKEY_ALICE")?.parse()?;
+    let client_buyer = AlkahestClient::new(alice, env::var("RPC_URL")?.as_str(), None).await?;
 
-    let client_seller = AlkahestClient::new(
-        env::var("PRIVKEY_BOB")?.as_str(),
-        env::var("RPC_URL")?.as_str(),
-        None,
-    )
-    .await?;
+    let bob: PrivateKeySigner = env::var("PRIVKEY_BOB")?.parse()?;
+    let client_seller = AlkahestClient::new(bob, env::var("RPC_URL")?.as_str(), None).await?;
     // the example will use JobResultObligation to demand a string to be capitalized
     // but JobResultObligation is generic enough to represent much more (a db query, a Dockerfile...)
     // see https://github.com/CoopHive/alkahest-mocks/blob/main/src/Statements/JobResultObligation.sol
@@ -143,34 +115,24 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
 
     // approve escrow contract to spend tokens
     let usdc = address!("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
+    let bid = Erc20Data {
+        address: usdc,
+        value: 10.try_into()?,
+    };
+    let ask = ArbiterData {
+        arbiter: client_seller.arbiters.addresses.trusted_party_arbiter,
+        demand,
+    };
+
     client_buyer
         .erc20
-        .approve(
-            Erc20Data {
-                address: usdc,
-                value: 10.try_into()?,
-            },
-            ApprovalPurpose::Escrow,
-        )
+        .approve(&bid, ApprovalPurpose::Escrow)
         .await?;
 
     // make escrow with generic escrow function,
     // passing in TrustedPartyArbiter's address and our custom demand,
     // and no expiration
-    let escrow = client_buyer
-        .erc20
-        .buy_with_erc20(
-            Erc20Data {
-                address: usdc,
-                value: 10.try_into()?,
-            },
-            ArbiterData {
-                arbiter: client_seller.arbiters.addresses.trusted_party_arbiter,
-                demand,
-            },
-            0,
-        )
-        .await?;
+    let escrow = client_buyer.erc20.buy_with_erc20(&bid, &ask, 0).await?;
     let escrow = AlkahestClient::get_attested_event(escrow)?;
     println!("escrow: {escrow:?}");
 
