@@ -61,6 +61,11 @@ macro_rules! impl_payment_obligation {
                 }
             }
         }
+        impl From<(&TokenBundleData, Address)> for $target {
+            fn from((bundle, payee): (&TokenBundleData, Address)) -> Self {
+                (bundle.clone(), payee).into()
+            }
+        }
     };
 }
 
@@ -81,6 +86,11 @@ macro_rules! impl_escrow_obligation {
                     arbiter: arbiter_data.arbiter,
                     demand: arbiter_data.demand,
                 }
+            }
+        }
+        impl From<(&TokenBundleData, ArbiterData)> for $target {
+            fn from((bundle, payee): (&TokenBundleData, ArbiterData)) -> Self {
+                (bundle.clone(), payee).into()
             }
         }
     };
