@@ -8,9 +8,9 @@ use alloy::{
 use clients::{
     arbiters::{ArbitersAddresses, ArbitersClient},
     attestation::{AttestationAddresses, AttestationClient},
-    erc1155::{Erc1155Addresses, Erc1155Client},
     erc20::{Erc20Addresses, Erc20Client},
     erc721::{Erc721Addresses, Erc721Client},
+    erc1155::{Erc1155Addresses, Erc1155Client},
     string_obligation::{StringObligationAddresses, StringObligationClient},
     token_bundle::{TokenBundleAddresses, TokenBundleClient},
 };

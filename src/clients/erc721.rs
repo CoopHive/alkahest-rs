@@ -110,7 +110,7 @@ impl Erc721Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn approve(
         &self,
-        token: Erc721Data,
+        token: &Erc721Data,
         purpose: ApprovalPurpose,
     ) -> eyre::Result<TransactionReceipt> {
         let erc721_contract = contracts::IERC721::new(token.address, &self.wallet_provider);
@@ -255,8 +255,8 @@ impl Erc721Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_with_erc721(
         &self,
-        price: Erc721Data,
-        item: ArbiterData,
+        price: &Erc721Data,
+        item: &ArbiterData,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let escrow_obligation_contract = contracts::ERC721EscrowObligation::new(
@@ -270,7 +270,7 @@ impl Erc721Client {
                     token: price.address,
                     tokenId: price.id,
                     arbiter: item.arbiter,
-                    demand: item.demand,
+                    demand: item.demand.clone(),
                 },
                 expiration,
             )
@@ -292,7 +292,7 @@ impl Erc721Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_with_erc721(
         &self,
-        price: Erc721Data,
+        price: &Erc721Data,
         payee: Address,
     ) -> eyre::Result<TransactionReceipt> {
         let payment_obligation_contract = contracts::ERC721PaymentObligation::new(
@@ -325,8 +325,8 @@ impl Erc721Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc_721_for_erc_721(
         &self,
-        bid: Erc721Data,
-        ask: Erc721Data,
+        bid: &Erc721Data,
+        ask: &Erc721Data,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let barter_utils_contract =
@@ -377,8 +377,8 @@ impl Erc721Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc20_with_erc721(
         &self,
-        bid: Erc721Data,
-        ask: Erc20Data,
+        bid: &Erc721Data,
+        ask: &Erc20Data,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let barter_utils_contract =
@@ -435,8 +435,8 @@ impl Erc721Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc1155_with_erc721(
         &self,
-        bid: Erc721Data,
-        ask: Erc1155Data,
+        bid: &Erc721Data,
+        ask: &Erc1155Data,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let barter_utils_contract =
@@ -500,7 +500,7 @@ impl Erc721Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_bundle_with_erc721(
         &self,
-        bid: Erc721Data,
+        bid: &Erc721Data,
         ask: TokenBundleData,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {

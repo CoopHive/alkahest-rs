@@ -1,4 +1,3 @@
-use alloy::primitives::{address, Address, Bytes, FixedBytes};
 use alloy::primitives::{Address, Bytes, FixedBytes, address};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
@@ -7,7 +6,7 @@ use alloy::sol_types::SolValue as _;
 use crate::addresses::FILECOIN_CALIBRATION_ADDRESSES;
 use crate::contracts::{self};
 use crate::types::{
-    ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData,
+    ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
 };
 use crate::{types::WalletProvider, utils};
 
@@ -73,12 +72,10 @@ impl Erc1155Client {
     /// # Returns
     /// * `Result<contracts::ERC1155EscrowObligation::StatementData>` - The decoded statement data
     pub fn decode_escrow_statement(
-        statement_data: Bytes,
+        statement_data: &Bytes,
     ) -> eyre::Result<contracts::ERC1155EscrowObligation::StatementData> {
-        let statement_data = contracts::ERC1155EscrowObligation::StatementData::abi_decode(
-            statement_data.as_ref(),
-            true,
-        )?;
+        let statement_data =
+            contracts::ERC1155EscrowObligation::StatementData::abi_decode(statement_data, true)?;
         return Ok(statement_data);
     }
 
@@ -92,12 +89,10 @@ impl Erc1155Client {
     ///
     /// * `eyre::Result<contracts::ERC1155PaymentObligation::StatementData>` - The decoded statement data
     pub fn decode_payment_statement(
-        statement_data: Bytes,
+        statement_data: &Bytes,
     ) -> eyre::Result<contracts::ERC1155PaymentObligation::StatementData> {
-        let statement_data = contracts::ERC1155PaymentObligation::StatementData::abi_decode(
-            statement_data.as_ref(),
-            true,
-        )?;
+        let statement_data =
+            contracts::ERC1155PaymentObligation::StatementData::abi_decode(statement_data, true)?;
         return Ok(statement_data);
     }
 
@@ -112,7 +107,7 @@ impl Erc1155Client {
     pub async fn approve_all(
         &self,
         token_contract: Address,
-        purpose: ApprovalPurpose,
+        purpose: &ApprovalPurpose,
     ) -> eyre::Result<TransactionReceipt> {
         let erc1155_contract = contracts::IERC1155::new(token_contract, &self.wallet_provider);
 
@@ -142,7 +137,7 @@ impl Erc1155Client {
     pub async fn revoke_all(
         &self,
         token_contract: Address,
-        purpose: ApprovalPurpose,
+        purpose: &ApprovalPurpose,
     ) -> eyre::Result<TransactionReceipt> {
         let erc1155_contract = contracts::IERC1155::new(token_contract, &self.wallet_provider);
 
@@ -226,8 +221,8 @@ impl Erc1155Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_with_erc1155(
         &self,
-        price: Erc1155Data,
-        item: ArbiterData,
+        price: &Erc1155Data,
+        item: &ArbiterData,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let escrow_obligation_contract = contracts::ERC1155EscrowObligation::new(
@@ -242,7 +237,7 @@ impl Erc1155Client {
                     tokenId: price.id,
                     amount: price.value,
                     arbiter: item.arbiter,
-                    demand: item.demand,
+                    demand: item.demand.clone(),
                 },
                 expiration,
             )
@@ -264,7 +259,7 @@ impl Erc1155Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_with_erc1155(
         &self,
-        price: Erc1155Data,
+        price: &Erc1155Data,
         payee: Address,
     ) -> eyre::Result<TransactionReceipt> {
         let payment_obligation_contract = contracts::ERC1155PaymentObligation::new(
@@ -298,8 +293,8 @@ impl Erc1155Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc1155_for_erc1155(
         &self,
-        bid: Erc1155Data,
-        ask: Erc1155Data,
+        bid: &Erc1155Data,
+        ask: &Erc1155Data,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let barter_utils_contract =
@@ -358,8 +353,8 @@ impl Erc1155Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc20_with_erc1155(
         &self,
-        bid: Erc1155Data,
-        ask: Erc20Data,
+        bid: &Erc1155Data,
+        ask: &Erc20Data,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let barter_utils_contract =
@@ -423,8 +418,8 @@ impl Erc1155Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_erc721_with_erc1155(
         &self,
-        bid: Erc1155Data,
-        ask: Erc721Data,
+        bid: &Erc1155Data,
+        ask: &Erc721Data,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let barter_utils_contract =
@@ -488,8 +483,8 @@ impl Erc1155Client {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_bundle_with_erc1155(
         &self,
-        bid: Erc1155Data,
-        ask: TokenBundleData,
+        bid: &Erc1155Data,
+        ask: &TokenBundleData,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let barter_utils_contract =
