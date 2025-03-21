@@ -73,14 +73,13 @@ impl AlkahestClient {
     /// # Returns
     /// * `Result<Self>` - The initialized client instance with all sub-clients configured
     pub async fn new(
-        private_key: impl ToString + Clone,
+        private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone,
         addresses: Option<AddressConfig>,
     ) -> eyre::Result<Self> {
         let wallet_provider =
             utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
         let public_provider = utils::get_public_provider(rpc_url.clone()).await?;
-        let signer: PrivateKeySigner = private_key.to_string().parse()?;
 
         macro_rules! make_client {
             ($client:ident, $addresses:ident) => {
@@ -95,7 +94,7 @@ impl AlkahestClient {
         Ok(AlkahestClient {
             wallet_provider: wallet_provider.clone(),
             public_provider: public_provider.clone(),
-            address: signer.address(),
+            address: private_key.address(),
             arbiters: make_client!(ArbitersClient, arbiters_addresses).await?,
             erc20: make_client!(Erc20Client, erc20_addresses).await?,
             erc721: make_client!(Erc721Client, erc721_addresses).await?,

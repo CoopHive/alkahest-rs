@@ -1,5 +1,5 @@
 use alloy::{
-    primitives::{address, Address, Bytes, FixedBytes, Log},
+    primitives::{Address, Bytes, FixedBytes, Log, address},
     providers::Provider as _,
     rpc::types::{Filter, TransactionReceipt},
     signers::local::PrivateKeySigner,
@@ -66,16 +66,15 @@ sol! {
 
 impl ArbitersClient {
     pub async fn new(
-        private_key: impl ToString + Clone,
+        signer: PrivateKeySigner,
         rpc_url: impl ToString + Clone,
         addresses: Option<ArbitersAddresses>,
     ) -> eyre::Result<Self> {
         let public_provider = utils::get_public_provider(rpc_url.clone()).await?;
-        let wallet_provider =
-            utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
+        let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
         Ok(ArbitersClient {
-            signer: private_key.to_string().parse()?,
+            signer,
             public_provider: public_provider.clone(),
             wallet_provider,
 

@@ -1,4 +1,4 @@
-use alloy::primitives::{address, Address, Bytes, FixedBytes};
+use alloy::primitives::{Address, Bytes, FixedBytes, address};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
@@ -52,15 +52,14 @@ impl TokenBundleClient {
     /// # Returns
     /// * `Result<Self>` - The initialized client instance
     pub async fn new(
-        private_key: impl ToString + Clone,
+        signer: PrivateKeySigner,
         rpc_url: impl ToString + Clone,
         addresses: Option<TokenBundleAddresses>,
     ) -> eyre::Result<Self> {
-        let wallet_provider =
-            utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
+        let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
         Ok(TokenBundleClient {
-            signer: private_key.to_string().parse()?,
+            signer,
             wallet_provider,
 
             addresses: addresses.unwrap_or_default(),

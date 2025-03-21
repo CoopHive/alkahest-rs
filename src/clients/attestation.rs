@@ -1,4 +1,4 @@
-use alloy::primitives::{address, Address};
+use alloy::primitives::{Address, address};
 use alloy::primitives::{Bytes, FixedBytes};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
@@ -43,15 +43,14 @@ impl AttestationClient {
     /// * `rpc_url` - The RPC endpoint URL
     /// * `addresses` - Optional custom contract addresses
     pub async fn new(
-        private_key: impl ToString + Clone,
+        signer: PrivateKeySigner,
         rpc_url: impl ToString + Clone,
         addresses: Option<AttestationAddresses>,
     ) -> eyre::Result<Self> {
-        let wallet_provider =
-            utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
+        let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
         Ok(AttestationClient {
-            signer: private_key.to_string().parse()?,
+            signer,
             wallet_provider,
 
             addresses: addresses.unwrap_or_default(),

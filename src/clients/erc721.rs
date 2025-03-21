@@ -1,4 +1,4 @@
-use alloy::primitives::{address, Address, Bytes, FixedBytes};
+use alloy::primitives::{Address, Bytes, FixedBytes, address};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
@@ -6,7 +6,7 @@ use alloy::sol_types::SolValue as _;
 use crate::addresses::FILECOIN_CALIBRATION_ADDRESSES;
 use crate::contracts::{self};
 use crate::types::{
-    ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData,
+    ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
 };
 use crate::{types::WalletProvider, utils};
 
@@ -50,15 +50,14 @@ impl Erc721Client {
     /// # Returns
     /// * `Result<Self>` - The initialized client instance
     pub async fn new(
-        private_key: impl ToString + Clone,
+        signer: PrivateKeySigner,
         rpc_url: impl ToString + Clone,
         addresses: Option<Erc721Addresses>,
     ) -> eyre::Result<Self> {
-        let wallet_provider =
-            utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
+        let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
         Ok(Erc721Client {
-            signer: private_key.to_string().parse()?,
+            signer,
             wallet_provider,
 
             addresses: addresses.unwrap_or_default(),

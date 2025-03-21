@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use alloy::primitives::{address, keccak256, Address, Bytes, FixedBytes, U256};
+use alloy::primitives::{Address, Bytes, FixedBytes, U256, address, keccak256};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::signers::{Signature, Signer};
@@ -53,15 +53,14 @@ impl Erc20Client {
     /// # Returns
     /// * `Result<Self>` - The initialized client instance
     pub async fn new(
-        private_key: impl ToString + Clone,
+        signer: PrivateKeySigner,
         rpc_url: impl ToString + Clone,
         addresses: Option<Erc20Addresses>,
     ) -> eyre::Result<Self> {
-        let wallet_provider =
-            utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
+        let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
         Ok(Erc20Client {
-            signer: private_key.to_string().parse()?,
+            signer,
             wallet_provider,
 
             addresses: addresses.unwrap_or_default(),

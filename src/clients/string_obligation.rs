@@ -1,5 +1,5 @@
 use alloy::{
-    primitives::{address, Address, Bytes, FixedBytes},
+    primitives::{Address, Bytes, FixedBytes, address},
     rpc::types::TransactionReceipt,
     signers::local::PrivateKeySigner,
     sol_types::SolValue as _,
@@ -41,12 +41,11 @@ impl StringObligationClient {
     /// # Returns
     /// * `Result<Self>` - The initialized client instance with all sub-clients configured
     pub async fn new(
-        private_key: impl ToString + Clone,
+        signer: PrivateKeySigner,
         rpc_url: impl ToString + Clone,
         addresses: Option<StringObligationAddresses>,
     ) -> eyre::Result<Self> {
-        let signer: PrivateKeySigner = private_key.to_string().parse()?;
-        let wallet_provider = crate::utils::get_wallet_provider(private_key, rpc_url).await?;
+        let wallet_provider = crate::utils::get_wallet_provider(signer.clone(), rpc_url).await?;
 
         Ok(StringObligationClient {
             signer,
