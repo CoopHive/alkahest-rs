@@ -59,22 +59,26 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let god: PrivateKeySigner = anvil.keys()[2].clone().into();
     let god_wallet = EthereumWallet::from(god.clone());
 
-    let rpc_url = anvil.endpoint_url();
+    let rpc_url = anvil.ws_endpoint_url();
+    let ws = WsConnect::new(rpc_url.clone());
+
     let alice_client = AlkahestClient::new(alice.clone(), rpc_url.clone(), None).await?;
     let bob_client = AlkahestClient::new(bob.clone(), rpc_url.clone(), None).await?;
 
-    let god_provider = ProviderBuilder::new()
-        .wallet(god_wallet)
-        .on_http(rpc_url.clone());
+    let god_provider = ProviderBuilder::new().wallet(god_wallet).on_ws(ws).await?;
     let god_provider_ = god_provider.clone();
 
     let schema_registry = SchemaRegistry::deploy(&god_provider).await?;
     let eas = EAS::deploy(&god_provider, schema_registry.address().clone()).await?;
 
-    let mock_erc20 =
+    let mock_erc20_a =
         MockERC20Permit::deploy(&god_provider, "Mock Erc20".into(), "TK1".into()).await?;
-    let mock_erc721 = MockERC721::deploy(&god_provider).await?;
-    let mock_erc1155 = MockERC1155::deploy(&god_provider).await?;
+    let mock_erc20_b =
+        MockERC20Permit::deploy(&god_provider, "Mock Erc20".into(), "TK2".into()).await?;
+    let mock_erc721_a = MockERC721::deploy(&god_provider).await?;
+    let mock_erc721_b = MockERC721::deploy(&god_provider).await?;
+    let mock_erc1155_a = MockERC1155::deploy(&god_provider).await?;
+    let mock_erc1155_b = MockERC1155::deploy(&god_provider).await?;
 
     let specific_attestation_arbiter = SpecificAttestationArbiter::deploy(&god_provider).await?;
     let trivial_arbiter = TrivialArbiter::deploy(&god_provider).await?;
@@ -192,9 +196,12 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
             }),
         },
         mock_addresses: MockAddresses {
-            erc20: mock_erc20.address().clone(),
-            erc721: mock_erc721.address().clone(),
-            erc1155: mock_erc1155.address().clone(),
+            erc20_a: mock_erc20_a.address().clone(),
+            erc20_b: mock_erc20_b.address().clone(),
+            erc721_a: mock_erc721_a.address().clone(),
+            erc721_b: mock_erc721_b.address().clone(),
+            erc1155_a: mock_erc1155_a.address().clone(),
+            erc1155_b: mock_erc1155_b.address().clone(),
         },
     })
 }
@@ -212,7 +219,10 @@ pub struct TestContext {
 }
 
 pub struct MockAddresses {
-    pub erc20: Address,
-    pub erc721: Address,
-    pub erc1155: Address,
+    pub erc20_a: Address,
+    pub erc20_b: Address,
+    pub erc721_a: Address,
+    pub erc721_b: Address,
+    pub erc1155_a: Address,
+    pub erc1155_b: Address,
 }
