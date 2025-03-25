@@ -12,6 +12,7 @@ alloy = { version = "0.12", features = [
     "node-bindings",
     "signers",
     "rlp",
+    "eip712",
 ] }
 
 # async
