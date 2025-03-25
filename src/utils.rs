@@ -49,9 +49,9 @@ pub async fn get_public_provider(rpc_url: impl ToString) -> eyre::Result<PublicP
 }
 
 pub async fn setup_test_environment() -> eyre::Result<TestContext> {
-    let anvil = alloy::node_bindings::Anvil::new()
-        .block_time(100)
-        .try_spawn()?;
+    println!("launching anvil");
+    let anvil = alloy::node_bindings::Anvil::new().try_spawn()?;
+    println!("anvil launched");
 
     let alice: PrivateKeySigner = anvil.keys()[0].clone().into();
     let bob: PrivateKeySigner = anvil.keys()[1].clone().into();
