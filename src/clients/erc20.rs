@@ -1,6 +1,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use alloy::dyn_abi::Eip712Domain;
 use alloy::primitives::{Address, Bytes, FixedBytes, U256, address, keccak256};
+use alloy::providers::Provider as _;
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::signers::{Signature, Signer};
@@ -82,32 +84,49 @@ impl Erc20Client {
         token: &Erc20Data,
         deadline: U256,
     ) -> eyre::Result<Signature> {
-        let token_contract = ERC20Permit::new(token.address, &self.wallet_provider);
+        use alloy::sol;
 
-        let permit_type_hash = keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)",
-        );
+        // Define the Permit type using the sol! macro
+        sol! {
+            struct Permit {
+                address owner;
+                address spender;
+                uint256 value;
+                uint256 nonce;
+                uint256 deadline;
+            }
+        }
+
+        let token_contract = ERC20Permit::new(token.address, &self.wallet_provider);
         let owner = self.signer.address();
 
-        let (nonce, domain_separator) = tokio::try_join!(
-            async { Ok::<_, eyre::Error>(token_contract.nonces(owner).call().await?._0) },
-            async { Ok(token_contract.DOMAIN_SEPARATOR().call().await?._0) }
+        // Get token name and nonce
+        let (name, nonce, chain_id) = tokio::try_join!(
+            async { Ok::<_, eyre::Error>(token_contract.name().call().await?._0) },
+            async { Ok(token_contract.nonces(owner).call().await?._0) },
+            async { Ok(self.wallet_provider.get_chain_id().await?) },
         )?;
 
-        let struct_hash = keccak256(
-            (
-                permit_type_hash,
-                owner,
-                spender,
-                token.value,
-                nonce,
-                deadline,
-            )
-                .abi_encode(),
-        );
+        // Create the EIP-712 domain
+        let domain = Eip712Domain {
+            name: Some(name.into()),
+            version: Some("1".into()),
+            chain_id: Some(chain_id.try_into()?),
+            verifying_contract: Some(token.address),
+            salt: None,
+        };
 
-        let digest = keccak256((&[0x19, 0x01], domain_separator, struct_hash).abi_encode_packed());
-        let signature = self.signer.sign_hash(&digest).await?;
+        // Create the permit data
+        let permit = Permit {
+            owner,
+            spender,
+            value: token.value,
+            nonce,
+            deadline,
+        };
+
+        // Sign the typed data according to EIP-712
+        let signature = self.signer.sign_typed_data(&permit, &domain).await?;
 
         Ok(signature)
     }
@@ -377,7 +396,7 @@ impl Erc20Client {
                 price.value,
                 payee,
                 deadline.try_into()?,
-                if permit.v() { 27 } else { 28 },
+                27 + permit.v() as u8,
                 permit.r().into(),
                 permit.s().into(),
             )
@@ -425,15 +444,6 @@ impl Erc20Client {
     ///
     /// # Returns
     /// * `Result<TransactionReceipt>` - The transaction receipt
-    /// Creates an escrow to trade ERC20 tokens for other ERC20 tokens using permit signature.
-    ///
-    /// # Arguments
-    /// * `bid` - The ERC20 token data being offered
-    /// * `ask` - The ERC20 token data being requested
-    /// * `expiration` - The expiration timestamp
-    ///
-    /// # Returns
-    /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn permit_and_buy_erc20_for_erc20(
         &self,
         bid: &Erc20Data,
@@ -441,6 +451,7 @@ impl Erc20Client {
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
+
         let permit = self
             .get_permit_signature(self.addresses.escrow_obligation, bid, deadline.try_into()?)
             .await?;
@@ -456,7 +467,7 @@ impl Erc20Client {
                 ask.value,
                 expiration,
                 deadline.try_into()?,
-                if permit.v() { 27 } else { 28 },
+                27 + permit.v() as u8,
                 permit.r().into(),
                 permit.s().into(),
             )
@@ -543,7 +554,7 @@ impl Erc20Client {
             .permitAndPayErc20ForErc20(
                 buy_attestation,
                 deadline.try_into()?,
-                if permit.v() { 27 } else { 28 },
+                27 + permit.v() as u8,
                 permit.r().into(),
                 permit.s().into(),
             )
@@ -618,7 +629,7 @@ impl Erc20Client {
                 ask.id,
                 expiration,
                 deadline.try_into()?,
-                if permit.v() { 27 } else { 28 },
+                27 + permit.v() as u8,
                 permit.r().into(),
                 permit.s().into(),
             )
@@ -703,7 +714,7 @@ impl Erc20Client {
             .permitAndPayErc20ForErc721(
                 buy_attestation,
                 deadline.try_into()?,
-                if permit.v() { 27 } else { 28 },
+                27 + permit.v() as u8,
                 permit.r().into(),
                 permit.s().into(),
             )
@@ -786,7 +797,7 @@ impl Erc20Client {
                 ask.value,
                 expiration,
                 deadline.try_into()?,
-                if permit.v() { 27 } else { 28 },
+                27 + permit.v() as u8,
                 permit.r().into(),
                 permit.s().into(),
             )
@@ -950,7 +961,7 @@ impl Erc20Client {
                 (ask, self.signer.address()).into(),
                 expiration,
                 deadline.try_into()?,
-                if permit.v() { 27 } else { 28 },
+                27 + permit.v() as u8,
                 permit.r().into(),
                 permit.s().into(),
             )
@@ -1036,7 +1047,7 @@ impl Erc20Client {
             .permitAndPayErc20ForBundle(
                 buy_attestation,
                 deadline.try_into()?,
-                if permit.v() { 27 } else { 28 },
+                27 + permit.v() as u8,
                 permit.r().into(),
                 permit.s().into(),
             )
