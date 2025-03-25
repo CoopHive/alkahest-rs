@@ -1,9 +1,9 @@
 use alloy::{
     network::{EthereumWallet, TxSigner},
+    node_bindings::AnvilInstance,
     primitives::{Address, PrimitiveSignature},
     providers::{ProviderBuilder, WsConnect},
     signers::local::PrivateKeySigner,
-    transports::http::reqwest::Url,
 };
 
 use crate::{
@@ -52,7 +52,6 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     println!("launching anvil");
     let anvil = alloy::node_bindings::Anvil::new().try_spawn()?;
     println!("anvil launched");
-
 
     println!("creating god provider");
     let god: PrivateKeySigner = anvil.keys()[0].clone().into();
