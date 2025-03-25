@@ -1050,4 +1050,45 @@ impl Erc20Client {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use alloy::primitives::FixedBytes;
+
+    use crate::{
+        AlkahestClient,
+        types::{ApprovalPurpose, Erc20Data},
+        utils::setup_test_environment,
+    };
+
+    // Erc20BarterUtils
+    //
+    #[tokio::test]
+    async fn test_buy_erc20_for_erc20() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+
+        let bid = Erc20Data {
+            address: test.mock_addresses.erc20_a,
+            value: 10.try_into()?,
+        };
+        let ask = Erc20Data {
+            address: test.mock_addresses.erc20_b,
+            value: 20.try_into()?,
+        };
+        let expiration = 1000;
+
+        test.alice_client
+            .erc20
+            .approve(&bid, ApprovalPurpose::Escrow)
+            .await?;
+
+        let receipt = test
+            .alice_client
+            .erc20
+            .buy_erc20_for_erc20(&bid, &ask, expiration)
+            .await?;
+        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+
+        assert_ne!(attested_event.uid, FixedBytes::<32>::default());
+
+        Ok(())
+    }
+}
