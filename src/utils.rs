@@ -53,24 +53,22 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let anvil = alloy::node_bindings::Anvil::new().try_spawn()?;
     println!("anvil launched");
 
-    let alice: PrivateKeySigner = anvil.keys()[0].clone().into();
-    let bob: PrivateKeySigner = anvil.keys()[1].clone().into();
 
-    let god: PrivateKeySigner = anvil.keys()[2].clone().into();
+    println!("creating god provider");
+    let god: PrivateKeySigner = anvil.keys()[0].clone().into();
     let god_wallet = EthereumWallet::from(god.clone());
 
-    let rpc_url = anvil.ws_endpoint_url();
-    let ws = WsConnect::new(rpc_url.clone());
-
-    let alice_client = AlkahestClient::new(alice.clone(), rpc_url.clone(), None).await?;
-    let bob_client = AlkahestClient::new(bob.clone(), rpc_url.clone(), None).await?;
-
+    let ws = WsConnect::new(anvil.ws_endpoint_url());
     let god_provider = ProviderBuilder::new().wallet(god_wallet).on_ws(ws).await?;
     let god_provider_ = god_provider.clone();
+    println!("god provider created");
 
+    println!("deploying contracts");
+    println!("eas");
     let schema_registry = SchemaRegistry::deploy(&god_provider).await?;
     let eas = EAS::deploy(&god_provider, schema_registry.address().clone()).await?;
 
+    println!("mock tokens");
     let mock_erc20_a =
         MockERC20Permit::deploy(&god_provider, "Mock Erc20".into(), "TK1".into()).await?;
     let mock_erc20_b =
@@ -80,6 +78,7 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let mock_erc1155_a = MockERC1155::deploy(&god_provider).await?;
     let mock_erc1155_b = MockERC1155::deploy(&god_provider).await?;
 
+    println!("arbiters");
     let specific_attestation_arbiter = SpecificAttestationArbiter::deploy(&god_provider).await?;
     let trivial_arbiter = TrivialArbiter::deploy(&god_provider).await?;
     let trusted_oracle_arbiter = TrustedOracleArbiter::deploy(&god_provider).await?;
@@ -96,6 +95,7 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
         };
     }
 
+    println!("obligations");
     let attestation_escrow_obligation = deploy_obligation!(AttestationEscrowObligation);
     let attestation_escrow_obligation_2 = deploy_obligation!(AttestationEscrowObligation2);
     let bundle_escrow_obligation = deploy_obligation!(TokenBundleEscrowObligation);
@@ -126,6 +126,7 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
         };
     }
 
+    println!("barter utils");
     let attestation_barter_utils = AttestationBarterUtils::deploy(
         &god_provider,
         eas.address().clone(),
@@ -143,6 +144,71 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let erc20_barter_utils = deploy_cross_token!(ERC20BarterCrossToken);
     let erc721_barter_utils = deploy_cross_token!(ERC721BarterCrossToken);
     let erc1155_barter_utils = deploy_cross_token!(ERC1155BarterCrossToken);
+    println!("contracts deployed");
+
+    println!("creating clients");
+    let alice: PrivateKeySigner = anvil.keys()[1].clone().into();
+    let bob: PrivateKeySigner = anvil.keys()[2].clone().into();
+
+    let addresses = AddressConfig {
+        arbiters_addresses: Some(ArbitersAddresses {
+            specific_attestation_arbiter: specific_attestation_arbiter.address().clone(),
+            trivial_arbiter: trivial_arbiter.address().clone(),
+            trusted_oracle_arbiter: trusted_oracle_arbiter.address().clone(),
+            trusted_party_arbiter: trusted_party_arbiter.address().clone(),
+        }),
+        string_obligation_addresses: Some(StringObligationAddresses {
+            eas: eas.address().clone(),
+            obligation: string_obligation.address().clone(),
+        }),
+        erc20_addresses: Some(Erc20Addresses {
+            eas: eas.address().clone(),
+            barter_utils: erc20_barter_utils.address().clone(),
+            escrow_obligation: erc20_escrow_obligation.address().clone(),
+            payment_obligation: erc20_payment_obligation.address().clone(),
+        }),
+        erc721_addresses: Some(Erc721Addresses {
+            eas: eas.address().clone(),
+            barter_utils: erc721_barter_utils.address().clone(),
+            escrow_obligation: erc721_escrow_obligation.address().clone(),
+            payment_obligation: erc721_payment_obligation.address().clone(),
+        }),
+        erc1155_addresses: Some(Erc1155Addresses {
+            eas: eas.address().clone(),
+            barter_utils: erc1155_barter_utils.address().clone(),
+            escrow_obligation: erc1155_escrow_obligation.address().clone(),
+            payment_obligation: erc1155_payment_obligation.address().clone(),
+        }),
+        token_bundle_addresses: Some(TokenBundleAddresses {
+            eas: eas.address().clone(),
+            barter_utils: bundle_barter_utils.address().clone(),
+            escrow_obligation: bundle_escrow_obligation.address().clone(),
+            payment_obligation: bundle_payment_obligation.address().clone(),
+        }),
+        attestation_addresses: Some(AttestationAddresses {
+            eas: eas.address().clone(),
+            eas_schema_registry: schema_registry.address().clone(),
+            barter_utils: attestation_barter_utils.address().clone(),
+            escrow_obligation: attestation_escrow_obligation.address().clone(),
+            escrow_obligation_2: attestation_escrow_obligation_2.address().clone(),
+        }),
+    };
+
+    let alice_client = AlkahestClient::new(
+        alice.clone(),
+        anvil.ws_endpoint_url(),
+        Some(addresses.clone()),
+    )
+    .await?;
+    let bob_client = AlkahestClient::new(
+        bob.clone(),
+        anvil.ws_endpoint_url(),
+        Some(addresses.clone()),
+    )
+    .await?;
+
+    println!("clients created");
+    println!("setup done");
 
     Ok(TestContext {
         alice,
@@ -152,49 +218,7 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
         rpc_url,
         alice_client,
         bob_client,
-        addresses: AddressConfig {
-            arbiters_addresses: Some(ArbitersAddresses {
-                specific_attestation_arbiter: specific_attestation_arbiter.address().clone(),
-                trivial_arbiter: trivial_arbiter.address().clone(),
-                trusted_oracle_arbiter: trusted_oracle_arbiter.address().clone(),
-                trusted_party_arbiter: trusted_party_arbiter.address().clone(),
-            }),
-            string_obligation_addresses: Some(StringObligationAddresses {
-                eas: eas.address().clone(),
-                obligation: string_obligation.address().clone(),
-            }),
-            erc20_addresses: Some(Erc20Addresses {
-                eas: eas.address().clone(),
-                barter_utils: erc20_barter_utils.address().clone(),
-                escrow_obligation: erc20_escrow_obligation.address().clone(),
-                payment_obligation: erc20_payment_obligation.address().clone(),
-            }),
-            erc721_addresses: Some(Erc721Addresses {
-                eas: eas.address().clone(),
-                barter_utils: erc721_barter_utils.address().clone(),
-                escrow_obligation: erc721_escrow_obligation.address().clone(),
-                payment_obligation: erc721_payment_obligation.address().clone(),
-            }),
-            erc1155_addresses: Some(Erc1155Addresses {
-                eas: eas.address().clone(),
-                barter_utils: erc1155_barter_utils.address().clone(),
-                escrow_obligation: erc1155_escrow_obligation.address().clone(),
-                payment_obligation: erc1155_payment_obligation.address().clone(),
-            }),
-            token_bundle_addresses: Some(TokenBundleAddresses {
-                eas: eas.address().clone(),
-                barter_utils: bundle_barter_utils.address().clone(),
-                escrow_obligation: bundle_escrow_obligation.address().clone(),
-                payment_obligation: bundle_payment_obligation.address().clone(),
-            }),
-            attestation_addresses: Some(AttestationAddresses {
-                eas: eas.address().clone(),
-                eas_schema_registry: schema_registry.address().clone(),
-                barter_utils: attestation_barter_utils.address().clone(),
-                escrow_obligation: attestation_escrow_obligation.address().clone(),
-                escrow_obligation_2: attestation_escrow_obligation_2.address().clone(),
-            }),
-        },
+        addresses,
         mock_addresses: MockAddresses {
             erc20_a: mock_erc20_a.address().clone(),
             erc20_b: mock_erc20_b.address().clone(),
