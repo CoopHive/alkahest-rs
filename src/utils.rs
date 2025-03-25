@@ -211,11 +211,11 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     println!("setup done");
 
     Ok(TestContext {
+        anvil,
         alice,
         bob,
         god,
         god_provider: god_provider_,
-        rpc_url,
         alice_client,
         bob_client,
         addresses,
@@ -231,11 +231,11 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
 }
 
 pub struct TestContext {
+    pub anvil: AnvilInstance,
     pub alice: PrivateKeySigner,
     pub bob: PrivateKeySigner,
     pub god: PrivateKeySigner,
     pub god_provider: WalletProvider,
-    pub rpc_url: Url,
     pub alice_client: AlkahestClient,
     pub bob_client: AlkahestClient,
     pub addresses: AddressConfig,
