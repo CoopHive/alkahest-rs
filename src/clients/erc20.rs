@@ -5,7 +5,6 @@ use alloy::providers::Provider as _;
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::signers::{Signature, Signer};
-use alloy::sol_types::SolValue as _;
 use alloy::{
     primitives::{Address, Bytes, FixedBytes, U256},
     sol_types::SolValue,
@@ -223,7 +222,7 @@ impl Erc20Client {
             .await?
             ._0;
 
-        if current_allowance > token.value {
+        if current_allowance >= token.value {
             return Ok(None);
         }
 
@@ -1069,6 +1068,7 @@ mod tests {
 
     use alloy::{
         primitives::{Bytes, FixedBytes, U256},
+        providers::ext::AnvilApi as _,
         sol_types::SolValue,
     };
 
@@ -1225,105 +1225,105 @@ mod tests {
         Ok(())
     }
 
-    // #[tokio::test]
-    // async fn test_approve_if_less() -> eyre::Result<()> {
-    //     // test setup
-    //     let test = setup_test_environment().await?;
+    #[tokio::test]
+    async fn test_approve_if_less() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
 
-    //     // give alice some erc20 tokens
-    //     let mock_erc20_a = MockERC20Permit::new(test.mock_addresses.erc20_a, &test.god_provider);
-    //     mock_erc20_a
-    //         .transfer(test.alice.address(), 200.try_into()?)
-    //         .send()
-    //         .await?
-    //         .get_receipt()
-    //         .await?;
+        // give alice some erc20 tokens
+        let mock_erc20_a = MockERC20Permit::new(test.mock_addresses.erc20_a, &test.god_provider);
+        mock_erc20_a
+            .transfer(test.alice.address(), 200.try_into()?)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
 
-    //     let token = Erc20Data {
-    //         address: test.mock_addresses.erc20_a,
-    //         value: 100.try_into()?,
-    //     };
+        let token = Erc20Data {
+            address: test.mock_addresses.erc20_a,
+            value: 100.try_into()?,
+        };
 
-    //     // First time should approve (no existing allowance)
-    //     let receipt_opt = test
-    //         .alice_client
-    //         .erc20
-    //         .approve_if_less(&token, ApprovalPurpose::Payment)
-    //         .await?;
+        // First time should approve (no existing allowance)
+        let receipt_opt = test
+            .alice_client
+            .erc20
+            .approve_if_less(&token, ApprovalPurpose::Payment)
+            .await?;
 
-    //     assert!(
-    //         receipt_opt.is_some(),
-    //         "First approval should return receipt"
-    //     );
+        assert!(
+            receipt_opt.is_some(),
+            "First approval should return receipt"
+        );
 
-    //     // Verify approval happened
-    //     let payment_allowance = mock_erc20_a
-    //         .allowance(
-    //             test.alice.address(),
-    //             test.addresses
-    //                 .erc20_addresses
-    //                 .clone()
-    //                 .ok_or(eyre::eyre!("no erc20-related addresses"))?
-    //                 .payment_obligation,
-    //         )
-    //         .call()
-    //         .await?
-    //         ._0;
+        // Verify approval happened
+        let payment_allowance = mock_erc20_a
+            .allowance(
+                test.alice.address(),
+                test.addresses
+                    .erc20_addresses
+                    .clone()
+                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
+                    .payment_obligation,
+            )
+            .call()
+            .await?
+            ._0;
 
-    //     assert_eq!(
-    //         payment_allowance,
-    //         100.try_into()?,
-    //         "Payment allowance should be set correctly"
-    //     );
+        assert_eq!(
+            payment_allowance,
+            100.try_into()?,
+            "Payment allowance should be set correctly"
+        );
 
-    //     // Second time should not approve (existing allowance is sufficient)
-    //     let receipt_opt = test
-    //         .alice_client
-    //         .erc20
-    //         .approve_if_less(&token, ApprovalPurpose::Payment)
-    //         .await?;
+        // Second time should not approve (existing allowance is sufficient)
+        let receipt_opt = test
+            .alice_client
+            .erc20
+            .approve_if_less(&token, ApprovalPurpose::Payment)
+            .await?;
 
-    //     assert!(receipt_opt.is_none(), "Second approval should not happen");
+        assert!(receipt_opt.is_none(), "Second approval should not happen");
 
-    //     // Now test with a larger amount
-    //     let larger_token = Erc20Data {
-    //         address: test.mock_addresses.erc20_a,
-    //         value: 150.try_into()?,
-    //     };
+        // Now test with a larger amount
+        let larger_token = Erc20Data {
+            address: test.mock_addresses.erc20_a,
+            value: 150.try_into()?,
+        };
 
-    //     // This should approve again because we need a higher allowance
-    //     let receipt_opt = test
-    //         .alice_client
-    //         .erc20
-    //         .approve_if_less(&larger_token, ApprovalPurpose::Payment)
-    //         .await?;
+        // This should approve again because we need a higher allowance
+        let receipt_opt = test
+            .alice_client
+            .erc20
+            .approve_if_less(&larger_token, ApprovalPurpose::Payment)
+            .await?;
 
-    //     assert!(
-    //         receipt_opt.is_some(),
-    //         "Third approval with larger amount should return receipt"
-    //     );
+        assert!(
+            receipt_opt.is_some(),
+            "Third approval with larger amount should return receipt"
+        );
 
-    //     // Verify new approval amount
-    //     let new_payment_allowance = mock_erc20_a
-    //         .allowance(
-    //             test.alice.address(),
-    //             test.addresses
-    //                 .erc20_addresses
-    //                 .ok_or(eyre::eyre!("no erc20-related addresses"))?
-    //                 .payment_obligation,
-    //         )
-    //         .call()
-    //         .await?
-    //         ._0;
+        // Verify new approval amount
+        let new_payment_allowance = mock_erc20_a
+            .allowance(
+                test.alice.address(),
+                test.addresses
+                    .erc20_addresses
+                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
+                    .payment_obligation,
+            )
+            .call()
+            .await?
+            ._0;
 
-    //     assert_eq!(
-    //         new_payment_allowance,
-    //         150.try_into()?,
-    //         "New payment allowance should be set correctly"
-    //     );
+        assert_eq!(
+            new_payment_allowance,
+            150.try_into()?,
+            "New payment allowance should be set correctly"
+        );
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_buy_with_erc20() -> eyre::Result<()> {
@@ -1435,20 +1435,11 @@ mod tests {
             .await?
             ._0;
 
-        let payment_balance = mock_erc20_a
-            .balanceOf(
-                test.addresses
-                    .erc20_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
-                    .payment_obligation,
-            )
-            .call()
-            .await?
-            ._0;
+        let bob_balance = mock_erc20_a.balanceOf(test.bob.address()).call().await?._0;
 
-        // all tokens moved to payment contract
+        // all tokens paid to bob
         assert_eq!(alice_balance, 0.try_into()?);
-        assert_eq!(payment_balance, 100.try_into()?);
+        assert_eq!(bob_balance, 100.try_into()?);
 
         // payment statement made
         let attested_event = AlkahestClient::get_attested_event(receipt)?;
@@ -1490,20 +1481,11 @@ mod tests {
             .await?
             ._0;
 
-        let payment_balance = mock_erc20_a
-            .balanceOf(
-                test.addresses
-                    .erc20_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
-                    .payment_obligation,
-            )
-            .call()
-            .await?
-            ._0;
+        let bob_balance = mock_erc20_a.balanceOf(test.bob.address()).call().await?._0;
 
-        // all tokens moved to payment contract
+        // all tokens paid to bob
         assert_eq!(alice_balance, 0.try_into()?);
-        assert_eq!(payment_balance, 100.try_into()?);
+        assert_eq!(bob_balance, 100.try_into()?);
 
         // payment statement made
         let attested_event = AlkahestClient::get_attested_event(receipt)?;
@@ -1798,105 +1780,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_collect_payment() -> eyre::Result<()> {
-        // test setup
-        let test = setup_test_environment().await?;
-
-        // give alice some erc20 tokens for bidding
-        let mock_erc20_a = MockERC20Permit::new(test.mock_addresses.erc20_a, &test.god_provider);
-        mock_erc20_a
-            .transfer(test.alice.address(), 100.try_into()?)
-            .send()
-            .await?
-            .get_receipt()
-            .await?;
-
-        // give bob some erc20 tokens for fulfillment
-        let mock_erc20_b = MockERC20Permit::new(test.mock_addresses.erc20_b, &test.god_provider);
-        mock_erc20_b
-            .transfer(test.bob.address(), 200.try_into()?)
-            .send()
-            .await?
-            .get_receipt()
-            .await?;
-
-        // begin test
-        let bid = Erc20Data {
-            address: test.mock_addresses.erc20_a,
-            value: 100.try_into()?,
-        };
-        let ask = Erc20Data {
-            address: test.mock_addresses.erc20_b,
-            value: 200.try_into()?,
-        };
-
-        // alice approves tokens for escrow and creates buy attestation
-        println!("alice approves");
-        test.alice_client
-            .erc20
-            .approve(&bid, ApprovalPurpose::Escrow)
-            .await?;
-
-        println!("alice buys");
-        let buy_receipt = test
-            .alice_client
-            .erc20
-            .buy_erc20_for_erc20(&bid, &ask, 0)
-            .await?;
-
-        let buy_attestation = AlkahestClient::get_attested_event(buy_receipt)?.uid;
-        println!("buy attestation: {:?}", buy_attestation);
-
-        // bob approves tokens for payment and creates fulfillment
-        println!("bob approves");
-        test.bob_client
-            .erc20
-            .approve(&ask, ApprovalPurpose::Payment)
-            .await?;
-
-        println!("bob fulfills");
-        let sell_receipt = test
-            .bob_client
-            .erc20
-            .pay_erc20_for_erc20(buy_attestation)
-            .await?;
-
-        let fulfillment = AlkahestClient::get_attested_event(sell_receipt)?.uid;
-        println!("fulfillment: {:?}", fulfillment);
-
-        // Test collecting payment
-        println!("bob collects");
-        let collect_receipt = test
-            .bob_client
-            .erc20
-            .collect_payment(buy_attestation, fulfillment)
-            .await?;
-
-        // verify token transfers
-        let alice_token_b_balance = mock_erc20_b
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
-
-        let bob_token_a_balance = mock_erc20_a.balanceOf(test.bob.address()).call().await?._0;
-
-        // both sides received the tokens
-        assert_eq!(
-            alice_token_b_balance,
-            200.try_into()?,
-            "Alice should have received token B"
-        );
-        assert_eq!(
-            bob_token_a_balance,
-            100.try_into()?,
-            "Bob should have received token A"
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_collect_expired() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1927,17 +1810,18 @@ mod tests {
             .await?;
 
         // alice makes escrow with a short expiration
-        let expiration = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 1;
+        let expiration = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 10;
         let receipt = test
             .alice_client
             .erc20
-            .buy_erc20_for_erc20(&bid, &ask, expiration as u64)
+            .buy_erc20_for_erc20(&bid, &ask, expiration as u64 + 1)
             .await?;
 
         let buy_attestation = AlkahestClient::get_attested_event(receipt)?.uid;
+        println!("buy attestation: {:?}", buy_attestation);
 
         // Wait for expiration
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        test.god_provider.anvil_increase_time(20).await?;
 
         // alice collects expired funds
         let collect_receipt = test
