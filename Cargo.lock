@@ -23,6 +23,7 @@ version = "0.4.1"
 dependencies = [
  "alloy",
  "eyre",
+ "futures",
  "futures-util",
  "serde",
  "serde_json",
