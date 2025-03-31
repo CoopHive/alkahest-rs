@@ -884,7 +884,7 @@ impl Erc20Client {
             .permitAndPayErc20ForErc1155(
                 buy_attestation,
                 deadline.try_into()?,
-                permit.v().into(),
+                27 + permit.v() as u8,
                 permit.r().into(),
                 permit.s().into(),
             )
@@ -2808,34 +2808,9 @@ mod tests {
         };
 
         // Bob approves his tokens for the bundle escrow
-        // ERC20
         test.bob_client
-            .erc20
-            .approve(
-                &Erc20Data {
-                    address: test.mock_addresses.erc20_b,
-                    value: bob_erc20_amount,
-                },
-                ApprovalPurpose::Escrow,
-            )
-            .await?;
-
-        // ERC721
-        test.bob_client
-            .erc721
-            .approve(
-                &Erc721Data {
-                    address: test.mock_addresses.erc721_a,
-                    id: erc721_token_id,
-                },
-                ApprovalPurpose::Escrow,
-            )
-            .await?;
-
-        // ERC1155
-        test.bob_client
-            .erc1155
-            .approve_all(test.mock_addresses.erc1155_a, &ApprovalPurpose::Escrow)
+            .token_bundle
+            .approve(&bundle, ApprovalPurpose::Escrow)
             .await?;
 
         // Bob creates bundle escrow demanding ERC20 from Alice
@@ -3029,35 +3004,9 @@ mod tests {
         };
 
         // Bob approves his tokens for the bundle escrow
-        // ERC20
-
         test.bob_client
-            .erc20
-            .approve(
-                &Erc20Data {
-                    address: test.mock_addresses.erc20_b,
-                    value: bob_erc20_amount,
-                },
-                ApprovalPurpose::Escrow,
-            )
-            .await?;
-
-        // ERC721
-        test.bob_client
-            .erc721
-            .approve(
-                &Erc721Data {
-                    address: test.mock_addresses.erc721_a,
-                    id: erc721_token_id,
-                },
-                ApprovalPurpose::Escrow,
-            )
-            .await?;
-
-        // ERC1155
-        test.bob_client
-            .erc1155
-            .approve_all(test.mock_addresses.erc1155_a, &ApprovalPurpose::Escrow)
+            .token_bundle
+            .approve(&bundle, ApprovalPurpose::Escrow)
             .await?;
 
         // Bob creates bundle escrow demanding ERC20 from Alice
