@@ -88,9 +88,9 @@ macro_rules! impl_escrow_obligation {
                 }
             }
         }
-        impl From<(&TokenBundleData, ArbiterData)> for $target {
-            fn from((bundle, payee): (&TokenBundleData, ArbiterData)) -> Self {
-                (bundle.clone(), payee).into()
+        impl From<(&TokenBundleData, &ArbiterData)> for $target {
+            fn from((bundle, arbiter_data): (&TokenBundleData, &ArbiterData)) -> Self {
+                (bundle.clone(), arbiter_data.clone()).into()
             }
         }
     };
