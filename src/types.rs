@@ -29,6 +29,7 @@ pub type PublicProvider = FillProvider<
     RootProvider,
 >;
 
+#[derive(Debug, Clone)]
 pub struct ArbiterData {
     pub arbiter: Address,
     pub demand: Bytes,
