@@ -2,10 +2,14 @@ use alloy::primitives::{Address, Bytes, FixedBytes, address};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
+use std::collections::HashSet;
 
-use crate::contracts::{self};
+use crate::contracts::{self, IERC20, IERC721, IERC1155};
 use crate::types::{ArbiterData, TokenBundleData};
-use crate::{types::WalletProvider, utils};
+use crate::{
+    types::{ApprovalPurpose, WalletProvider},
+    utils,
+};
 
 #[derive(Debug, Clone)]
 pub struct TokenBundleAddresses {
@@ -167,8 +171,8 @@ impl TokenBundleClient {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_with_bundle(
         &self,
-        price: TokenBundleData,
-        item: ArbiterData,
+        price: &TokenBundleData,
+        item: &ArbiterData,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let escrow_obligation_contract = contracts::token_bundle::TokenBundleEscrowObligation::new(
@@ -196,7 +200,7 @@ impl TokenBundleClient {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn pay_with_bundle(
         &self,
-        price: TokenBundleData,
+        price: &TokenBundleData,
         payee: Address,
     ) -> eyre::Result<TransactionReceipt> {
         let payment_obligation_contract =
@@ -226,8 +230,8 @@ impl TokenBundleClient {
     /// * `Result<TransactionReceipt>` - The transaction receipt
     pub async fn buy_bundle_for_bundle(
         &self,
-        bid: TokenBundleData,
-        ask: TokenBundleData,
+        bid: &TokenBundleData,
+        ask: &TokenBundleData,
         expiration: u64,
     ) -> eyre::Result<TransactionReceipt> {
         let barter_utils_contract = contracts::TokenBundleBarterUtils::new(
@@ -242,7 +246,7 @@ impl TokenBundleClient {
 
         let receipt = barter_utils_contract
             .buyBundleForBundle(
-                (bid, zero_arbiter).into(),
+                (bid, &zero_arbiter).into(),
                 (ask, self.signer.address()).into(),
                 expiration,
             )
@@ -278,5 +282,89 @@ impl TokenBundleClient {
             .await?;
 
         Ok(receipt)
+    }
+
+    /// Approves all tokens in a bundle for trading.
+    ///
+    /// # Arguments
+    /// * `bundle` - The token bundle data containing tokens to approve
+    /// * `purpose` - Purpose of approval (escrow or payment)
+    ///
+    /// # Returns
+    /// * `Result<Vec<TransactionReceipt>>` - A vector of transaction receipts for all approval transactions
+    ///
+    /// # Example
+    /// ```rust
+    /// let approvals = client.approve(&token_bundle, ApprovalPurpose::Escrow).await?;
+    /// ```
+    pub async fn approve(
+        &self,
+        bundle: &TokenBundleData,
+        purpose: ApprovalPurpose,
+    ) -> eyre::Result<Vec<TransactionReceipt>> {
+        // Get the appropriate contract address based on purpose
+        let target = match purpose {
+            ApprovalPurpose::Escrow => self.addresses.escrow_obligation,
+            ApprovalPurpose::Payment => self.addresses.payment_obligation,
+        };
+
+        let mut results = Vec::new();
+
+        // Process ERC20 tokens
+        for token in &bundle.erc20s {
+            let erc20_contract = IERC20::new(token.address, &self.wallet_provider);
+            // Use a two-step process to handle errors properly
+            match erc20_contract.approve(target, token.value).send().await {
+                Ok(pending_tx) => {
+                    match pending_tx.get_receipt().await {
+                        Ok(receipt) => results.push(receipt),
+                        Err(e) => return Err(eyre::eyre!("Failed to get ERC20 approval receipt: {}", e)),
+                    }
+                },
+                Err(e) => return Err(eyre::eyre!("Failed to send ERC20 approval: {}", e)),
+            }
+        }
+
+        // Process ERC721 tokens - group by token contract to use setApprovalForAll when possible
+        let erc721_addresses: HashSet<Address> = bundle.erc721s.iter()
+            .map(|token| token.address)
+            .collect();
+
+        // For contracts with multiple tokens, use setApprovalForAll
+        for address in erc721_addresses {
+            let erc721_contract = IERC721::new(address, &self.wallet_provider);
+            // Use a two-step process to handle errors properly
+            match erc721_contract.setApprovalForAll(target, true).send().await {
+                Ok(pending_tx) => {
+                    match pending_tx.get_receipt().await {
+                        Ok(receipt) => results.push(receipt),
+                        Err(e) => return Err(eyre::eyre!("Failed to get ERC721 approval receipt: {}", e)),
+                    }
+                },
+                Err(e) => return Err(eyre::eyre!("Failed to send ERC721 approval: {}", e)),
+            }
+        }
+
+        // Process ERC1155 tokens - group by token contract to use setApprovalForAll
+        let erc1155_addresses: HashSet<Address> = bundle.erc1155s.iter()
+            .map(|token| token.address)
+            .collect();
+
+        // For ERC1155, always use setApprovalForAll
+        for address in erc1155_addresses {
+            let erc1155_contract = IERC1155::new(address, &self.wallet_provider);
+            // Use a two-step process to handle errors properly
+            match erc1155_contract.setApprovalForAll(target, true).send().await {
+                Ok(pending_tx) => {
+                    match pending_tx.get_receipt().await {
+                        Ok(receipt) => results.push(receipt),
+                        Err(e) => return Err(eyre::eyre!("Failed to get ERC1155 approval receipt: {}", e)),
+                    }
+                },
+                Err(e) => return Err(eyre::eyre!("Failed to send ERC1155 approval: {}", e)),
+            }
+        }
+
+        Ok(results)
     }
 }
