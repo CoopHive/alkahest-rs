@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, Bytes, FixedBytes, address};
+use alloy::primitives::{Address, Bytes, FixedBytes};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
@@ -550,5 +550,760 @@ impl Erc721Client {
             .await?;
 
         Ok(receipt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use alloy::{
+        primitives::{Bytes, FixedBytes, U256},
+        providers::ext::AnvilApi as _,
+        sol_types::SolValue as _,
+    };
+
+    use crate::{
+        AlkahestClient,
+        clients::erc721::Erc721Client,
+        fixtures::MockERC721,
+        types::{
+            ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
+        },
+        utils::setup_test_environment,
+    };
+
+    #[tokio::test]
+    async fn test_decode_escrow_statement() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // Create sample statement data
+        let token_address = test.mock_addresses.erc721_a;
+        let id: U256 = 1.try_into()?;
+        let arbiter = test
+            .addresses
+            .erc721_addresses
+            .ok_or(eyre::eyre!("no erc721-related addresses"))?
+            .payment_obligation;
+        let demand = Bytes::from(vec![1, 2, 3, 4]); // sample demand data
+
+        let escrow_data = crate::contracts::ERC721EscrowObligation::StatementData {
+            token: token_address,
+            tokenId: id,
+            arbiter,
+            demand: demand.clone(),
+        };
+
+        // Encode the data
+        let encoded = escrow_data.abi_encode();
+
+        // Decode the data
+        let decoded = Erc721Client::decode_escrow_statement(encoded.into())?;
+
+        // Verify decoded data
+        assert_eq!(decoded.token, token_address, "Token address should match");
+        assert_eq!(decoded.tokenId, id, "ID should match");
+        assert_eq!(decoded.arbiter, arbiter, "Arbiter should match");
+        assert_eq!(decoded.demand, demand, "Demand should match");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_decode_payment_statement() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // Create sample statement data
+        let token_address = test.mock_addresses.erc721_a;
+        let id: U256 = 1.try_into()?;
+        let payee = test.alice.address();
+
+        let payment_data = crate::contracts::ERC721PaymentObligation::StatementData {
+            token: token_address,
+            tokenId: id,
+            payee,
+        };
+
+        // Encode the data
+        let encoded = payment_data.abi_encode();
+
+        // Decode the data
+        let decoded = Erc721Client::decode_payment_statement(encoded.into())?;
+
+        // Verify decoded data
+        assert_eq!(decoded.token, token_address, "Token address should match");
+        assert_eq!(decoded.tokenId, id, "ID should match");
+        assert_eq!(decoded.payee, payee, "Payee should match");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_approve() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // mint an ERC721 token to alice
+        let mock_erc721_a = MockERC721::new(test.mock_addresses.erc721_a, &test.god_provider);
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        let token = Erc721Data {
+            address: test.mock_addresses.erc721_a,
+            id: 1.try_into()?,
+        };
+
+        // Test approve for payment
+        let _receipt = test
+            .alice_client
+            .erc721
+            .approve(&token, ApprovalPurpose::Payment)
+            .await?;
+
+        // Verify approval for payment obligation
+        let payment_approved = mock_erc721_a.getApproved(1.try_into()?).call().await?._0;
+
+        assert_eq!(
+            payment_approved,
+            test.addresses
+                .erc721_addresses
+                .clone()
+                .ok_or(eyre::eyre!("no erc721-related addresses"))?
+                .payment_obligation,
+            "Payment approval should be set correctly"
+        );
+
+        // Test approve for escrow
+        let _receipt = test
+            .alice_client
+            .erc721
+            .approve(&token, ApprovalPurpose::Escrow)
+            .await?;
+
+        // Verify approval for escrow obligation
+        let escrow_approved = mock_erc721_a.getApproved(1.try_into()?).call().await?._0;
+
+        assert_eq!(
+            escrow_approved,
+            test.addresses
+                .erc721_addresses
+                .ok_or(eyre::eyre!("no erc721-related addresses"))?
+                .escrow_obligation,
+            "Escrow approval should be set correctly"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_approve_all() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // mint ERC721 tokens to alice
+        let mock_erc721_a = MockERC721::new(test.mock_addresses.erc721_a, &test.god_provider);
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        // Test approve_all for payment
+        let _receipt = test
+            .alice_client
+            .erc721
+            .approve_all(test.mock_addresses.erc721_a, ApprovalPurpose::Payment)
+            .await?;
+
+        // Verify approval for payment obligation
+        let payment_approved = mock_erc721_a
+            .isApprovedForAll(
+                test.alice.address(),
+                test.addresses
+                    .erc721_addresses
+                    .clone()
+                    .ok_or(eyre::eyre!("no erc721-related addresses"))?
+                    .payment_obligation,
+            )
+            .call()
+            .await?
+            ._0;
+
+        assert!(
+            payment_approved,
+            "Payment approval for all should be set correctly"
+        );
+
+        // Test approve_all for escrow
+        let _receipt = test
+            .alice_client
+            .erc721
+            .approve_all(test.mock_addresses.erc721_a, ApprovalPurpose::Escrow)
+            .await?;
+
+        // Verify approval for escrow obligation
+        let escrow_approved = mock_erc721_a
+            .isApprovedForAll(
+                test.alice.address(),
+                test.addresses
+                    .erc721_addresses
+                    .ok_or(eyre::eyre!("no erc721-related addresses"))?
+                    .escrow_obligation,
+            )
+            .call()
+            .await?
+            ._0;
+
+        assert!(
+            escrow_approved,
+            "Escrow approval for all should be set correctly"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_revoke_all() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // mint ERC721 tokens to alice
+        let mock_erc721_a = MockERC721::new(test.mock_addresses.erc721_a, &test.god_provider);
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        // First approve all
+        test.alice_client
+            .erc721
+            .approve_all(test.mock_addresses.erc721_a, ApprovalPurpose::Payment)
+            .await?;
+
+        // Then revoke all
+        let _receipt = test
+            .alice_client
+            .erc721
+            .revoke_all(test.mock_addresses.erc721_a, ApprovalPurpose::Payment)
+            .await?;
+
+        // Verify revocation
+        let payment_approved = mock_erc721_a
+            .isApprovedForAll(
+                test.alice.address(),
+                test.addresses
+                    .erc721_addresses
+                    .clone()
+                    .ok_or(eyre::eyre!("no erc721-related addresses"))?
+                    .payment_obligation,
+            )
+            .call()
+            .await?
+            ._0;
+
+        assert!(!payment_approved, "Payment approval should be revoked");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_buy_with_erc721() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // mint an ERC721 token to alice
+        let mock_erc721_a = MockERC721::new(test.mock_addresses.erc721_a, &test.god_provider);
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        let price = Erc721Data {
+            address: test.mock_addresses.erc721_a,
+            id: 1.try_into()?,
+        };
+
+        // Create custom arbiter data
+        let arbiter = test
+            .addresses
+            .erc721_addresses
+            .clone()
+            .ok_or(eyre::eyre!("no erc721-related addresses"))?
+            .payment_obligation;
+        let demand = Bytes::from(b"custom demand data");
+        let item = ArbiterData { arbiter, demand };
+
+        // approve token for escrow
+        test.alice_client
+            .erc721
+            .approve(&price, ApprovalPurpose::Escrow)
+            .await?;
+
+        // alice creates escrow with custom demand
+        let receipt = test
+            .alice_client
+            .erc721
+            .buy_with_erc721(&price, &item, 0)
+            .await?;
+
+        // Verify escrow happened
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+
+        // token in escrow
+        assert_eq!(
+            owner,
+            test.addresses
+                .erc721_addresses
+                .ok_or(eyre::eyre!("no erc721-related addresses"))?
+                .escrow_obligation,
+            "Token should be owned by escrow contract"
+        );
+
+        // escrow statement made
+        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        assert_ne!(attested_event.uid, FixedBytes::<32>::default());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pay_with_erc721() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // mint an ERC721 token to alice
+        let mock_erc721_a = MockERC721::new(test.mock_addresses.erc721_a, &test.god_provider);
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        let price = Erc721Data {
+            address: test.mock_addresses.erc721_a,
+            id: 1.try_into()?,
+        };
+
+        // approve token for payment
+        test.alice_client
+            .erc721
+            .approve(&price, ApprovalPurpose::Payment)
+            .await?;
+
+        // alice makes direct payment to bob
+        let receipt = test
+            .alice_client
+            .erc721
+            .pay_with_erc721(&price, test.bob.address())
+            .await?;
+
+        // Verify payment happened
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+
+        // token paid to bob
+        assert_eq!(owner, test.bob.address(), "Token should be owned by Bob");
+
+        // payment statement made
+        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        assert_ne!(attested_event.uid, FixedBytes::<32>::default());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_buy_erc_721_for_erc_721() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // mint an ERC721 token to alice
+        let mock_erc721_a = MockERC721::new(test.mock_addresses.erc721_a, &test.god_provider);
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        // begin test
+        let bid = Erc721Data {
+            address: test.mock_addresses.erc721_a,
+            id: 1.try_into()?,
+        };
+        let ask = Erc721Data {
+            address: test.mock_addresses.erc721_b,
+            id: 2.try_into()?,
+        };
+
+        // alice approves token for escrow
+        test.alice_client
+            .erc721
+            .approve(&bid, ApprovalPurpose::Escrow)
+            .await?;
+
+        // alice makes escrow
+        let receipt = test
+            .alice_client
+            .erc721
+            .buy_erc_721_for_erc_721(&bid, &ask, 0)
+            .await?;
+
+        // verify escrow
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+
+        assert_eq!(
+            owner,
+            test.addresses
+                .erc721_addresses
+                .ok_or(eyre::eyre!("no erc721-related addresses"))?
+                .escrow_obligation,
+            "Token should be in escrow"
+        );
+
+        // escrow statement made
+        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        assert_ne!(attested_event.uid, FixedBytes::<32>::default());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pay_erc_721_for_erc_721() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // mint ERC721 tokens to alice and bob
+        let mock_erc721_a = MockERC721::new(test.mock_addresses.erc721_a, &test.god_provider);
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        let mock_erc721_b = MockERC721::new(test.mock_addresses.erc721_b, &test.god_provider);
+        mock_erc721_b
+            .mint(test.bob.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        // begin test
+        let bid = Erc721Data {
+            address: test.mock_addresses.erc721_a,
+            id: 1.try_into()?,
+        };
+        let ask = Erc721Data {
+            address: test.mock_addresses.erc721_b,
+            id: 2.try_into()?,
+        };
+
+        // alice approves token for escrow and creates buy attestation
+        test.alice_client
+            .erc721
+            .approve(&bid, ApprovalPurpose::Escrow)
+            .await?;
+
+        let buy_receipt = test
+            .alice_client
+            .erc721
+            .buy_erc_721_for_erc_721(&bid, &ask, 0)
+            .await?;
+
+        let buy_attestation = AlkahestClient::get_attested_event(buy_receipt)?.uid;
+
+        // bob approves token for payment
+        test.bob_client
+            .erc721
+            .approve(&ask, ApprovalPurpose::Payment)
+            .await?;
+
+        // bob fulfills the buy attestation
+        let _sell_receipt = test
+            .bob_client
+            .erc721
+            .pay_erc_721_for_erc_721(buy_attestation)
+            .await?;
+
+        // verify token transfers
+        let alice_token_b_owner = mock_erc721_b.ownerOf(2.try_into()?).call().await?._0;
+        let bob_token_a_owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+
+        // both sides received the tokens
+        assert_eq!(
+            alice_token_b_owner,
+            test.alice.address(),
+            "Alice should have received token B"
+        );
+        assert_eq!(
+            bob_token_a_owner,
+            test.bob.address(),
+            "Bob should have received token A"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_collect_expired() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // mint an ERC721 token to alice
+        let mock_erc721_a = MockERC721::new(test.mock_addresses.erc721_a, &test.god_provider);
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        // begin test
+        let bid = Erc721Data {
+            address: test.mock_addresses.erc721_a,
+            id: 1.try_into()?,
+        };
+        let ask = Erc721Data {
+            address: test.mock_addresses.erc721_b,
+            id: 2.try_into()?,
+        };
+
+        // alice approves token for escrow
+        test.alice_client
+            .erc721
+            .approve(&bid, ApprovalPurpose::Escrow)
+            .await?;
+
+        // alice makes escrow with a short expiration
+        let expiration = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 10;
+        let receipt = test
+            .alice_client
+            .erc721
+            .buy_erc_721_for_erc_721(&bid, &ask, expiration as u64 + 1)
+            .await?;
+
+        let buy_attestation = AlkahestClient::get_attested_event(receipt)?.uid;
+
+        // Wait for expiration
+        test.god_provider.anvil_increase_time(20).await?;
+
+        // alice collects expired funds
+        let _collect_receipt = test
+            .alice_client
+            .erc721
+            .collect_expired(buy_attestation)
+            .await?;
+
+        // verify token returned to alice
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+
+        assert_eq!(
+            owner,
+            test.alice.address(),
+            "Token should be returned to Alice"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_buy_erc20_with_erc721() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // mint an ERC721 token to alice
+        let mock_erc721_a = MockERC721::new(test.mock_addresses.erc721_a, &test.god_provider);
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        // Create exchange information
+        let bid = Erc721Data {
+            address: test.mock_addresses.erc721_a,
+            id: 1.try_into()?,
+        };
+        let ask = Erc20Data {
+            address: test.mock_addresses.erc20_a,
+            value: 100.try_into()?,
+        };
+
+        // alice approves token for escrow
+        test.alice_client
+            .erc721
+            .approve(&bid, ApprovalPurpose::Escrow)
+            .await?;
+
+        // alice creates purchase offer
+        let receipt = test
+            .alice_client
+            .erc721
+            .buy_erc20_with_erc721(&bid, &ask, 0)
+            .await?;
+
+        // Verify escrow happened
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+
+        assert_eq!(
+            owner,
+            test.addresses
+                .erc721_addresses
+                .ok_or(eyre::eyre!("no erc721-related addresses"))?
+                .escrow_obligation,
+            "Token should be in escrow"
+        );
+
+        // escrow statement made
+        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        assert_ne!(attested_event.uid, FixedBytes::<32>::default());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_buy_erc1155_with_erc721() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // mint an ERC721 token to alice
+        let mock_erc721_a = MockERC721::new(test.mock_addresses.erc721_a, &test.god_provider);
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        // Create exchange information
+        let bid = Erc721Data {
+            address: test.mock_addresses.erc721_a,
+            id: 1.try_into()?,
+        };
+        let ask = Erc1155Data {
+            address: test.mock_addresses.erc1155_a,
+            id: 1.try_into()?,
+            value: 10.try_into()?,
+        };
+
+        // alice approves token for escrow
+        test.alice_client
+            .erc721
+            .approve(&bid, ApprovalPurpose::Escrow)
+            .await?;
+
+        // alice creates purchase offer
+        let receipt = test
+            .alice_client
+            .erc721
+            .buy_erc1155_with_erc721(&bid, &ask, 0)
+            .await?;
+
+        // Verify escrow happened
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+
+        assert_eq!(
+            owner,
+            test.addresses
+                .erc721_addresses
+                .ok_or(eyre::eyre!("no erc721-related addresses"))?
+                .escrow_obligation,
+            "Token should be in escrow"
+        );
+
+        // escrow statement made
+        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        assert_ne!(attested_event.uid, FixedBytes::<32>::default());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_buy_bundle_with_erc721() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // mint an ERC721 token to alice
+        let mock_erc721_a = MockERC721::new(test.mock_addresses.erc721_a, &test.god_provider);
+        mock_erc721_a
+            .mint(test.alice.address())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        // Create exchange information
+        let bid = Erc721Data {
+            address: test.mock_addresses.erc721_a,
+            id: 1.try_into()?,
+        };
+
+        // Create bundle data
+        let bundle = TokenBundleData {
+            erc20s: vec![Erc20Data {
+                address: test.mock_addresses.erc20_b,
+                value: 20.try_into()?,
+            }],
+            erc721s: vec![Erc721Data {
+                address: test.mock_addresses.erc721_b,
+                id: 2.try_into()?,
+            }],
+            erc1155s: vec![Erc1155Data {
+                address: test.mock_addresses.erc1155_a,
+                id: 1.try_into()?,
+                value: 5.try_into()?,
+            }],
+        };
+
+        // alice approves token for escrow
+        test.alice_client
+            .erc721
+            .approve(&bid, ApprovalPurpose::Escrow)
+            .await?;
+
+        // alice creates purchase offer
+        let receipt = test
+            .alice_client
+            .erc721
+            .buy_bundle_with_erc721(&bid, bundle, 0)
+            .await?;
+
+        // Verify escrow happened
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+
+        assert_eq!(
+            owner,
+            test.addresses
+                .erc721_addresses
+                .ok_or(eyre::eyre!("no erc721-related addresses"))?
+                .escrow_obligation,
+            "Token should be in escrow"
+        );
+
+        // escrow statement made
+        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        assert_ne!(attested_event.uid, FixedBytes::<32>::default());
+
+        Ok(())
     }
 }
