@@ -323,7 +323,7 @@ impl Erc721Client {
     ///
     /// # Returns
     /// * `Result<TransactionReceipt>` - The transaction receipt
-    pub async fn buy_erc_721_for_erc_721(
+    pub async fn buy_erc721_for_erc721(
         &self,
         bid: &Erc721Data,
         ask: &Erc721Data,
@@ -349,7 +349,7 @@ impl Erc721Client {
     ///
     /// # Returns
     /// * `Result<TransactionReceipt>` - The transaction receipt
-    pub async fn pay_erc_721_for_erc_721(
+    pub async fn pay_erc721_for_erc721(
         &self,
         buy_attestation: FixedBytes<32>,
     ) -> eyre::Result<TransactionReceipt> {
@@ -930,7 +930,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_buy_erc_721_for_erc_721() -> eyre::Result<()> {
+    async fn test_buy_erc721_for_erc721() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
 
@@ -963,7 +963,7 @@ mod tests {
         let receipt = test
             .alice_client
             .erc721
-            .buy_erc_721_for_erc_721(&bid, &ask, 0)
+            .buy_erc721_for_erc721(&bid, &ask, 0)
             .await?;
 
         // verify escrow
@@ -986,7 +986,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_pay_erc_721_for_erc_721() -> eyre::Result<()> {
+    async fn test_pay_erc721_for_erc721() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
 
@@ -1026,7 +1026,7 @@ mod tests {
         let buy_receipt = test
             .alice_client
             .erc721
-            .buy_erc_721_for_erc_721(&bid, &ask, 0)
+            .buy_erc721_for_erc721(&bid, &ask, 0)
             .await?;
 
         let buy_attestation = AlkahestClient::get_attested_event(buy_receipt)?.uid;
@@ -1041,7 +1041,7 @@ mod tests {
         let _sell_receipt = test
             .bob_client
             .erc721
-            .pay_erc_721_for_erc_721(buy_attestation)
+            .pay_erc721_for_erc721(buy_attestation)
             .await?;
 
         // verify token transfers
@@ -1098,7 +1098,7 @@ mod tests {
         let receipt = test
             .alice_client
             .erc721
-            .buy_erc_721_for_erc_721(&bid, &ask, expiration as u64 + 1)
+            .buy_erc721_for_erc721(&bid, &ask, expiration as u64 + 1)
             .await?;
 
         let buy_attestation = AlkahestClient::get_attested_event(receipt)?.uid;
