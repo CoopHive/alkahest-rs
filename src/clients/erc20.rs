@@ -2521,7 +2521,7 @@ mod tests {
         // Bob approves his ERC1155 for escrow
         test.bob_client
             .erc1155
-            .approve_all(test.mock_addresses.erc1155_a, &ApprovalPurpose::Escrow)
+            .approve_all(test.mock_addresses.erc1155_a, ApprovalPurpose::Escrow)
             .await?;
 
         // Bob creates ERC1155 escrow requesting ERC20
@@ -2654,7 +2654,7 @@ mod tests {
         // Bob approves his ERC1155 for escrow
         test.bob_client
             .erc1155
-            .approve_all(test.mock_addresses.erc1155_a, &ApprovalPurpose::Escrow)
+            .approve_all(test.mock_addresses.erc1155_a, ApprovalPurpose::Escrow)
             .await?;
 
         // Bob creates ERC1155 escrow requesting ERC20

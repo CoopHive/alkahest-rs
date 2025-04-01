@@ -107,7 +107,7 @@ impl Erc1155Client {
     pub async fn approve_all(
         &self,
         token_contract: Address,
-        purpose: &ApprovalPurpose,
+        purpose: ApprovalPurpose,
     ) -> eyre::Result<TransactionReceipt> {
         let erc1155_contract = contracts::IERC1155::new(token_contract, &self.wallet_provider);
 
@@ -137,7 +137,7 @@ impl Erc1155Client {
     pub async fn revoke_all(
         &self,
         token_contract: Address,
-        purpose: &ApprovalPurpose,
+        purpose: ApprovalPurpose,
     ) -> eyre::Result<TransactionReceipt> {
         let erc1155_contract = contracts::IERC1155::new(token_contract, &self.wallet_provider);
 
