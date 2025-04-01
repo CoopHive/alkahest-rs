@@ -1014,7 +1014,7 @@ mod tests {
         };
         let ask = Erc721Data {
             address: test.mock_addresses.erc721_b,
-            id: 2.try_into()?,
+            id: 1.try_into()?,
         };
 
         // alice approves token for escrow and creates buy attestation
@@ -1045,7 +1045,7 @@ mod tests {
             .await?;
 
         // verify token transfers
-        let alice_token_b_owner = mock_erc721_b.ownerOf(2.try_into()?).call().await?._0;
+        let alice_token_b_owner = mock_erc721_b.ownerOf(1.try_into()?).call().await?._0;
         let bob_token_a_owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
 
         // both sides received the tokens
