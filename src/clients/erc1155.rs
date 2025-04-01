@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, Bytes, FixedBytes, address};
+use alloy::primitives::{Address, Bytes, FixedBytes};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;

@@ -1,5 +1,5 @@
 use alloy::{
-    primitives::{Address, Bytes, FixedBytes, Log, address},
+    primitives::{Address, Bytes, FixedBytes, Log},
     providers::Provider as _,
     rpc::types::{Filter, TransactionReceipt},
     signers::local::PrivateKeySigner,
@@ -25,7 +25,7 @@ pub struct ArbitersAddresses {
 
 #[derive(Clone)]
 pub struct ArbitersClient {
-    signer: PrivateKeySigner,
+    _signer: PrivateKeySigner,
     public_provider: PublicProvider,
     wallet_provider: WalletProvider,
 
@@ -74,7 +74,7 @@ impl ArbitersClient {
         let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
         Ok(ArbitersClient {
-            signer,
+            _signer: signer,
             public_provider: public_provider.clone(),
             wallet_provider,
 

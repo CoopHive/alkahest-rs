@@ -1,5 +1,5 @@
 use alloy::{
-    primitives::{Address, Bytes, FixedBytes, address},
+    primitives::{Address, Bytes, FixedBytes},
     rpc::types::TransactionReceipt,
     signers::local::PrivateKeySigner,
     sol_types::SolValue as _,
@@ -16,7 +16,7 @@ pub struct StringObligationAddresses {
 
 #[derive(Clone)]
 pub struct StringObligationClient {
-    signer: PrivateKeySigner,
+    _signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
 
     pub addresses: StringObligationAddresses,
@@ -48,7 +48,7 @@ impl StringObligationClient {
         let wallet_provider = crate::utils::get_wallet_provider(signer.clone(), rpc_url).await?;
 
         Ok(StringObligationClient {
-            signer,
+            _signer: signer,
             wallet_provider,
             addresses: addresses.unwrap_or_default(),
         })

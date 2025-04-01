@@ -1075,7 +1075,7 @@ mod tests {
     use crate::{
         AlkahestClient,
         clients::erc20::Erc20Client,
-        contracts::{ERC20PaymentObligation, IERC721, IERC1155},
+        contracts::ERC20PaymentObligation,
         fixtures::{MockERC20Permit, MockERC721, MockERC1155},
         types::{
             ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
@@ -1671,7 +1671,7 @@ mod tests {
             .await?;
 
         // bob fulfills the buy attestation
-        let sell_receipt = test
+        let _sell_receipt = test
             .bob_client
             .erc20
             .pay_erc20_for_erc20(buy_attestation)
@@ -1749,7 +1749,7 @@ mod tests {
         let buy_attestation = AlkahestClient::get_attested_event(buy_receipt)?.uid;
 
         // bob fulfills the buy attestation with permit
-        let sell_receipt = test
+        let _sell_receipt = test
             .bob_client
             .erc20
             .permit_and_pay_erc20_for_erc20(buy_attestation)
@@ -1824,7 +1824,7 @@ mod tests {
         test.god_provider.anvil_increase_time(20).await?;
 
         // alice collects expired funds
-        let collect_receipt = test
+        let _collect_receipt = test
             .alice_client
             .erc20
             .collect_expired(buy_attestation)

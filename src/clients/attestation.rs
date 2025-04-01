@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, address};
+use alloy::primitives::Address;
 use alloy::primitives::{Bytes, FixedBytes};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
@@ -21,7 +21,7 @@ pub struct AttestationAddresses {
 
 #[derive(Clone)]
 pub struct AttestationClient {
-    signer: PrivateKeySigner,
+    _signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
 
     pub addresses: AttestationAddresses,
@@ -50,7 +50,7 @@ impl AttestationClient {
         let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
         Ok(AttestationClient {
-            signer,
+            _signer: signer,
             wallet_provider,
 
             addresses: addresses.unwrap_or_default(),
