@@ -82,45 +82,38 @@ impl ArbitersClient {
         })
     }
 
-    pub fn encode_trusted_party_demand(demand: TrustedPartyArbiter::DemandData) -> Bytes {
+    pub fn encode_trusted_party_demand(demand: &TrustedPartyArbiter::DemandData) -> Bytes {
         demand.abi_encode().into()
     }
 
     pub fn decode_trusted_party_demand(
-        data: Bytes,
+        data: &Bytes,
     ) -> eyre::Result<TrustedPartyArbiter::DemandData> {
-        Ok(TrustedPartyArbiter::DemandData::abi_decode(
-            data.as_ref(),
-            true,
-        )?)
+        Ok(TrustedPartyArbiter::DemandData::abi_decode(data, true)?)
     }
 
     pub fn encode_specific_attestation_demand(
-        demand: SpecificAttestationArbiter::DemandData,
+        demand: &SpecificAttestationArbiter::DemandData,
     ) -> Bytes {
         demand.abi_encode().into()
     }
 
     pub fn decode_specific_attestation_demand(
-        data: Bytes,
+        data: &Bytes,
     ) -> eyre::Result<SpecificAttestationArbiter::DemandData> {
         Ok(SpecificAttestationArbiter::DemandData::abi_decode(
-            data.as_ref(),
-            true,
+            data, true,
         )?)
     }
 
-    pub fn encode_trusted_oracle_demand(demand: TrustedOracleArbiter::DemandData) -> Bytes {
+    pub fn encode_trusted_oracle_demand(demand: &TrustedOracleArbiter::DemandData) -> Bytes {
         demand.abi_encode().into()
     }
 
     pub fn decode_trusted_oracle_demand(
-        data: Bytes,
+        data: &Bytes,
     ) -> eyre::Result<TrustedOracleArbiter::DemandData> {
-        Ok(TrustedOracleArbiter::DemandData::abi_decode(
-            data.as_ref(),
-            true,
-        )?)
+        Ok(TrustedOracleArbiter::DemandData::abi_decode(data, true)?)
     }
 
     pub async fn arbitrate_as_trusted_oracle(
@@ -303,7 +296,7 @@ mod tests {
         };
 
         // Encode the demand data
-        let demand = ArbitersClient::encode_trusted_party_demand(demand_data);
+        let demand = ArbitersClient::encode_trusted_party_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check statement should return true
@@ -354,7 +347,7 @@ mod tests {
         };
 
         // Encode the demand data
-        let demand = ArbitersClient::encode_trusted_party_demand(demand_data);
+        let demand = ArbitersClient::encode_trusted_party_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check statement should revert with NotTrustedParty
@@ -400,7 +393,7 @@ mod tests {
         };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_trusted_oracle_demand(demand_data);
+        let demand = ArbitersClient::encode_trusted_oracle_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check statement - should be false initially since no decision has been made
@@ -443,7 +436,7 @@ mod tests {
         };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_trusted_oracle_demand(demand_data);
+        let demand = ArbitersClient::encode_trusted_oracle_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check contract interface
@@ -547,7 +540,7 @@ mod tests {
 
         // Check with oracle1 (Bob) - should be true
         let demand_data1 = TrustedOracleArbiter::DemandData { oracle: oracle1 };
-        let demand1 = ArbitersClient::encode_trusted_oracle_demand(demand_data1);
+        let demand1 = ArbitersClient::encode_trusted_oracle_demand(&demand_data1);
         let counteroffer = FixedBytes::<32>::default();
 
         let result1 = trusted_oracle_arbiter
@@ -560,7 +553,7 @@ mod tests {
 
         // Check with oracle2 (Alice) - should be false
         let demand_data2 = TrustedOracleArbiter::DemandData { oracle: oracle2 };
-        let demand2 = ArbitersClient::encode_trusted_oracle_demand(demand_data2);
+        let demand2 = ArbitersClient::encode_trusted_oracle_demand(&demand_data2);
 
         let result2 = trusted_oracle_arbiter
             .checkStatement(attestation.into(), demand2, counteroffer)
@@ -589,7 +582,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData { oracle: new_oracle };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_trusted_oracle_demand(demand_data);
+        let demand = ArbitersClient::encode_trusted_oracle_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check with the new oracle - should be false (default value)
@@ -628,7 +621,7 @@ mod tests {
         let demand_data = SpecificAttestationArbiter::DemandData { uid };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_specific_attestation_demand(demand_data);
+        let demand = ArbitersClient::encode_specific_attestation_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check statement - should return true
@@ -668,7 +661,7 @@ mod tests {
         let demand_data = SpecificAttestationArbiter::DemandData { uid: different_uid };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_specific_attestation_demand(demand_data);
+        let demand = ArbitersClient::encode_specific_attestation_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check statement should revert with NotDemandedAttestation
@@ -718,10 +711,10 @@ mod tests {
         };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_trusted_party_demand(demand_data.clone());
+        let encoded = ArbitersClient::encode_trusted_party_demand(&demand_data);
 
         // Decode the demand data
-        let decoded = ArbitersClient::decode_trusted_party_demand(encoded)?;
+        let decoded = ArbitersClient::decode_trusted_party_demand(&encoded)?;
 
         // Verify decoded data
         assert_eq!(
@@ -747,10 +740,10 @@ mod tests {
         let demand_data = SpecificAttestationArbiter::DemandData { uid };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_specific_attestation_demand(demand_data.clone());
+        let encoded = ArbitersClient::encode_specific_attestation_demand(&demand_data);
 
         // Decode the demand data
-        let decoded = ArbitersClient::decode_specific_attestation_demand(encoded)?;
+        let decoded = ArbitersClient::decode_specific_attestation_demand(&encoded)?;
 
         // Verify decoded data
         assert_eq!(decoded.uid, uid, "UID should match");
@@ -768,10 +761,10 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData { oracle };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_trusted_oracle_demand(demand_data.clone());
+        let encoded = ArbitersClient::encode_trusted_oracle_demand(&demand_data);
 
         // Decode the demand data
-        let decoded = ArbitersClient::decode_trusted_oracle_demand(encoded)?;
+        let decoded = ArbitersClient::decode_trusted_oracle_demand(&encoded)?;
 
         // Verify decoded data
         assert_eq!(decoded.oracle, oracle, "Oracle should match");
