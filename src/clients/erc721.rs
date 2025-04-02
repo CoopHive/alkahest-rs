@@ -72,7 +72,7 @@ impl Erc721Client {
     /// # Returns
     /// * `Result<contracts::ERC721EscrowObligation::StatementData>` - The decoded statement data
     pub fn decode_escrow_statement(
-        statement_data: Bytes,
+        statement_data: &Bytes,
     ) -> eyre::Result<contracts::ERC721EscrowObligation::StatementData> {
         let statement_data = contracts::ERC721EscrowObligation::StatementData::abi_decode(
             statement_data.as_ref(),
@@ -91,7 +91,7 @@ impl Erc721Client {
     ///
     /// * `eyre::Result<contracts::ERC721PaymentObligation::StatementData>` - The decoded statement data
     pub fn decode_payment_statement(
-        statement_data: Bytes,
+        statement_data: &Bytes,
     ) -> eyre::Result<contracts::ERC721PaymentObligation::StatementData> {
         let statement_data = contracts::ERC721PaymentObligation::StatementData::abi_decode(
             statement_data.as_ref(),
@@ -599,7 +599,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = Erc721Client::decode_escrow_statement(encoded.into())?;
+        let decoded = Erc721Client::decode_escrow_statement(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.token, token_address, "Token address should match");
@@ -630,7 +630,7 @@ mod tests {
         let encoded = payment_data.abi_encode();
 
         // Decode the data
-        let decoded = Erc721Client::decode_payment_statement(encoded.into())?;
+        let decoded = Erc721Client::decode_payment_statement(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.token, token_address, "Token address should match");

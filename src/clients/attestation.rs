@@ -65,10 +65,10 @@ impl AttestationClient {
     /// # Returns
     /// * `Result<contracts::AttestationEscrowObligation::StatementData>` - The decoded statement data
     pub fn decode_escrow_statement(
-        statement_data: Bytes,
+        statement_data: &Bytes,
     ) -> eyre::Result<contracts::AttestationEscrowObligation::StatementData> {
         let statement_data = contracts::AttestationEscrowObligation::StatementData::abi_decode(
-            statement_data.as_ref(),
+            statement_data,
             true,
         )?;
         return Ok(statement_data);
@@ -82,10 +82,10 @@ impl AttestationClient {
     /// # Returns
     /// * `Result<contracts::AttestationEscrowObligation2::StatementData>` - The decoded statement data
     pub fn decode_escrow_statement_2(
-        statement_data: Bytes,
+        statement_data: &Bytes,
     ) -> eyre::Result<contracts::AttestationEscrowObligation2::StatementData> {
         let statement_data = contracts::AttestationEscrowObligation2::StatementData::abi_decode(
-            statement_data.as_ref(),
+            statement_data,
             true,
         )?;
         return Ok(statement_data);
@@ -453,7 +453,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = AttestationClient::decode_escrow_statement(encoded.into())?;
+        let decoded = AttestationClient::decode_escrow_statement(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.arbiter, arbiter, "Arbiter should match");
@@ -494,7 +494,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = AttestationClient::decode_escrow_statement_2(encoded.into())?;
+        let decoded = AttestationClient::decode_escrow_statement_2(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(

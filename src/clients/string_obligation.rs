@@ -55,24 +55,24 @@ impl StringObligationClient {
     }
 
     pub fn decode(
-        statement_data: Bytes,
+        statement_data: &Bytes,
     ) -> eyre::Result<contracts::StringObligation::StatementData> {
         let statementdata =
             contracts::StringObligation::StatementData::abi_decode(statement_data.as_ref(), true)?;
         Ok(statementdata)
     }
 
-    pub fn decode_json<T: DeserializeOwned>(statement_data: Bytes) -> eyre::Result<T> {
+    pub fn decode_json<T: DeserializeOwned>(statement_data: &Bytes) -> eyre::Result<T> {
         let decoded: T = serde_json::from_str(&Self::decode(statement_data)?.item)?;
         Ok(decoded)
     }
 
-    pub fn encode(statement_data: contracts::StringObligation::StatementData) -> Bytes {
+    pub fn encode(statement_data: &contracts::StringObligation::StatementData) -> Bytes {
         return contracts::StringObligation::StatementData::abi_encode(&statement_data).into();
     }
 
     pub fn encode_json<T: serde::Serialize>(statement_data: T) -> eyre::Result<Bytes> {
-        let encoded = Self::encode(contracts::StringObligation::StatementData {
+        let encoded = Self::encode(&contracts::StringObligation::StatementData {
             item: serde_json::to_string(&statement_data)?,
         });
         Ok(encoded)

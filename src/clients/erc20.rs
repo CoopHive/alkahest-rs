@@ -141,12 +141,10 @@ impl Erc20Client {
     /// # Returns
     /// * `Result<contracts::ERC20EscrowObligation::StatementData>` - The decoded statement data
     pub fn decode_escrow_statement(
-        statement_data: Bytes,
+        statement_data: &Bytes,
     ) -> eyre::Result<contracts::ERC20EscrowObligation::StatementData> {
-        let statement_data = contracts::ERC20EscrowObligation::StatementData::abi_decode(
-            statement_data.as_ref(),
-            true,
-        )?;
+        let statement_data =
+            contracts::ERC20EscrowObligation::StatementData::abi_decode(statement_data, true)?;
         return Ok(statement_data);
     }
 
@@ -160,12 +158,10 @@ impl Erc20Client {
     ///
     /// * `eyre::Result<contracts::ERC20PaymentObligation::StatementData>` - The decoded statement data
     pub fn decode_payment_statement(
-        statement_data: Bytes,
+        statement_data: &Bytes,
     ) -> eyre::Result<contracts::ERC20PaymentObligation::StatementData> {
-        let statement_data = contracts::ERC20PaymentObligation::StatementData::abi_decode(
-            statement_data.as_ref(),
-            true,
-        )?;
+        let statement_data =
+            contracts::ERC20PaymentObligation::StatementData::abi_decode(statement_data, true)?;
         return Ok(statement_data);
     }
 
@@ -1109,7 +1105,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = Erc20Client::decode_escrow_statement(encoded.into())?;
+        let decoded = Erc20Client::decode_escrow_statement(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.token, token_address, "Token address should match");
@@ -1140,7 +1136,7 @@ mod tests {
         let encoded = payment_data.abi_encode();
 
         // Decode the data
-        let decoded = Erc20Client::decode_payment_statement(encoded.into())?;
+        let decoded = Erc20Client::decode_payment_statement(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.token, token_address, "Token address should match");
