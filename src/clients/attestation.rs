@@ -316,7 +316,8 @@ mod tests {
     use alloy::{
         primitives::{Address, Bytes, FixedBytes, U256},
         rpc::types::TransactionReceipt,
-        sol_types::SolValue as _,
+        sol,
+        sol_types::{SolEvent as _, SolValue as _},
     };
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -599,6 +600,12 @@ mod tests {
         // Setup test environment
         let test = setup_test_environment().await?;
 
+        sol! {
+            struct TestStruct {
+                bool value;
+            }
+        }
+
         // Register a schema
         let schema_id = register_test_schema(
             &test,
@@ -618,7 +625,7 @@ mod tests {
                 expirationTime: expiration.into(),
                 revocable: true,
                 refUID: FixedBytes::<32>::default(),
-                data: Bytes::from("true".as_bytes()),
+                data: TestStruct { value: true }.abi_encode().into(),
                 value: U256::ZERO,
             },
         };
@@ -648,6 +655,12 @@ mod tests {
         // Setup test environment
         let test = setup_test_environment().await?;
 
+        sol! {
+            struct TestStruct {
+                string value;
+            }
+        }
+
         // Register a schema
         let schema_id = register_test_schema(
             &test,
@@ -667,7 +680,11 @@ mod tests {
                 expirationTime: expiration.into(),
                 revocable: true,
                 refUID: FixedBytes::<32>::default(),
-                data: Bytes::from("test attestation data".as_bytes()),
+                data: TestStruct {
+                    value: "test attestation data".to_string(),
+                }
+                .abi_encode()
+                .into(),
                 value: U256::ZERO,
             },
         };
@@ -678,7 +695,13 @@ mod tests {
             .attestation_addresses
             .ok_or(eyre::eyre!("no attestation-related addresses"))?
             .barter_utils;
-        let demand = Bytes::from("test demand".as_bytes());
+
+        let demand = TestStruct {
+            value: "test demand".to_string(),
+        }
+        .abi_encode()
+        .into();
+
         let demand_data = ArbiterData { arbiter, demand };
 
         // Create escrow expiration
@@ -723,6 +746,12 @@ mod tests {
         // Setup test environment
         let test = setup_test_environment().await?;
 
+        sol! {
+            struct TestStruct {
+                string value;
+            }
+        }
+
         // Register a schema
         let schema_id = register_test_schema(
             &test,
@@ -738,7 +767,11 @@ mod tests {
             &test,
             schema_id,
             test.bob.address(),
-            Bytes::from("pre-existing attestation data".as_bytes()),
+            TestStruct {
+                value: "pre-existing attestation data".to_string(),
+            }
+            .abi_encode()
+            .into(),
         )
         .await?;
 
@@ -748,7 +781,13 @@ mod tests {
             .arbiters_addresses
             .ok_or(eyre::eyre!("no attestation-related addresses"))?
             .trivial_arbiter;
-        let demand = Bytes::from("test demand".as_bytes());
+
+        let demand = TestStruct {
+            value: "test demand".to_string(),
+        }
+        .abi_encode()
+        .into();
+
         let demand_data = ArbiterData { arbiter, demand };
 
         // Create escrow expiration
@@ -811,6 +850,12 @@ mod tests {
         // Setup test environment
         let test = setup_test_environment().await?;
 
+        sol! {
+            struct TestStruct {
+                string value;
+            }
+        }
+
         // Register a schema
         let schema_id = register_test_schema(
             &test,
@@ -830,7 +875,11 @@ mod tests {
                 expirationTime: expiration.into(),
                 revocable: true,
                 refUID: FixedBytes::<32>::default(),
-                data: Bytes::from("test attestation data".as_bytes()),
+                data: TestStruct {
+                    value: "test attestation data".to_string(),
+                }
+                .abi_encode()
+                .into(),
                 value: U256::ZERO,
             },
         };
@@ -841,7 +890,12 @@ mod tests {
             .arbiters_addresses
             .ok_or(eyre::eyre!("no attestation-related addresses"))?
             .trivial_arbiter;
-        let demand = Bytes::from("test demand".as_bytes());
+        let demand = TestStruct {
+            value: "test demand".to_string(),
+        }
+        .abi_encode()
+        .into();
+
         let demand_data = ArbiterData { arbiter, demand };
 
         // Create escrow using the client
@@ -919,6 +973,12 @@ mod tests {
     async fn test_collect_payment_2() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
+
+        sol! {
+            struct TestStruct {
+                string value;
+            }
+        }
 
         // Register a schema
         let schema_id = register_test_schema(
@@ -1056,6 +1116,12 @@ mod tests {
         // Setup test environment
         let test = setup_test_environment().await?;
 
+        sol! {
+            struct TestStruct {
+                string value;
+            }
+        }
+
         // Register a schema
         let schema_id = register_test_schema(
             &test,
@@ -1075,7 +1141,11 @@ mod tests {
                 expirationTime: expiration.into(),
                 revocable: true,
                 refUID: FixedBytes::<32>::default(),
-                data: Bytes::from("test attestation data".as_bytes()),
+                data: TestStruct {
+                    value: "test attestation data".to_string(),
+                }
+                .abi_encode()
+                .into(),
                 value: U256::ZERO,
             },
         };
@@ -1086,7 +1156,11 @@ mod tests {
             .arbiters_addresses
             .ok_or(eyre::eyre!("no arbiter addresses"))?
             .trivial_arbiter;
-        let demand = Bytes::from("test demand".as_bytes());
+        let demand = TestStruct {
+            value: "test demand".to_string(),
+        }
+        .abi_encode()
+        .into();
         let demand_data = ArbiterData { arbiter, demand };
 
         // Create escrow expiration
