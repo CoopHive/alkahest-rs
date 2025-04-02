@@ -1173,25 +1173,16 @@ mod tests {
             .await?;
 
         // This function creates two attestations - one for the attestation and one for the escrow
-        // Extract attestation UIDs from logs - this is more complex as we need to parse multiple events
 
-        // For simplicity, we'll just check that the transaction succeeded and there are events
-        assert!(!receipt.logs().is_empty(), "Receipt should contain logs");
+        let attested_events = receipt
+            .inner
+            .logs()
+            .iter()
+            .filter(|log| log.topic0() == Some(&contracts::IEAS::Attested::SIGNATURE_HASH))
+            .map(|log| log.log_decode::<contracts::IEAS::Attested>())
+            .collect::<Vec<_>>();
 
-        // Try to find Attested events in the logs
-        let mut attestation_uids = Vec::new();
-        for log in receipt.logs().iter() {
-            if log.topics().len() > 1 && log.topics()[0].starts_with(b"\x40\x7f\x47\x7a") {
-                // This is likely an Attested event (topic 0 starts with the signature hash)
-                attestation_uids.push(log.topics()[1]);
-            }
-        }
-
-        // Verify we found at least one attestation
-        assert!(
-            !attestation_uids.is_empty(),
-            "Should find at least one attestation UID in logs"
-        );
+        assert_eq!(attested_events.len(), 2, "2 attestations should be created");
 
         Ok(())
     }
