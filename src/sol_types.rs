@@ -4,7 +4,10 @@ use alloy::{
 };
 
 use crate::{
-    contracts::{self, AttestationBarterUtils, AttestationEscrowObligation, IEAS},
+    contracts::{
+        self, AttestationBarterUtils, AttestationEscrowObligation, IEAS,
+        SpecificAttestationArbiter, TrivialArbiter, TrustedOracleArbiter, TrustedPartyArbiter,
+    },
     types::{ArbiterData, TokenBundleData},
 };
 
@@ -139,3 +142,29 @@ macro_rules! impl_attestation_request {
 
 impl_attestation_request!(AttestationEscrowObligation);
 impl_attestation_request!(AttestationBarterUtils);
+
+macro_rules! impl_from_attestation {
+    ($target:ident) => {
+        impl From<IEAS::Attestation> for $target::Attestation {
+            fn from(attestation: IEAS::Attestation) -> Self {
+                Self {
+                    uid: attestation.uid,
+                    schema: attestation.schema,
+                    time: attestation.time,
+                    expirationTime: attestation.expirationTime,
+                    revocationTime: attestation.revocationTime,
+                    refUID: attestation.refUID,
+                    recipient: attestation.recipient,
+                    attester: attestation.attester,
+                    revocable: attestation.revocable,
+                    data: attestation.data,
+                }
+            }
+        }
+    };
+}
+
+impl_from_attestation!(SpecificAttestationArbiter);
+impl_from_attestation!(TrivialArbiter);
+impl_from_attestation!(TrustedPartyArbiter);
+impl_from_attestation!(TrustedOracleArbiter);
