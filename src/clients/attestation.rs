@@ -914,24 +914,15 @@ mod tests {
         let escrow_uid = escrow_event.uid;
 
         // Bob creates a fulfillment using StringObligation
-        let string_obligation = StringObligation::new(
-            test.addresses
-                .string_obligation_addresses
-                .ok_or(eyre::eyre!("no string obligation"))?
-                .obligation,
-            &test.bob_client.wallet_provider,
-        );
-
-        let fulfillment_receipt = string_obligation
-            .makeStatement(
-                contracts::StringObligation::StatementData {
+        let fulfillment_receipt = test
+            .bob_client
+            .string_obligation
+            .make_statement(
+                StringObligation::StatementData {
                     item: "fulfillment data".to_string(),
                 },
-                FixedBytes::<32>::default(),
+                None,
             )
-            .send()
-            .await?
-            .get_receipt()
             .await?;
 
         let fulfillment_event = AlkahestClient::get_attested_event(fulfillment_receipt)?;
