@@ -644,7 +644,7 @@ mod tests {
         assert_ne!(
             attested_event.uid,
             FixedBytes::<32>::default(),
-            "Attestation UID should not be empty"
+            "Attestation UID should not be empty",
         );
 
         Ok(())
@@ -946,15 +946,15 @@ mod tests {
             "Payment UID should not be empty"
         );
 
-        // Verify escrow attestation was revoked (not always the case in tests)
+        // Verify escrow attestation was revoked
         let escrow_attestation = test
             .bob_client
             .attestation
             .get_attestation(escrow_uid)
             .await?;
-        assert!(
-            escrow_attestation.schema == schema_id,
-            "Escrow attestation schema should match the original schema"
+        assert_ne!(
+            escrow_attestation.revocationTime, 0,
+            "Escrow attestation should be revoked"
         );
 
         Ok(())
