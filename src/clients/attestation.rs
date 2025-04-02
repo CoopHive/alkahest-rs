@@ -986,7 +986,11 @@ mod tests {
             &test,
             schema_id,
             test.bob.address(),
-            Bytes::from("pre-existing attestation data".as_bytes()),
+            TestStruct {
+                value: "pre-existing attestation data".to_string(),
+            }
+            .abi_encode()
+            .into(),
         )
         .await?;
 
@@ -996,7 +1000,11 @@ mod tests {
             .arbiters_addresses
             .ok_or(eyre::eyre!("no attestation-related addresses"))?
             .trivial_arbiter;
-        let demand = Bytes::from("test demand".as_bytes());
+        let demand = TestStruct {
+            value: "test demand".to_string(),
+        }
+        .abi_encode()
+        .into();
         let demand_data = ArbiterData { arbiter, demand };
 
         // Create escrow expiration
