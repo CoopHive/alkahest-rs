@@ -41,9 +41,9 @@ impl Default for ArbitersAddresses {
 sol! {
     contract TrustedPartyArbiter {
         struct DemandData {
-            address creator;
             address baseArbiter;
             bytes baseDemand;
+            address creator;
         }
     }
 }
