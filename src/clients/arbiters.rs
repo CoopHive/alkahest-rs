@@ -60,6 +60,7 @@ sol! {
     contract TrustedOracleArbiter {
         struct DemandData {
             address oracle;
+            bytes data;
         }
     }
 }
@@ -174,7 +175,7 @@ impl ArbitersClient {
 #[cfg(test)]
 mod tests {
     use alloy::{
-        primitives::{Address, Bytes, FixedBytes},
+        primitives::{Address, Bytes, FixedBytes, bytes},
         providers::Provider as _,
         sol,
         sol_types::SolValue,
@@ -384,6 +385,7 @@ mod tests {
         // Create demand data with oracle as bob
         let demand_data = TrustedOracleArbiter::DemandData {
             oracle: test.bob.address(),
+            data: bytes!(""),
         };
 
         // Encode demand data
@@ -427,6 +429,7 @@ mod tests {
         // Create demand data with oracle as bob
         let demand_data = TrustedOracleArbiter::DemandData {
             oracle: test.bob.address(),
+            data: bytes!(""),
         };
 
         // Encode demand data
@@ -533,7 +536,10 @@ mod tests {
         );
 
         // Check with oracle1 (Bob) - should be true
-        let demand_data1 = TrustedOracleArbiter::DemandData { oracle: oracle1 };
+        let demand_data1 = TrustedOracleArbiter::DemandData {
+            oracle: oracle1,
+            data: bytes!(""),
+        };
         let demand1 = ArbitersClient::encode_trusted_oracle_demand(&demand_data1);
         let counteroffer = FixedBytes::<32>::default();
 
@@ -546,7 +552,10 @@ mod tests {
         assert!(result1, "Decision for Oracle 1 (Bob) should be true");
 
         // Check with oracle2 (Alice) - should be false
-        let demand_data2 = TrustedOracleArbiter::DemandData { oracle: oracle2 };
+        let demand_data2 = TrustedOracleArbiter::DemandData {
+            oracle: oracle2,
+            data: bytes!(""),
+        };
         let demand2 = ArbitersClient::encode_trusted_oracle_demand(&demand_data2);
 
         let result2 = trusted_oracle_arbiter
@@ -573,7 +582,10 @@ mod tests {
         let attestation = create_test_attestation(Some(statement_uid), None);
 
         // Create demand data with the new oracle
-        let demand_data = TrustedOracleArbiter::DemandData { oracle: new_oracle };
+        let demand_data = TrustedOracleArbiter::DemandData {
+            oracle: new_oracle,
+            data: bytes!(""),
+        };
 
         // Encode demand data
         let demand = ArbitersClient::encode_trusted_oracle_demand(&demand_data);
@@ -745,7 +757,10 @@ mod tests {
 
         // Create a test demand data
         let oracle = test.bob.address();
-        let demand_data = TrustedOracleArbiter::DemandData { oracle };
+        let demand_data = TrustedOracleArbiter::DemandData {
+            oracle,
+            data: bytes!(""),
+        };
 
         // Encode the demand data
         let encoded = ArbitersClient::encode_trusted_oracle_demand(&demand_data);
