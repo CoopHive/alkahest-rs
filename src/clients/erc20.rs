@@ -13,7 +13,8 @@ use alloy::{
 use crate::addresses::FILECOIN_CALIBRATION_ADDRESSES;
 use crate::contracts::{self, ERC20Permit};
 use crate::types::{
-    ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
+    ApprovalPurpose, ArbiterData, DecodedAttestation, Erc20Data, Erc721Data, Erc1155Data,
+    TokenBundleData,
 };
 use crate::{types::WalletProvider, utils};
 
@@ -163,6 +164,38 @@ impl Erc20Client {
         let statement_data =
             contracts::ERC20PaymentObligation::StatementData::abi_decode(statement_data, true)?;
         return Ok(statement_data);
+    }
+
+    pub async fn get_escrow_statement(
+        &self,
+        uid: FixedBytes<32>,
+    ) -> eyre::Result<DecodedAttestation<contracts::ERC20EscrowObligation::StatementData>> {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+
+        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let statement_data =
+            contracts::ERC20EscrowObligation::StatementData::abi_decode(&attestation.data, true)?;
+
+        Ok(DecodedAttestation {
+            attestation,
+            data: statement_data,
+        })
+    }
+
+    pub async fn get_payment_statement(
+        &self,
+        uid: FixedBytes<32>,
+    ) -> eyre::Result<DecodedAttestation<contracts::ERC20PaymentObligation::StatementData>> {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+
+        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let statement_data =
+            contracts::ERC20PaymentObligation::StatementData::abi_decode(&attestation.data, true)?;
+
+        Ok(DecodedAttestation {
+            attestation,
+            data: statement_data,
+        })
     }
 
     /// Approves token spending for payment or escrow purposes.

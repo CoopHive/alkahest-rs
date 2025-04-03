@@ -6,7 +6,8 @@ use alloy::sol_types::SolValue as _;
 use crate::addresses::FILECOIN_CALIBRATION_ADDRESSES;
 use crate::contracts::{self};
 use crate::types::{
-    ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
+    ApprovalPurpose, ArbiterData, DecodedAttestation, Erc20Data, Erc721Data, Erc1155Data,
+    TokenBundleData,
 };
 use crate::{types::WalletProvider, utils};
 
@@ -94,6 +95,40 @@ impl Erc1155Client {
         let statement_data =
             contracts::ERC1155PaymentObligation::StatementData::abi_decode(statement_data, true)?;
         return Ok(statement_data);
+    }
+
+    pub async fn get_escrow_statement(
+        &self,
+        uid: FixedBytes<32>,
+    ) -> eyre::Result<DecodedAttestation<contracts::ERC1155EscrowObligation::StatementData>> {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+
+        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let statement_data =
+            contracts::ERC1155EscrowObligation::StatementData::abi_decode(&attestation.data, true)?;
+
+        Ok(DecodedAttestation {
+            attestation,
+            data: statement_data,
+        })
+    }
+
+    pub async fn get_payment_statement(
+        &self,
+        uid: FixedBytes<32>,
+    ) -> eyre::Result<DecodedAttestation<contracts::ERC1155PaymentObligation::StatementData>> {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+
+        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let statement_data = contracts::ERC1155PaymentObligation::StatementData::abi_decode(
+            &attestation.data,
+            true,
+        )?;
+
+        Ok(DecodedAttestation {
+            attestation,
+            data: statement_data,
+        })
     }
 
     /// Approves all tokens from a contract for trading.
