@@ -6,7 +6,11 @@ use alloy::{
 };
 use serde::de::DeserializeOwned;
 
-use crate::{addresses::FILECOIN_CALIBRATION_ADDRESSES, contracts, types::WalletProvider};
+use crate::{
+    addresses::FILECOIN_CALIBRATION_ADDRESSES,
+    contracts,
+    types::{DecodedAttestation, WalletProvider},
+};
 
 #[derive(Debug, Clone)]
 pub struct StringObligationAddresses {
@@ -51,6 +55,22 @@ impl StringObligationClient {
             _signer: signer,
             wallet_provider,
             addresses: addresses.unwrap_or_default(),
+        })
+    }
+
+    pub async fn get_statement(
+        &self,
+        uid: FixedBytes<32>,
+    ) -> eyre::Result<DecodedAttestation<contracts::StringObligation::StatementData>> {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+
+        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let statement_data =
+            contracts::StringObligation::StatementData::abi_decode(&attestation.data, true)?;
+
+        Ok(DecodedAttestation {
+            attestation,
+            data: statement_data,
         })
     }
 

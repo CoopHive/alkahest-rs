@@ -7,7 +7,7 @@ use alloy::sol_types::SolValue as _;
 use crate::addresses::FILECOIN_CALIBRATION_ADDRESSES;
 use crate::contracts::IEAS::Attestation;
 use crate::contracts::{self, IEAS};
-use crate::types::ArbiterData;
+use crate::types::{ArbiterData, DecodedAttestation};
 use crate::{types::WalletProvider, utils};
 
 #[derive(Debug, Clone)]
@@ -89,6 +89,44 @@ impl AttestationClient {
             true,
         )?;
         return Ok(statement_data);
+    }
+
+    pub async fn get_escrow_statement(
+        &self,
+        uid: FixedBytes<32>,
+    ) -> eyre::Result<DecodedAttestation<contracts::AttestationEscrowObligation::StatementData>>
+    {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+
+        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let statement_data = contracts::AttestationEscrowObligation::StatementData::abi_decode(
+            &attestation.data,
+            true,
+        )?;
+
+        Ok(DecodedAttestation {
+            attestation,
+            data: statement_data,
+        })
+    }
+
+    pub async fn get_escrow_statement_2(
+        &self,
+        uid: FixedBytes<32>,
+    ) -> eyre::Result<DecodedAttestation<contracts::AttestationEscrowObligation2::StatementData>>
+    {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+
+        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let statement_data = contracts::AttestationEscrowObligation2::StatementData::abi_decode(
+            &attestation.data,
+            true,
+        )?;
+
+        Ok(DecodedAttestation {
+            attestation,
+            data: statement_data,
+        })
     }
 
     /// Retrieves an attestation by its UID.

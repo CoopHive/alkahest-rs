@@ -5,7 +5,7 @@ use alloy::sol_types::SolValue as _;
 use std::collections::HashSet;
 
 use crate::contracts::{self, IERC20, IERC721, IERC1155};
-use crate::types::{ArbiterData, TokenBundleData};
+use crate::types::{ArbiterData, DecodedAttestation, TokenBundleData};
 use crate::{
     types::{ApprovalPurpose, WalletProvider},
     utils,
@@ -104,6 +104,48 @@ impl TokenBundleClient {
             true,
         )?;
         return Ok(statement_data);
+    }
+
+    pub async fn get_escrow_statement(
+        &self,
+        uid: FixedBytes<32>,
+    ) -> eyre::Result<
+        DecodedAttestation<contracts::token_bundle::TokenBundleEscrowObligation::StatementData>,
+    > {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+
+        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let statement_data =
+            contracts::token_bundle::TokenBundleEscrowObligation::StatementData::abi_decode(
+                &attestation.data,
+                true,
+            )?;
+
+        Ok(DecodedAttestation {
+            attestation,
+            data: statement_data,
+        })
+    }
+
+    pub async fn get_payment_statement(
+        &self,
+        uid: FixedBytes<32>,
+    ) -> eyre::Result<
+        DecodedAttestation<contracts::token_bundle::TokenBundlePaymentObligation::StatementData>,
+    > {
+        let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
+
+        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let statement_data =
+            contracts::token_bundle::TokenBundlePaymentObligation::StatementData::abi_decode(
+                &attestation.data,
+                true,
+            )?;
+
+        Ok(DecodedAttestation {
+            attestation,
+            data: statement_data,
+        })
     }
 
     /// Collects payment from a fulfilled trade.
