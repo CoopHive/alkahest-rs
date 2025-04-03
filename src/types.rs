@@ -10,6 +10,8 @@ use alloy::{
     },
 };
 
+use crate::contracts::IEAS::Attestation;
+
 pub type WalletProvider = FillProvider<
     JoinFill<
         JoinFill<
@@ -64,4 +66,9 @@ pub struct TokenBundleData {
 pub enum ApprovalPurpose {
     Escrow,
     Payment,
+}
+
+pub struct DecodedAttestation<T> {
+    pub attestation: Attestation,
+    pub data: T,
 }
