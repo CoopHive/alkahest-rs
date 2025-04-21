@@ -11,6 +11,7 @@ use clients::{
     erc20::{Erc20Addresses, Erc20Client},
     erc721::{Erc721Addresses, Erc721Client},
     erc1155::{Erc1155Addresses, Erc1155Client},
+    oracle::{OracleAddresses, OracleClient},
     string_obligation::{StringObligationAddresses, StringObligationClient},
     token_bundle::{TokenBundleAddresses, TokenBundleClient},
 };
@@ -60,6 +61,7 @@ pub struct AlkahestClient {
     pub token_bundle: TokenBundleClient,
     pub attestation: AttestationClient,
     pub string_obligation: StringObligationClient,
+    pub oracle: OracleClient,
 }
 
 impl AlkahestClient {
@@ -103,6 +105,19 @@ impl AlkahestClient {
             attestation: make_client!(AttestationClient, attestation_addresses).await?,
             string_obligation: make_client!(StringObligationClient, string_obligation_addresses)
                 .await?,
+            oracle: OracleClient::new(
+                private_key.clone(),
+                rpc_url.clone(),
+                addresses
+                    .clone()
+                    .and_then(|a| a.arbiters_addresses)
+                    .and_then(|a| {
+                        Some(OracleAddresses {
+                            trusted_oracle_arbiter: a.trusted_oracle_arbiter,
+                        })
+                    }),
+            )
+            .await?,
         })
     }
 
