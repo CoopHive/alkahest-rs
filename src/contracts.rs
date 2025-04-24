@@ -250,3 +250,35 @@ sol!(
     TrustedOracleArbiter,
     "src/contracts/TrustedOracleArbiter.json"
 );
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    IntrinsicsArbiter,
+    "src/contracts/IntrinsicsArbiter.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    IntrinsicsArbiter2,
+    "src/contracts/IntrinsicsArbiter2.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    AnyArbiter,
+    "src/contracts/AnyArbiter.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    AllArbiter,
+    "src/contracts/AllArbiter.json"
+);

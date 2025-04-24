@@ -1,12 +1,12 @@
-use alloy::primitives::address;
+use alloy::primitives::{Address, address};
 
 use crate::{
+    AddressConfig,
     clients::{
-        arbiters::ArbitersAddresses, attestation::AttestationAddresses, erc1155::Erc1155Addresses,
-        erc20::Erc20Addresses, erc721::Erc721Addresses,
+        arbiters::ArbitersAddresses, attestation::AttestationAddresses, erc20::Erc20Addresses,
+        erc721::Erc721Addresses, erc1155::Erc1155Addresses,
         string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses,
     },
-    AddressConfig,
 };
 
 pub const BASE_SEPOLIA_ADDRESSES: AddressConfig = AddressConfig {
@@ -15,6 +15,10 @@ pub const BASE_SEPOLIA_ADDRESSES: AddressConfig = AddressConfig {
         trusted_party_arbiter: address!("0x3895398C46da88b75eE3ca3092F7714BEbE795a5"),
         trivial_arbiter: address!("0x7D4bCD84901cEC903105564f63BE70432448B222"),
         trusted_oracle_arbiter: address!("0x361E0950534F4a54A39F8C4f1f642C323f6e66B9"),
+        intrinsics_arbiter: Address::ZERO,
+        intrinsics_arbiter_2: Address::ZERO,
+        any_arbiter: Address::ZERO,
+        all_arbiter: Address::ZERO,
     }),
     string_obligation_addresses: Some(StringObligationAddresses {
         eas: address!("0x4200000000000000000000000000000000000021"),
@@ -59,6 +63,10 @@ pub const FILECOIN_CALIBRATION_ADDRESSES: AddressConfig = AddressConfig {
         trusted_party_arbiter: address!("0xed550301b3258612509615bbddd4b2383cf32df4"),
         trivial_arbiter: address!("0x6e9bc0d34fff16140401fc51653347be0a1f0ec0"),
         trusted_oracle_arbiter: address!("0x5f1db54dbc5006894ef6c43b2174c05ccaa250ec"),
+        intrinsics_arbiter: Address::ZERO,
+        intrinsics_arbiter_2: Address::ZERO,
+        any_arbiter: Address::ZERO,
+        all_arbiter: Address::ZERO,
     }),
     string_obligation_addresses: Some(StringObligationAddresses {
         eas: address!("0x3c79a0225380fb6f3cb990ffc4e3d5af4546b524"),

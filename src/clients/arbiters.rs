@@ -21,6 +21,10 @@ pub struct ArbitersAddresses {
     pub trivial_arbiter: Address,
     pub specific_attestation_arbiter: Address,
     pub trusted_oracle_arbiter: Address,
+    pub intrinsics_arbiter: Address,
+    pub intrinsics_arbiter_2: Address,
+    pub any_arbiter: Address,
+    pub all_arbiter: Address,
 }
 
 #[derive(Clone)]
@@ -65,6 +69,24 @@ sol! {
     }
 }
 
+sol! {
+    contract IntrinsicsArbiter2 {
+        struct DemandData {
+            bytes32 schema;
+        }
+    }
+}
+
+sol! {
+    contract MultiArbiter {
+        // Shared structure for both AnyArbiter and AllArbiter
+        struct DemandData {
+            address[] arbiters;
+            bytes[] demands;
+        }
+    }
+}
+
 impl ArbitersClient {
     pub async fn new(
         signer: PrivateKeySigner,
@@ -81,6 +103,24 @@ impl ArbitersClient {
 
             addresses: addresses.unwrap_or_default(),
         })
+    }
+
+    pub fn encode_intrinsics_demand_2(demand: &IntrinsicsArbiter2::DemandData) -> Bytes {
+        demand.abi_encode().into()
+    }
+
+    pub fn decode_intrinsics_demand_2(
+        data: &Bytes,
+    ) -> eyre::Result<IntrinsicsArbiter2::DemandData> {
+        Ok(IntrinsicsArbiter2::DemandData::abi_decode(data, true)?)
+    }
+
+    pub fn encode_multi_demand(demand: &MultiArbiter::DemandData) -> Bytes {
+        demand.abi_encode().into()
+    }
+
+    pub fn decode_multi_demand(data: &Bytes) -> eyre::Result<MultiArbiter::DemandData> {
+        Ok(MultiArbiter::DemandData::abi_decode(data, true)?)
     }
 
     pub fn encode_trusted_party_demand(demand: &TrustedPartyArbiter::DemandData) -> Bytes {

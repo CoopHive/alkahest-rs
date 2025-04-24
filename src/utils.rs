@@ -14,9 +14,10 @@ use crate::{
         string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses,
     },
     contracts::{
-        AttestationBarterUtils, AttestationEscrowObligation, AttestationEscrowObligation2,
-        ERC20EscrowObligation, ERC20PaymentObligation, ERC721EscrowObligation,
-        ERC721PaymentObligation, ERC1155EscrowObligation, ERC1155PaymentObligation,
+        AllArbiter, AnyArbiter, AttestationBarterUtils, AttestationEscrowObligation,
+        AttestationEscrowObligation2, ERC20EscrowObligation, ERC20PaymentObligation,
+        ERC721EscrowObligation, ERC721PaymentObligation, ERC1155EscrowObligation,
+        ERC1155PaymentObligation, IntrinsicsArbiter, IntrinsicsArbiter2,
         SpecificAttestationArbiter, StringObligation, TokenBundleBarterUtils, TrivialArbiter,
         TrustedOracleArbiter, TrustedPartyArbiter,
         erc20_barter_cross_token::ERC20BarterCrossToken,
@@ -74,6 +75,10 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let trivial_arbiter = TrivialArbiter::deploy(&god_provider).await?;
     let trusted_oracle_arbiter = TrustedOracleArbiter::deploy(&god_provider).await?;
     let trusted_party_arbiter = TrustedPartyArbiter::deploy(&god_provider).await?;
+    let intrinsics_arbiter = IntrinsicsArbiter::deploy(&god_provider).await?;
+    let intrinsics_arbiter_2 = IntrinsicsArbiter2::deploy(&god_provider).await?;
+    let any_arbiter = AnyArbiter::deploy(&god_provider).await?;
+    let all_arbiter = AllArbiter::deploy(&god_provider).await?;
 
     macro_rules! deploy_obligation {
         ($name:ident) => {
@@ -143,6 +148,10 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
             trivial_arbiter: trivial_arbiter.address().clone(),
             trusted_oracle_arbiter: trusted_oracle_arbiter.address().clone(),
             trusted_party_arbiter: trusted_party_arbiter.address().clone(),
+            intrinsics_arbiter: intrinsics_arbiter.address().clone(),
+            intrinsics_arbiter_2: intrinsics_arbiter_2.address().clone(),
+            any_arbiter: any_arbiter.address().clone(),
+            all_arbiter: all_arbiter.address().clone(),
         }),
         string_obligation_addresses: Some(StringObligationAddresses {
             eas: eas.address().clone(),
