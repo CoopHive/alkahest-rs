@@ -224,7 +224,8 @@ mod tests {
 
     use crate::{
         clients::arbiters::{
-            ArbitersClient, SpecificAttestationArbiter, TrustedOracleArbiter, TrustedPartyArbiter,
+            ArbitersClient, IntrinsicsArbiter2, MultiArbiter, SpecificAttestationArbiter,
+            TrustedOracleArbiter, TrustedPartyArbiter,
         },
         contracts,
         utils::setup_test_environment,
@@ -863,6 +864,477 @@ mod tests {
             "Statement UID in event should match"
         );
         assert!(log_result.decision, "Decision in event should be true");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_intrinsics_arbiter() -> eyre::Result<()> {
+        // Setup test environment
+        let test = setup_test_environment().await?;
+
+        // Create a valid non-expired attestation
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Create a valid attestation (not expired, not revoked)
+        let valid_attestation = contracts::IEAS::Attestation {
+            uid: FixedBytes::<32>::from_slice(&[1u8; 32]),
+            schema: FixedBytes::<32>::from_slice(&[2u8; 32]),
+            time: now.into(),
+            expirationTime: (now + 3600).into(), // expires in 1 hour
+            revocationTime: 0u64.into(),         // not revoked
+            refUID: FixedBytes::<32>::default(),
+            recipient: Address::default(),
+            attester: Address::default(),
+            revocable: true,
+            data: Bytes::default(),
+        };
+
+        // Create an expired attestation
+        let expired_attestation = contracts::IEAS::Attestation {
+            expirationTime: (now - 3600).into(), // expired 1 hour ago
+            ..valid_attestation.clone()
+        };
+
+        // Create a revoked attestation
+        let revoked_attestation = contracts::IEAS::Attestation {
+            revocationTime: (now - 3600).into(), // revoked 1 hour ago
+            ..valid_attestation.clone()
+        };
+
+        // Test with IntrinsicsArbiter
+        let intrinsics_arbiter = contracts::IntrinsicsArbiter::new(
+            test.addresses
+                .arbiters_addresses
+                .ok_or(eyre::eyre!("no arbiter addresses"))?
+                .intrinsics_arbiter,
+            &test.alice_client.wallet_provider,
+        );
+
+        // Valid attestation should pass
+        let result_valid = intrinsics_arbiter
+            .checkStatement(
+                valid_attestation.into(),
+                Bytes::default(),
+                FixedBytes::<32>::default(),
+            )
+            .call()
+            .await?
+            ._0;
+        assert!(
+            result_valid,
+            "Valid attestation should pass intrinsic checks"
+        );
+
+        // Expired attestation should fail
+        let result_expired = intrinsics_arbiter
+            .checkStatement(
+                expired_attestation.into(),
+                Bytes::default(),
+                FixedBytes::<32>::default(),
+            )
+            .call()
+            .await;
+
+        assert!(
+            result_expired.is_err(),
+            "Expired attestation should fail intrinsic checks"
+        );
+
+        // Revoked attestation should fail
+        let result_revoked = intrinsics_arbiter
+            .checkStatement(
+                revoked_attestation.into(),
+                Bytes::default(),
+                FixedBytes::<32>::default(),
+            )
+            .call()
+            .await;
+
+        assert!(
+            result_revoked.is_err(),
+            "Revoked attestation should fail intrinsic checks"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_intrinsics_arbiter_2() -> eyre::Result<()> {
+        // Setup test environment
+        let test = setup_test_environment().await?;
+
+        // Define schemas
+        let schema1 = FixedBytes::<32>::from_slice(&[1u8; 32]);
+        let schema2 = FixedBytes::<32>::from_slice(&[2u8; 32]);
+
+        // Create a valid attestation with schema1
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let valid_attestation = contracts::IEAS::Attestation {
+            uid: FixedBytes::<32>::from_slice(&[1u8; 32]),
+            schema: schema1,
+            time: now.into(),
+            expirationTime: (now + 3600).into(), // expires in 1 hour
+            revocationTime: 0u64.into(),         // not revoked
+            refUID: FixedBytes::<32>::default(),
+            recipient: Address::default(),
+            attester: Address::default(),
+            revocable: true,
+            data: Bytes::default(),
+        };
+
+        // Test with IntrinsicsArbiter2
+        let intrinsics_arbiter2 = contracts::IntrinsicsArbiter2::new(
+            test.addresses
+                .arbiters_addresses
+                .ok_or(eyre::eyre!("no arbiter addresses"))?
+                .intrinsics_arbiter_2,
+            &test.alice_client.wallet_provider,
+        );
+
+        // Create demand with matching schema
+        let matching_demand = IntrinsicsArbiter2::DemandData { schema: schema1 };
+        let encoded_matching_demand = ArbitersClient::encode_intrinsics_demand_2(&matching_demand);
+
+        // Create demand with non-matching schema
+        let non_matching_demand = IntrinsicsArbiter2::DemandData { schema: schema2 };
+        let encoded_non_matching_demand =
+            ArbitersClient::encode_intrinsics_demand_2(&non_matching_demand);
+
+        // Test with matching schema - should pass
+        let result_matching = intrinsics_arbiter2
+            .checkStatement(
+                valid_attestation.clone().into(),
+                encoded_matching_demand,
+                FixedBytes::<32>::default(),
+            )
+            .call()
+            .await?
+            ._0;
+        assert!(
+            result_matching,
+            "Attestation with matching schema should pass"
+        );
+
+        // Test with non-matching schema - should fail
+        let result_non_matching = intrinsics_arbiter2
+            .checkStatement(
+                valid_attestation.into(),
+                encoded_non_matching_demand,
+                FixedBytes::<32>::default(),
+            )
+            .call()
+            .await;
+
+        assert!(
+            result_non_matching.is_err(),
+            "Attestation with non-matching schema should fail"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_any_arbiter() -> eyre::Result<()> {
+        // Setup test environment
+        let test = setup_test_environment().await?;
+
+        // Get arbiter addresses
+        let addresses = test
+            .addresses
+            .arbiters_addresses
+            .ok_or(eyre::eyre!("no arbiter addresses"))?;
+
+        // Create a test attestation
+        let uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
+        let attestation = create_test_attestation(Some(uid), None);
+
+        // Create different demand data for different arbiters
+
+        // SpecificAttestationArbiter with matching UID (will return true)
+        let specific_matching = SpecificAttestationArbiter::DemandData { uid };
+        let specific_matching_encoded =
+            ArbitersClient::encode_specific_attestation_demand(&specific_matching);
+
+        // SpecificAttestationArbiter with non-matching UID (will return false/error)
+        let non_matching_uid = FixedBytes::<32>::from_slice(&[2u8; 32]);
+        let specific_non_matching = SpecificAttestationArbiter::DemandData {
+            uid: non_matching_uid,
+        };
+        let specific_non_matching_encoded =
+            ArbitersClient::encode_specific_attestation_demand(&specific_non_matching);
+
+        // Set up AnyArbiter with two arbiters
+        let any_arbiter =
+            contracts::AnyArbiter::new(addresses.any_arbiter, &test.alice_client.wallet_provider);
+
+        // Test case 1: One true, one false - should return true
+        let any_demand_data1 = MultiArbiter::DemandData {
+            arbiters: vec![
+                addresses.trivial_arbiter,              // Always returns true
+                addresses.specific_attestation_arbiter, // Will return false with non-matching UID
+            ],
+            demands: vec![
+                Bytes::default(),                      // Empty data for TrivialArbiter
+                specific_non_matching_encoded.clone(), // Non-matching UID for SpecificAttestationArbiter
+            ],
+        };
+
+        let any_demand1 = ArbitersClient::encode_multi_demand(&any_demand_data1);
+        let result_any1 = any_arbiter
+            .checkStatement(
+                attestation.clone().into(),
+                any_demand1,
+                FixedBytes::<32>::default(),
+            )
+            .call()
+            .await?
+            ._0;
+
+        assert!(
+            result_any1,
+            "AnyArbiter should return true if any arbiter returns true"
+        );
+
+        // Test case 2: Both false - should return false
+        let any_demand_data2 = MultiArbiter::DemandData {
+            arbiters: vec![
+                addresses.specific_attestation_arbiter, // Will return false with non-matching UID
+                addresses.specific_attestation_arbiter, // Will return false with non-matching UID
+            ],
+            demands: vec![
+                specific_non_matching_encoded.clone(), // Non-matching UID
+                specific_non_matching_encoded,         // Non-matching UID
+            ],
+        };
+
+        let any_demand2 = ArbitersClient::encode_multi_demand(&any_demand_data2);
+        let result_any2 = any_arbiter
+            .checkStatement(
+                attestation.clone().into(),
+                any_demand2,
+                FixedBytes::<32>::default(),
+            )
+            .call()
+            .await;
+
+        // Should fail since both arbiters would fail
+        assert!(
+            result_any2.is_err() || !result_any2.unwrap()._0,
+            "AnyArbiter should return false if all arbiters return false"
+        );
+
+        // Test case 3: All true - should return true
+        let any_demand_data3 = MultiArbiter::DemandData {
+            arbiters: vec![
+                addresses.trivial_arbiter,              // Always returns true
+                addresses.specific_attestation_arbiter, // Will return true with matching UID
+            ],
+            demands: vec![
+                Bytes::default(),          // Empty data for TrivialArbiter
+                specific_matching_encoded, // Matching UID for SpecificAttestationArbiter
+            ],
+        };
+
+        let any_demand3 = ArbitersClient::encode_multi_demand(&any_demand_data3);
+        let result_any3 = any_arbiter
+            .checkStatement(attestation.into(), any_demand3, FixedBytes::<32>::default())
+            .call()
+            .await?
+            ._0;
+
+        assert!(
+            result_any3,
+            "AnyArbiter should return true if all arbiters return true"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_all_arbiter() -> eyre::Result<()> {
+        // Setup test environment
+        let test = setup_test_environment().await?;
+
+        // Get arbiter addresses
+        let addresses = test
+            .addresses
+            .arbiters_addresses
+            .ok_or(eyre::eyre!("no arbiter addresses"))?;
+
+        // Create a test attestation
+        let uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
+        let attestation = create_test_attestation(Some(uid), None);
+
+        // Create different demand data for different arbiters
+
+        // SpecificAttestationArbiter with matching UID (will return true)
+        let specific_matching = SpecificAttestationArbiter::DemandData { uid };
+        let specific_matching_encoded =
+            ArbitersClient::encode_specific_attestation_demand(&specific_matching);
+
+        // SpecificAttestationArbiter with non-matching UID (will return false/error)
+        let non_matching_uid = FixedBytes::<32>::from_slice(&[2u8; 32]);
+        let specific_non_matching = SpecificAttestationArbiter::DemandData {
+            uid: non_matching_uid,
+        };
+        let specific_non_matching_encoded =
+            ArbitersClient::encode_specific_attestation_demand(&specific_non_matching);
+
+        // Set up AllArbiter
+        let all_arbiter =
+            contracts::AllArbiter::new(addresses.all_arbiter, &test.alice_client.wallet_provider);
+
+        // Test case 1: One true, one false - should return false
+        let all_demand_data1 = MultiArbiter::DemandData {
+            arbiters: vec![
+                addresses.trivial_arbiter,              // Always returns true
+                addresses.specific_attestation_arbiter, // Will return false with non-matching UID
+            ],
+            demands: vec![
+                Bytes::default(),                      // Empty data for TrivialArbiter
+                specific_non_matching_encoded.clone(), // Non-matching UID for SpecificAttestationArbiter
+            ],
+        };
+
+        let all_demand1 = ArbitersClient::encode_multi_demand(&all_demand_data1);
+        let result_all1 = all_arbiter
+            .checkStatement(
+                attestation.clone().into(),
+                all_demand1,
+                FixedBytes::<32>::default(),
+            )
+            .call()
+            .await;
+
+        // Should fail since one arbiter would fail
+        assert!(
+            result_all1.is_err(),
+            "AllArbiter should return false if any arbiter returns false"
+        );
+
+        // Test case 2: All true - should return true
+        let all_demand_data2 = MultiArbiter::DemandData {
+            arbiters: vec![
+                addresses.trivial_arbiter,              // Always returns true
+                addresses.specific_attestation_arbiter, // Will return true with matching UID
+            ],
+            demands: vec![
+                Bytes::default(),          // Empty data for TrivialArbiter
+                specific_matching_encoded, // Matching UID for SpecificAttestationArbiter
+            ],
+        };
+
+        let all_demand2 = ArbitersClient::encode_multi_demand(&all_demand_data2);
+        let result_all2 = all_arbiter
+            .checkStatement(
+                attestation.clone().into(),
+                all_demand2,
+                FixedBytes::<32>::default(),
+            )
+            .call()
+            .await?
+            ._0;
+
+        assert!(
+            result_all2,
+            "AllArbiter should return true if all arbiters return true"
+        );
+
+        // Test case 3: Empty arbiters list - should return true (vacuously true)
+        let all_demand_data3 = MultiArbiter::DemandData {
+            arbiters: vec![],
+            demands: vec![],
+        };
+
+        let all_demand3 = ArbitersClient::encode_multi_demand(&all_demand_data3);
+        let result_all3 = all_arbiter
+            .checkStatement(attestation.into(), all_demand3, FixedBytes::<32>::default())
+            .call()
+            .await?
+            ._0;
+
+        assert!(
+            result_all3,
+            "AllArbiter should return true with empty arbiters list"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_encode_and_decode_intrinsics_demand_2() -> eyre::Result<()> {
+        // Create a test demand data
+        let schema = FixedBytes::<32>::from_slice(&[1u8; 32]);
+        let demand_data = IntrinsicsArbiter2::DemandData { schema };
+
+        // Encode the demand data
+        let encoded = ArbitersClient::encode_intrinsics_demand_2(&demand_data);
+
+        // Decode the demand data
+        let decoded = ArbitersClient::decode_intrinsics_demand_2(&encoded)?;
+
+        // Verify decoded data
+        assert_eq!(decoded.schema, schema, "Schema should match");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_encode_and_decode_multi_demand() -> eyre::Result<()> {
+        // Set up test environment
+        let test = setup_test_environment().await?;
+
+        // Get arbiter addresses
+        let addresses = test
+            .addresses
+            .arbiters_addresses
+            .ok_or(eyre::eyre!("no arbiter addresses"))?;
+
+        // Create a test demand data
+        let arbiters = vec![
+            addresses.trivial_arbiter,
+            addresses.specific_attestation_arbiter,
+        ];
+        let demands = vec![Bytes::default(), Bytes::from(vec![1, 2, 3])];
+
+        let demand_data = MultiArbiter::DemandData { arbiters, demands };
+
+        // Encode the demand data
+        let encoded = ArbitersClient::encode_multi_demand(&demand_data);
+
+        // Decode the demand data
+        let decoded = ArbitersClient::decode_multi_demand(&encoded)?;
+
+        // Verify decoded data
+        assert_eq!(
+            decoded.arbiters.len(),
+            demand_data.arbiters.len(),
+            "Number of arbiters should match"
+        );
+        assert_eq!(
+            decoded.demands.len(),
+            demand_data.demands.len(),
+            "Number of demands should match"
+        );
+
+        for i in 0..decoded.arbiters.len() {
+            assert_eq!(
+                decoded.arbiters[i], demand_data.arbiters[i],
+                "Arbiter address should match"
+            );
+            assert_eq!(
+                decoded.demands[i], demand_data.demands[i],
+                "Demand data should match"
+            );
+        }
 
         Ok(())
     }
