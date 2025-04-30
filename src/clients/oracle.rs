@@ -1,11 +1,16 @@
 use alloy::{
     dyn_abi::SolType,
+    eips::BlockNumberOrTag,
     primitives::{Address, FixedBytes},
+    providers::Provider,
+    rpc::types::{Filter, ValueOrArray},
     signers::local::PrivateKeySigner,
+    sol_types::SolEvent,
 };
 
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
+    contracts::IEAS,
     types::{PublicProvider, WalletProvider},
     utils,
 };
