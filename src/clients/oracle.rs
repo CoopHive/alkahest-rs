@@ -57,6 +57,22 @@ pub struct AttestationFilterWithoutRefUid {
     pub uid: Option<ValueOrArray<FixedBytes<32>>>,
 }
 
+impl From<(AttestationFilterWithoutRefUid, ValueOrArray<FixedBytes<32>>)> for AttestationFilter {
+    fn from(
+        filter_and_ref_uid: (AttestationFilterWithoutRefUid, ValueOrArray<FixedBytes<32>>),
+    ) -> Self {
+        let (filter, ref_uid) = filter_and_ref_uid;
+
+        Self {
+            attester: filter.attester,
+            recipient: filter.recipient,
+            schema_uid: filter.schema_uid,
+            uid: filter.uid,
+            ref_uid: Some(ref_uid),
+        }
+    }
+}
+
 pub struct FulfillmentParams<T: SolType> {
     pub statement_abi: T,
     pub filter: AttestationFilter,
