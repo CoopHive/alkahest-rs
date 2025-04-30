@@ -9,7 +9,7 @@ use alloy::{
 use futures_util::StreamExt as _;
 
 use crate::{
-    addresses::FILECOIN_CALIBRATION_ADDRESSES,
+    addresses::BASE_SEPOLIA_ADDRESSES,
     contracts,
     types::{PublicProvider, WalletProvider},
     utils,
@@ -38,7 +38,7 @@ pub struct ArbitersClient {
 
 impl Default for ArbitersAddresses {
     fn default() -> Self {
-        FILECOIN_CALIBRATION_ADDRESSES.arbiters_addresses.unwrap()
+        BASE_SEPOLIA_ADDRESSES.arbiters_addresses.unwrap()
     }
 }
 

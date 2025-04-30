@@ -10,7 +10,7 @@ use alloy::{
     sol_types::SolValue,
 };
 
-use crate::addresses::FILECOIN_CALIBRATION_ADDRESSES;
+use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::{self, ERC20Permit};
 use crate::types::{
     ApprovalPurpose, ArbiterData, DecodedAttestation, Erc20Data, Erc721Data, Erc1155Data,
@@ -43,7 +43,7 @@ pub struct Erc20Client {
 
 impl Default for Erc20Addresses {
     fn default() -> Self {
-        FILECOIN_CALIBRATION_ADDRESSES.erc20_addresses.unwrap()
+        BASE_SEPOLIA_ADDRESSES.erc20_addresses.unwrap()
     }
 }
 

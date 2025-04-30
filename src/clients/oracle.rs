@@ -5,7 +5,7 @@ use alloy::{
 };
 
 use crate::{
-    addresses::FILECOIN_CALIBRATION_ADDRESSES,
+    addresses::BASE_SEPOLIA_ADDRESSES,
     types::{PublicProvider, WalletProvider},
     utils,
 };
@@ -27,7 +27,7 @@ pub struct OracleClient {
 impl Default for OracleAddresses {
     fn default() -> Self {
         OracleAddresses {
-            trusted_oracle_arbiter: FILECOIN_CALIBRATION_ADDRESSES
+            trusted_oracle_arbiter: BASE_SEPOLIA_ADDRESSES
                 .arbiters_addresses
                 .unwrap()
                 .trusted_oracle_arbiter,

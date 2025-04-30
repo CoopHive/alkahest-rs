@@ -3,7 +3,7 @@ use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
 
-use crate::addresses::FILECOIN_CALIBRATION_ADDRESSES;
+use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::{self};
 use crate::types::{
     ApprovalPurpose, ArbiterData, DecodedAttestation, Erc20Data, Erc721Data, Erc1155Data,
@@ -36,7 +36,7 @@ pub struct Erc1155Client {
 
 impl Default for Erc1155Addresses {
     fn default() -> Self {
-        FILECOIN_CALIBRATION_ADDRESSES.erc1155_addresses.unwrap()
+        BASE_SEPOLIA_ADDRESSES.erc1155_addresses.unwrap()
     }
 }
 

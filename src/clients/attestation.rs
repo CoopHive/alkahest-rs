@@ -4,7 +4,7 @@ use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
 
-use crate::addresses::FILECOIN_CALIBRATION_ADDRESSES;
+use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::IEAS::Attestation;
 use crate::contracts::{self, IEAS};
 use crate::types::{ArbiterData, DecodedAttestation};
@@ -29,9 +29,7 @@ pub struct AttestationClient {
 
 impl Default for AttestationAddresses {
     fn default() -> Self {
-        FILECOIN_CALIBRATION_ADDRESSES
-            .attestation_addresses
-            .unwrap()
+        BASE_SEPOLIA_ADDRESSES.attestation_addresses.unwrap()
     }
 }
 

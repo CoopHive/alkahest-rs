@@ -7,7 +7,7 @@ use alloy::{
 use serde::de::DeserializeOwned;
 
 use crate::{
-    addresses::FILECOIN_CALIBRATION_ADDRESSES,
+    addresses::BASE_SEPOLIA_ADDRESSES,
     contracts,
     types::{DecodedAttestation, WalletProvider},
 };
@@ -28,9 +28,7 @@ pub struct StringObligationClient {
 
 impl Default for StringObligationAddresses {
     fn default() -> Self {
-        FILECOIN_CALIBRATION_ADDRESSES
-            .string_obligation_addresses
-            .unwrap()
+        BASE_SEPOLIA_ADDRESSES.string_obligation_addresses.unwrap()
     }
 }
 
