@@ -35,29 +35,19 @@ impl Default for OracleAddresses {
     }
 }
 
-pub enum AddressOrAddresses {
-    Address(Address),
-    Addresses(Vec<Address>),
-}
-
-pub enum Bytes32OrBytes32s {
-    Bytes32(FixedBytes<32>),
-    Bytes32s(Vec<FixedBytes<32>>),
-}
-
 pub struct AttestationFilter {
-    pub attester: Option<AddressOrAddresses>,
-    pub recipient: Option<AddressOrAddresses>,
-    pub schema_uid: Option<Bytes32OrBytes32s>,
-    pub uid: Option<Bytes32OrBytes32s>,
-    pub ref_uid: Option<Bytes32OrBytes32s>,
+    pub attester: Option<ValueOrArray<Address>>,
+    pub recipient: Option<ValueOrArray<Address>>,
+    pub schema_uid: Option<ValueOrArray<FixedBytes<32>>>,
+    pub uid: Option<ValueOrArray<FixedBytes<32>>>,
+    pub ref_uid: Option<ValueOrArray<FixedBytes<32>>>,
 }
 
 pub struct AttestationFilterWithoutRefUid {
-    pub attester: Option<AddressOrAddresses>,
-    pub recipient: Option<AddressOrAddresses>,
-    pub schema_uid: Option<Bytes32OrBytes32s>,
-    pub uid: Option<Bytes32OrBytes32s>,
+    pub attester: Option<ValueOrArray<Address>>,
+    pub recipient: Option<ValueOrArray<Address>>,
+    pub schema_uid: Option<ValueOrArray<FixedBytes<32>>>,
+    pub uid: Option<ValueOrArray<FixedBytes<32>>>,
 }
 
 pub struct FulfillmentParams<T: SolType> {
