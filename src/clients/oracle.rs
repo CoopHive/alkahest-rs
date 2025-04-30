@@ -85,6 +85,39 @@ impl OracleClient {
         })
     }
 
+    fn make_filter(&self, p: &AttestationFilter) -> Filter {
+        let mut filter = Filter::new()
+            .address(self.addresses.eas)
+            .event_signature(IEAS::Attested::SIGNATURE_HASH)
+            .from_block(BlockNumberOrTag::Earliest);
+
+        if let Some(ValueOrArray::Value(a)) = &p.recipient {
+            filter = filter.topic1(a.into_word());
+        }
+
+        if let Some(ValueOrArray::Array(ads)) = &p.recipient {
+            filter = filter.topic1(ads.into_iter().map(|a| a.into_word()).collect::<Vec<_>>());
+        }
+
+        if let Some(ValueOrArray::Value(a)) = &p.attester {
+            filter = filter.topic2(a.into_word());
+        }
+
+        if let Some(ValueOrArray::Array(ads)) = &p.attester {
+            filter = filter.topic2(ads.into_iter().map(|a| a.into_word()).collect::<Vec<_>>());
+        }
+
+        if let Some(ValueOrArray::Value(schema)) = &p.schema_uid {
+            filter = filter.topic3(*schema);
+        }
+
+        if let Some(ValueOrArray::Array(schemas)) = &p.schema_uid {
+            filter = filter.topic3(schemas.clone());
+        }
+
+        filter
+    }
+
     pub async fn arbitrate_past<
         StatementData: SolType,
         Arbitrate: Fn(StatementData::RustType) -> bool,
