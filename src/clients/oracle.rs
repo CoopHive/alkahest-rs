@@ -28,6 +28,7 @@ pub struct OracleClient {
 impl Default for OracleAddresses {
     fn default() -> Self {
         OracleAddresses {
+            eas: BASE_SEPOLIA_ADDRESSES.arbiters_addresses.unwrap().eas,
             trusted_oracle_arbiter: BASE_SEPOLIA_ADDRESSES
                 .arbiters_addresses
                 .unwrap()
