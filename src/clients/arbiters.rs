@@ -17,6 +17,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct ArbitersAddresses {
+    pub eas: Address,
     pub trusted_party_arbiter: Address,
     pub trivial_arbiter: Address,
     pub specific_attestation_arbiter: Address,

@@ -144,6 +144,7 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
 
     let addresses = AddressConfig {
         arbiters_addresses: Some(ArbitersAddresses {
+            eas: eas.address().clone(),
             specific_attestation_arbiter: specific_attestation_arbiter.address().clone(),
             trivial_arbiter: trivial_arbiter.address().clone(),
             trusted_oracle_arbiter: trusted_oracle_arbiter.address().clone(),

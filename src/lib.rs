@@ -113,6 +113,7 @@ impl AlkahestClient {
                     .and_then(|a| a.arbiters_addresses)
                     .and_then(|a| {
                         Some(OracleAddresses {
+                            eas: a.eas,
                             trusted_oracle_arbiter: a.trusted_oracle_arbiter,
                         })
                     }),

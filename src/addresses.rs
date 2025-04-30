@@ -11,6 +11,7 @@ use crate::{
 
 pub const BASE_SEPOLIA_ADDRESSES: AddressConfig = AddressConfig {
     arbiters_addresses: Some(ArbitersAddresses {
+        eas: address!("0x4200000000000000000000000000000000000021"),
         specific_attestation_arbiter: address!("0xdE5eCFC92E3da87865CD29C196aA5cebFdC4D9C6"),
         trusted_party_arbiter: address!("0x3895398C46da88b75eE3ca3092F7714BEbE795a5"),
         trivial_arbiter: address!("0x7D4bCD84901cEC903105564f63BE70432448B222"),
@@ -59,6 +60,7 @@ pub const BASE_SEPOLIA_ADDRESSES: AddressConfig = AddressConfig {
 
 pub const FILECOIN_CALIBRATION_ADDRESSES: AddressConfig = AddressConfig {
     arbiters_addresses: Some(ArbitersAddresses {
+        eas: address!("0x3c79a0225380fb6f3cb990ffc4e3d5af4546b524"),
         specific_attestation_arbiter: address!("0x10788ba2c4c65d1e97bc6005436b61c2c2e51572"),
         trusted_party_arbiter: address!("0xed550301b3258612509615bbddd4b2383cf32df4"),
         trivial_arbiter: address!("0x6e9bc0d34fff16140401fc51653347be0a1f0ec0"),
