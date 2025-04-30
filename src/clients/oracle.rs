@@ -12,6 +12,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct OracleAddresses {
+    pub eas: Address,
     pub trusted_oracle_arbiter: Address,
 }
 
