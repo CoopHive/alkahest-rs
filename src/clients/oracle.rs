@@ -97,6 +97,7 @@ impl OracleClient {
         StatementData: SolType,
         Arbitrate: Fn(StatementData::RustType) -> bool,
     >(
+        &self,
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
     ) {
@@ -107,6 +108,7 @@ impl OracleClient {
         ArbitrateFut: Future<Output = bool>,
         Arbitrate: Fn(StatementData::RustType) -> ArbitrateFut,
     >(
+        &self,
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
     ) {
@@ -116,6 +118,7 @@ impl OracleClient {
         StatementData: SolType,
         Arbitrate: Fn(StatementData::RustType) -> bool,
     >(
+        &self,
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
     ) {
@@ -126,6 +129,7 @@ impl OracleClient {
         ArbitrateFut: Future<Output = bool>,
         Arbitrate: Fn(StatementData::RustType) -> ArbitrateFut,
     >(
+        &self,
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
     ) {
@@ -136,6 +140,7 @@ impl OracleClient {
         DemandData: SolType,
         Arbitrate: Fn(StatementData::RustType, DemandData::RustType) -> bool,
     >(
+        &self,
         escrow: EscrowParams<DemandData>,
         fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
@@ -148,6 +153,7 @@ impl OracleClient {
         ArbitrateFut: Future<Output = bool>,
         Arbitrate: Fn(StatementData::RustType, DemandData::RustType) -> ArbitrateFut,
     >(
+        &self,
         escrow: EscrowParams<DemandData>,
         fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
@@ -159,6 +165,7 @@ impl OracleClient {
         DemandData: SolType,
         Arbitrate: Fn(StatementData::RustType, DemandData::RustType) -> bool,
     >(
+        &self,
         escrow: EscrowParams<DemandData>,
         fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
@@ -171,6 +178,7 @@ impl OracleClient {
         ArbitrateFut: Future<Output = bool>,
         Arbitrate: Fn(StatementData::RustType, DemandData::RustType) -> ArbitrateFut,
     >(
+        &self,
         escrow: EscrowParams<DemandData>,
         fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
