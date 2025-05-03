@@ -192,6 +192,12 @@ impl OracleClient {
                 return true;
             })
             .collect::<Vec<_>>();
+
+        let statements = attestations
+            .into_iter()
+            .map(|a| StatementData::abi_decode(&a.data, true))
+            .collect::<Result<Vec<_>, _>>()?;
+
     }
 
     pub async fn arbitrate_past_async<
