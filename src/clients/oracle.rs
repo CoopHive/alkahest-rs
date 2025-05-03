@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use alloy::{
     dyn_abi::SolType,
     eips::BlockNumberOrTag,
@@ -7,6 +9,7 @@ use alloy::{
     signers::local::PrivateKeySigner,
     sol_types::SolEvent,
 };
+use futures::future::{join_all, try_join_all};
 
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
@@ -146,7 +149,15 @@ impl OracleClient {
         &self,
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
-    ) {
+    ) -> eyre::Result<()> {
+        let filter = self.make_filter(&fulfillment.filter);
+        let logs = self
+            .public_provider
+            .get_logs(&filter)
+            .await?
+            .into_iter()
+            .map(|log| log.log_decode::<IEAS::Attested>())
+            .collect::<Result<Vec<_>, _>>()?;
     }
 
     pub async fn arbitrate_past_async<
