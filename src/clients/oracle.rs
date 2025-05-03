@@ -158,6 +158,40 @@ impl OracleClient {
             .into_iter()
             .map(|log| log.log_decode::<IEAS::Attested>())
             .collect::<Result<Vec<_>, _>>()?;
+
+        let attestation_futs = logs.into_iter().map(|log| {
+            let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
+            async move { eas.getAttestation(log.inner.uid).call().await }
+        });
+
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let attestations = try_join_all(attestation_futs)
+            .await?
+            .into_iter()
+            .map(|a| a._0)
+            .filter(|a| {
+                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
+                    if a.refUID != *ref_uid {
+                        return false;
+                    };
+                }
+                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
+                    if ref_uids.contains(&a.refUID) {
+                        return false;
+                    };
+                }
+
+                if a.expirationTime != 0 && a.expirationTime < now {
+                    return false;
+                }
+
+                if a.revocationTime != 0 && a.revocationTime < now {
+                    return false;
+                }
+
+                return true;
+            })
+            .collect::<Vec<_>>();
     }
 
     pub async fn arbitrate_past_async<
