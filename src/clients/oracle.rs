@@ -144,7 +144,7 @@ impl OracleClient {
 
     pub async fn arbitrate_past<
         StatementData: SolType,
-        Arbitrate: Fn(StatementData::RustType) -> bool,
+        Arbitrate: Fn(StatementData::RustType) -> Option<bool>,
     >(
         &self,
         fulfillment: FulfillmentParams<StatementData>,
@@ -202,7 +202,7 @@ impl OracleClient {
 
     pub async fn arbitrate_past_async<
         StatementData: SolType,
-        ArbitrateFut: Future<Output = bool>,
+        ArbitrateFut: Future<Output = Option<bool>>,
         Arbitrate: Fn(StatementData::RustType) -> ArbitrateFut,
     >(
         &self,
@@ -213,7 +213,7 @@ impl OracleClient {
 
     pub async fn listen_and_arbitrate<
         StatementData: SolType,
-        Arbitrate: Fn(StatementData::RustType) -> bool,
+        Arbitrate: Fn(StatementData::RustType) -> Option<bool>,
     >(
         &self,
         fulfillment: FulfillmentParams<StatementData>,
@@ -223,7 +223,7 @@ impl OracleClient {
 
     pub async fn listen_and_arbitrate_async<
         StatementData: SolType,
-        ArbitrateFut: Future<Output = bool>,
+        ArbitrateFut: Future<Output = Option<bool>>,
         Arbitrate: Fn(StatementData::RustType) -> ArbitrateFut,
     >(
         &self,
@@ -235,7 +235,7 @@ impl OracleClient {
     pub async fn arbitrate_past_for_escrow<
         StatementData: SolType,
         DemandData: SolType,
-        Arbitrate: Fn(StatementData::RustType, DemandData::RustType) -> bool,
+        Arbitrate: Fn(StatementData::RustType, DemandData::RustType) -> Option<bool>,
     >(
         &self,
         escrow: EscrowParams<DemandData>,
@@ -247,7 +247,7 @@ impl OracleClient {
     pub async fn arbitrate_past_for_escrow_async<
         StatementData: SolType,
         DemandData: SolType,
-        ArbitrateFut: Future<Output = bool>,
+        ArbitrateFut: Future<Output = Option<bool>>,
         Arbitrate: Fn(StatementData::RustType, DemandData::RustType) -> ArbitrateFut,
     >(
         &self,
@@ -260,7 +260,7 @@ impl OracleClient {
     pub async fn listen_and_arbitrate_for_escrow<
         StatementData: SolType,
         DemandData: SolType,
-        Arbitrate: Fn(StatementData::RustType, DemandData::RustType) -> bool,
+        Arbitrate: Fn(StatementData::RustType, DemandData::RustType) -> Option<bool>,
     >(
         &self,
         escrow: EscrowParams<DemandData>,
@@ -272,7 +272,7 @@ impl OracleClient {
     pub async fn listen_and_arbitrate_for_escrow_async<
         StatementData: SolType,
         DemandData: SolType,
-        ArbitrateFut: Future<Output = bool>,
+        ArbitrateFut: Future<Output = Option<bool>>,
         Arbitrate: Fn(StatementData::RustType, DemandData::RustType) -> ArbitrateFut,
     >(
         &self,
