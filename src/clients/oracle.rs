@@ -5,11 +5,12 @@ use alloy::{
     eips::BlockNumberOrTag,
     primitives::{Address, FixedBytes},
     providers::Provider,
-    rpc::types::{Filter, ValueOrArray},
+    rpc::types::{Filter, TransactionReceipt, ValueOrArray},
     signers::local::PrivateKeySigner,
     sol_types::SolEvent,
 };
 use futures::future::{join_all, try_join_all};
+use itertools::izip;
 
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
@@ -91,6 +92,13 @@ pub struct EscrowParams<T: SolType> {
     pub filter: AttestationFilter,
 }
 
+pub struct Decision<T: SolType> {
+    pub attestation: IEAS::Attestation,
+    pub statement: T::RustType,
+    pub decision: bool,
+    pub receipt: TransactionReceipt,
+}
+
 impl OracleClient {
     pub async fn new(
         signer: PrivateKeySigner,
@@ -149,7 +157,7 @@ impl OracleClient {
         &self,
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
-    ) -> eyre::Result<()> {
+    ) -> eyre::Result<Vec<Decision<StatementData>>> {
         let filter = self.make_filter(&fulfillment.filter);
         let logs = self
             .public_provider
@@ -198,14 +206,11 @@ impl OracleClient {
             .map(|a| StatementData::abi_decode(&a.data, true))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let decisions = statements
-            .into_iter()
-            .map(|s| arbitrate(s))
-            .collect::<Vec<_>>();
+        let decisions = statements.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
 
         let arbitration_futs = attestations
-            .into_iter()
-            .zip(decisions)
+            .iter()
+            .zip(decisions.iter())
             .map(|(attestation, decision)| {
                 let trusted_oracle_arbiter = TrustedOracleArbiter::new(
                     self.addresses.trusted_oracle_arbiter,
@@ -215,7 +220,7 @@ impl OracleClient {
                 if let Some(decision) = decision {
                     Some(async move {
                         trusted_oracle_arbiter
-                            .arbitrate(attestation.uid, decision)
+                            .arbitrate(attestation.uid, *decision)
                             .send()
                             .await
                     })
@@ -233,6 +238,17 @@ impl OracleClient {
 
         let receipts = try_join_all(receipt_futs).await?;
 
+        let result = izip!(attestations, statements, decisions, receipts)
+            .filter(|(_, _, d, _)| d.is_some())
+            .map(|(attestation, statement, decision, receipt)| Decision {
+                attestation,
+                statement,
+                decision: decision.unwrap(),
+                receipt,
+            })
+            .collect::<Vec<Decision<StatementData>>>();
+
+        Ok(result)
     }
 
     pub async fn arbitrate_past_async<
