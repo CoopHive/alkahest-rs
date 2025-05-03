@@ -13,7 +13,7 @@ use futures::future::{join_all, try_join_all};
 
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
-    contracts::IEAS,
+    contracts::{IEAS, TrustedOracleArbiter},
     types::{PublicProvider, WalletProvider},
     utils,
 };
@@ -194,9 +194,44 @@ impl OracleClient {
             .collect::<Vec<_>>();
 
         let statements = attestations
-            .into_iter()
+            .iter()
             .map(|a| StatementData::abi_decode(&a.data, true))
             .collect::<Result<Vec<_>, _>>()?;
+
+        let decisions = statements
+            .into_iter()
+            .map(|s| arbitrate(s))
+            .collect::<Vec<_>>();
+
+        let arbitration_futs = attestations
+            .into_iter()
+            .zip(decisions)
+            .map(|(attestation, decision)| {
+                let trusted_oracle_arbiter = TrustedOracleArbiter::new(
+                    self.addresses.trusted_oracle_arbiter,
+                    &self.wallet_provider,
+                );
+
+                if let Some(decision) = decision {
+                    Some(async move {
+                        trusted_oracle_arbiter
+                            .arbitrate(attestation.uid, decision)
+                            .send()
+                            .await
+                    })
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let pending_txs = try_join_all(arbitration_futs).await?;
+        let receipt_futs = pending_txs
+            .into_iter()
+            .map(|tx| async move { tx.get_receipt().await });
+
+        let receipts = try_join_all(receipt_futs).await?;
 
     }
 
