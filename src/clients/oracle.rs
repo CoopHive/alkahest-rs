@@ -395,7 +395,27 @@ impl OracleClient {
         escrow: EscrowParams<DemandData>,
         fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
-    ) {
+    ) -> eyre::Result<Vec<Decision<StatementData, DemandData>>> {
+        let escrow_filter = self.make_filter(&escrow.filter);
+        let escrow_logs_fut = async move { self.public_provider.get_logs(&escrow_filter).await };
+
+        let fulfillment_filter: AttestationFilter = (fulfillment.filter, None).into();
+        let fulfillment_filter = self.make_filter(&fulfillment_filter);
+        let fulfillment_logs_fut =
+            async move { self.public_provider.get_logs(&fulfillment_filter).await };
+
+        let (escrow_logs, fulfillment_logs) =
+            tokio::try_join!(escrow_logs_fut, fulfillment_logs_fut)?;
+
+        let escrow_logs = escrow_logs
+            .into_iter()
+            .map(|log| log.log_decode::<IEAS::Attested>())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let fulfillment_logs = fulfillment_logs
+            .into_iter()
+            .map(|log| log.log_decode::<IEAS::Attested>())
+            .collect::<Result<Vec<_>, _>>()?;
     }
 
     pub async fn arbitrate_past_for_escrow_async<
