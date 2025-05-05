@@ -92,9 +92,10 @@ pub struct EscrowParams<T: SolType> {
     pub filter: AttestationFilter,
 }
 
-pub struct Decision<T: SolType> {
+pub struct Decision<T: SolType, U: SolType> {
     pub attestation: IEAS::Attestation,
     pub statement: T::RustType,
+    pub demand: Option<U::RustType>,
     pub decision: bool,
     pub receipt: TransactionReceipt,
 }
@@ -157,7 +158,7 @@ impl OracleClient {
         &self,
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
-    ) -> eyre::Result<Vec<Decision<StatementData>>> {
+    ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
         let filter = self.make_filter(&fulfillment.filter);
         let logs = self
             .public_provider
@@ -243,10 +244,11 @@ impl OracleClient {
             .map(|(attestation, statement, decision, receipt)| Decision {
                 attestation,
                 statement,
+                demand: None,
                 decision: decision.unwrap(),
                 receipt,
             })
-            .collect::<Vec<Decision<StatementData>>>();
+            .collect::<Vec<Decision<StatementData, ()>>>();
 
         Ok(result)
     }
@@ -259,7 +261,7 @@ impl OracleClient {
         &self,
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
-    ) -> eyre::Result<Vec<Decision<StatementData>>> {
+    ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
         let filter = self.make_filter(&fulfillment.filter);
         let logs = self
             .public_provider
@@ -346,10 +348,11 @@ impl OracleClient {
             .map(|(attestation, statement, decision, receipt)| Decision {
                 attestation,
                 statement,
+                demand: None,
                 decision: decision.unwrap(),
                 receipt,
             })
-            .collect::<Vec<Decision<StatementData>>>();
+            .collect::<Vec<Decision<StatementData, ()>>>();
 
         Ok(result)
     }
