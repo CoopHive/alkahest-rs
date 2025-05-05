@@ -433,6 +433,52 @@ impl OracleClient {
 
         let (escrow_attestations, fulfillment_attestations) =
             tokio::try_join!(escrow_attestations_fut, fulfillment_attestations_fut)?;
+
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let escrow_attestations = escrow_attestations
+            .into_iter()
+            .map(|a| a._0)
+            .filter(|a| {
+                if let Some(ValueOrArray::Value(ref_uid)) = &escrow.filter.ref_uid {
+                    if a.refUID != *ref_uid {
+                        return false;
+                    };
+                }
+                if let Some(ValueOrArray::Array(ref_uids)) = &escrow.filter.ref_uid {
+                    if ref_uids.contains(&a.refUID) {
+                        return false;
+                    };
+                }
+
+                if a.expirationTime != 0 && a.expirationTime < now {
+                    return false;
+                }
+
+                if a.revocationTime != 0 && a.revocationTime < now {
+                    return false;
+                }
+
+                return true;
+            })
+            .collect::<Vec<_>>();
+
+        sol! {
+            struct ArbiterDemand {
+                address oracle;
+                bytes demand;
+            }
+        }
+
+        let escrow_statements = escrow_attestations
+            .iter()
+            .map(|a| ArbiterDemand::abi_decode(&a.data, true))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let escrow_demands = escrow_statements
+            .iter()
+            .map(|s| DemandData::abi_decode(&s.demand, true))
+            .collect::<Result<Vec<_>, _>>()?;
+
     }
 
     pub async fn arbitrate_past_for_escrow_async<
