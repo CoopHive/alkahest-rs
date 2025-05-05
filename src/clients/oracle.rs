@@ -259,7 +259,99 @@ impl OracleClient {
         &self,
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
-    ) {
+    ) -> eyre::Result<Vec<Decision<StatementData>>> {
+        let filter = self.make_filter(&fulfillment.filter);
+        let logs = self
+            .public_provider
+            .get_logs(&filter)
+            .await?
+            .into_iter()
+            .map(|log| log.log_decode::<IEAS::Attested>())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let attestation_futs = logs.into_iter().map(|log| {
+            let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
+            async move { eas.getAttestation(log.inner.uid).call().await }
+        });
+
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let attestations = try_join_all(attestation_futs)
+            .await?
+            .into_iter()
+            .map(|a| a._0)
+            .filter(|a| {
+                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
+                    if a.refUID != *ref_uid {
+                        return false;
+                    };
+                }
+                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
+                    if ref_uids.contains(&a.refUID) {
+                        return false;
+                    };
+                }
+
+                if a.expirationTime != 0 && a.expirationTime < now {
+                    return false;
+                }
+
+                if a.revocationTime != 0 && a.revocationTime < now {
+                    return false;
+                }
+
+                return true;
+            })
+            .collect::<Vec<_>>();
+
+        let statements = attestations
+            .iter()
+            .map(|a| StatementData::abi_decode(&a.data, true))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let decision_futs = statements.iter().map(|s| async move { arbitrate(s).await });
+        let decisions = join_all(decision_futs).await;
+
+        let arbitration_futs = attestations
+            .iter()
+            .zip(decisions.iter())
+            .map(|(attestation, decision)| {
+                let trusted_oracle_arbiter = TrustedOracleArbiter::new(
+                    self.addresses.trusted_oracle_arbiter,
+                    &self.wallet_provider,
+                );
+
+                if let Some(decision) = decision {
+                    Some(async move {
+                        trusted_oracle_arbiter
+                            .arbitrate(attestation.uid, *decision)
+                            .send()
+                            .await
+                    })
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let pending_txs = try_join_all(arbitration_futs).await?;
+        let receipt_futs = pending_txs
+            .into_iter()
+            .map(|tx| async move { tx.get_receipt().await });
+
+        let receipts = try_join_all(receipt_futs).await?;
+
+        let result = izip!(attestations, statements, decisions, receipts)
+            .filter(|(_, _, d, _)| d.is_some())
+            .map(|(attestation, statement, decision, receipt)| Decision {
+                attestation,
+                statement,
+                decision: decision.unwrap(),
+                receipt,
+            })
+            .collect::<Vec<Decision<StatementData>>>();
+
+        Ok(result)
     }
 
     pub async fn listen_and_arbitrate<
