@@ -61,9 +61,17 @@ pub struct AttestationFilterWithoutRefUid {
     pub uid: Option<ValueOrArray<FixedBytes<32>>>,
 }
 
-impl From<(AttestationFilterWithoutRefUid, ValueOrArray<FixedBytes<32>>)> for AttestationFilter {
+impl
+    From<(
+        AttestationFilterWithoutRefUid,
+        Option<ValueOrArray<FixedBytes<32>>>,
+    )> for AttestationFilter
+{
     fn from(
-        filter_and_ref_uid: (AttestationFilterWithoutRefUid, ValueOrArray<FixedBytes<32>>),
+        filter_and_ref_uid: (
+            AttestationFilterWithoutRefUid,
+            Option<ValueOrArray<FixedBytes<32>>>,
+        ),
     ) -> Self {
         let (filter, ref_uid) = filter_and_ref_uid;
 
@@ -72,7 +80,7 @@ impl From<(AttestationFilterWithoutRefUid, ValueOrArray<FixedBytes<32>>)> for At
             recipient: filter.recipient,
             schema_uid: filter.schema_uid,
             uid: filter.uid,
-            ref_uid: Some(ref_uid),
+            ref_uid,
         }
     }
 }
