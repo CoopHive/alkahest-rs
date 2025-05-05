@@ -254,7 +254,7 @@ impl OracleClient {
     pub async fn arbitrate_past_async<
         StatementData: SolType,
         ArbitrateFut: Future<Output = Option<bool>>,
-        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut,
+        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy,
     >(
         &self,
         fulfillment: FulfillmentParams<StatementData>,
@@ -275,7 +275,7 @@ impl OracleClient {
     pub async fn listen_and_arbitrate_async<
         StatementData: SolType,
         ArbitrateFut: Future<Output = Option<bool>>,
-        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut,
+        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy,
     >(
         &self,
         fulfillment: FulfillmentParams<StatementData>,
@@ -299,7 +299,7 @@ impl OracleClient {
         StatementData: SolType,
         DemandData: SolType,
         ArbitrateFut: Future<Output = Option<bool>>,
-        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> ArbitrateFut,
+        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> ArbitrateFut + Copy,
     >(
         &self,
         escrow: EscrowParams<DemandData>,
@@ -324,7 +324,7 @@ impl OracleClient {
         StatementData: SolType,
         DemandData: SolType,
         ArbitrateFut: Future<Output = Option<bool>>,
-        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> ArbitrateFut,
+        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> ArbitrateFut + Copy,
     >(
         &self,
         escrow: EscrowParams<DemandData>,
