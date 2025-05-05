@@ -416,6 +416,23 @@ impl OracleClient {
             .into_iter()
             .map(|log| log.log_decode::<IEAS::Attested>())
             .collect::<Result<Vec<_>, _>>()?;
+
+        let escrow_attestation_futs = escrow_logs.into_iter().map(|log| {
+            let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
+            async move { eas.getAttestation(log.inner.uid).call().await }
+        });
+
+        let fulfilllment_attestation_futs = fulfillment_logs.into_iter().map(|log| {
+            let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
+            async move { eas.getAttestation(log.inner.uid).call().await }
+        });
+
+        let escrow_attestations_fut = async move { try_join_all(escrow_attestation_futs).await };
+        let fulfillment_attestations_fut =
+            async move { try_join_all(fulfilllment_attestation_futs).await };
+
+        let (escrow_attestations, fulfillment_attestations) =
+            tokio::try_join!(escrow_attestations_fut, fulfillment_attestations_fut)?;
     }
 
     pub async fn arbitrate_past_for_escrow_async<
