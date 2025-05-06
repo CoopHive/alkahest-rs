@@ -372,10 +372,13 @@ impl OracleClient {
     pub async fn listen_and_arbitrate<
         StatementData: SolType,
         Arbitrate: Fn(&StatementData::RustType) -> Option<bool>,
+        OnAfterArbitrateFut: Future<Output = ()>,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy,
     >(
         &self,
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
     ) {
     }
 
@@ -383,10 +386,13 @@ impl OracleClient {
         StatementData: SolType,
         ArbitrateFut: Future<Output = Option<bool>>,
         Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy,
+        OnAfterArbitrateFut: Future<Output = ()>,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy,
     >(
         &self,
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
     ) {
     }
 
@@ -746,11 +752,14 @@ impl OracleClient {
         StatementData: SolType,
         DemandData: SolType,
         Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> Option<bool>,
+        OnAfterArbitrateFut: Future<Output = ()>,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy,
     >(
         &self,
         escrow: EscrowParams<DemandData>,
         fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
     ) {
     }
 
@@ -759,11 +768,14 @@ impl OracleClient {
         DemandData: SolType,
         ArbitrateFut: Future<Output = Option<bool>>,
         Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> ArbitrateFut + Copy,
+        OnAfterArbitrateFut: Future<Output = ()>,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy,
     >(
         &self,
         escrow: EscrowParams<DemandData>,
         fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
     ) {
     }
 }
