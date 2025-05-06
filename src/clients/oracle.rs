@@ -1,4 +1,7 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use alloy::{
     dyn_abi::SolType,
@@ -7,6 +10,7 @@ use alloy::{
     providers::Provider,
     rpc::types::{Filter, TransactionReceipt, ValueOrArray},
     signers::local::PrivateKeySigner,
+    sol,
     sol_types::SolEvent,
 };
 use futures::future::{join_all, try_join_all};
@@ -395,7 +399,10 @@ impl OracleClient {
         escrow: EscrowParams<DemandData>,
         fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
-    ) -> eyre::Result<Vec<Decision<StatementData, DemandData>>> {
+    ) -> eyre::Result<Vec<Decision<StatementData, DemandData>>>
+    where
+        DemandData::RustType: Clone,
+    {
         let escrow_filter = self.make_filter(&escrow.filter);
         let escrow_logs_fut = async move { self.public_provider.get_logs(&escrow_filter).await };
 
@@ -422,14 +429,14 @@ impl OracleClient {
             async move { eas.getAttestation(log.inner.uid).call().await }
         });
 
-        let fulfilllment_attestation_futs = fulfillment_logs.into_iter().map(|log| {
+        let fulfillment_attestation_futs = fulfillment_logs.into_iter().map(|log| {
             let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
             async move { eas.getAttestation(log.inner.uid).call().await }
         });
 
         let escrow_attestations_fut = async move { try_join_all(escrow_attestation_futs).await };
         let fulfillment_attestations_fut =
-            async move { try_join_all(fulfilllment_attestation_futs).await };
+            async move { try_join_all(fulfillment_attestation_futs).await };
 
         let (escrow_attestations, fulfillment_attestations) =
             tokio::try_join!(escrow_attestations_fut, fulfillment_attestations_fut)?;
@@ -479,6 +486,82 @@ impl OracleClient {
             .map(|s| DemandData::abi_decode(&s.demand, true))
             .collect::<Result<Vec<_>, _>>()?;
 
+        let demands_map: HashMap<_, _> = escrow_attestations
+            .iter()
+            .zip(escrow_demands.iter())
+            .map(|(attestation, demand)| (attestation.uid, demand))
+            .collect();
+
+        let fulfillment_attestations = fulfillment_attestations
+            .iter()
+            .map(|a| a._0.clone())
+            .filter(|a| demands_map.contains_key(&a.refUID))
+            .collect::<Vec<_>>();
+
+        let fulfillment_statements = fulfillment_attestations
+            .iter()
+            .map(|a| StatementData::abi_decode(&a.data, true))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let decisions = fulfillment_statements
+            .iter()
+            .zip(fulfillment_attestations.iter())
+            .map(|(statement, attestation)| {
+                let demand = demands_map.get(&attestation.refUID)?;
+                arbitrate(statement, demand)
+            })
+            .collect::<Vec<_>>();
+
+        let arbitration_futs = fulfillment_attestations
+            .iter()
+            .zip(decisions.iter())
+            .map(|(attestation, decision)| {
+                let trusted_oracle_arbiter = TrustedOracleArbiter::new(
+                    self.addresses.trusted_oracle_arbiter,
+                    &self.wallet_provider,
+                );
+
+                if let Some(decision) = decision {
+                    Some(async move {
+                        trusted_oracle_arbiter
+                            .arbitrate(attestation.uid, *decision)
+                            .send()
+                            .await
+                    })
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let pending_txs = try_join_all(arbitration_futs).await?;
+        let receipt_futs = pending_txs
+            .into_iter()
+            .map(|tx| async move { tx.get_receipt().await });
+
+        let receipts = try_join_all(receipt_futs).await?;
+
+        let result = izip!(
+            fulfillment_attestations,
+            fulfillment_statements,
+            decisions,
+            receipts
+        )
+        .filter(|(_, _, d, _)| d.is_some())
+        .map(|(attestation, statement, decision, receipt)| {
+            let demand = demands_map.get(&attestation.refUID).map(|&x| x.clone());
+            Decision {
+                attestation,
+                statement,
+                demand,
+                decision: decision.unwrap(),
+                receipt,
+            }
+        })
+        .collect::<Vec<Decision<StatementData, DemandData>>>();
+
+        Ok(result)
     }
 
     pub async fn arbitrate_past_for_escrow_async<
