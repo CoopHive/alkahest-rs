@@ -113,6 +113,13 @@ pub struct Decision<T: SolType, U: SolType> {
     pub receipt: TransactionReceipt,
 }
 
+sol! {
+    struct ArbiterDemand {
+        address oracle;
+        bytes demand;
+    }
+}
+
 impl OracleClient {
     pub async fn new(
         signer: PrivateKeySigner,
@@ -476,13 +483,6 @@ impl OracleClient {
             })
             .collect::<Vec<_>>();
 
-        sol! {
-            struct ArbiterDemand {
-                address oracle;
-                bytes demand;
-            }
-        }
-
         let escrow_statements = escrow_attestations
             .iter()
             .map(|a| ArbiterDemand::abi_decode(&a.data, true))
@@ -650,13 +650,6 @@ impl OracleClient {
                 return true;
             })
             .collect::<Vec<_>>();
-
-        sol! {
-            struct ArbiterDemand {
-                address oracle;
-                bytes demand;
-            }
-        }
 
         let escrow_statements = escrow_attestations
             .iter()
