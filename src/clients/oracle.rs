@@ -58,6 +58,7 @@ pub struct AttestationFilter {
     pub ref_uid: Option<ValueOrArray<FixedBytes<32>>>,
 }
 
+#[derive(Clone)]
 pub struct AttestationFilterWithoutRefUid {
     pub attester: Option<ValueOrArray<Address>>,
     pub recipient: Option<ValueOrArray<Address>>,
@@ -412,7 +413,7 @@ impl OracleClient {
         let escrow_filter = self.make_filter(&escrow.filter);
         let escrow_logs_fut = async move { self.public_provider.get_logs(&escrow_filter).await };
 
-        let fulfillment_filter: AttestationFilter = (fulfillment.filter, None).into();
+        let fulfillment_filter: AttestationFilter = (fulfillment.filter.clone(), None).into();
         let fulfillment_filter = self.make_filter(&fulfillment_filter);
         let fulfillment_logs_fut =
             async move { self.public_provider.get_logs(&fulfillment_filter).await };
@@ -587,7 +588,7 @@ impl OracleClient {
         let escrow_filter = self.make_filter(&escrow.filter);
         let escrow_logs_fut = async move { self.public_provider.get_logs(&escrow_filter).await };
 
-        let fulfillment_filter: AttestationFilter = (fulfillment.filter, None).into();
+        let fulfillment_filter: AttestationFilter = (fulfillment.filter.clone(), None).into();
         let fulfillment_filter = self.make_filter(&fulfillment_filter);
         let fulfillment_logs_fut =
             async move { self.public_provider.get_logs(&fulfillment_filter).await };
