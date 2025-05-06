@@ -168,7 +168,7 @@ impl OracleClient {
         Arbitrate: Fn(&StatementData::RustType) -> Option<bool>,
     >(
         &self,
-        fulfillment: FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
         let filter = self.make_filter(&fulfillment.filter);
@@ -271,7 +271,7 @@ impl OracleClient {
         Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy,
     >(
         &self,
-        fulfillment: FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
         let filter = self.make_filter(&fulfillment.filter);
@@ -376,7 +376,7 @@ impl OracleClient {
         OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy,
     >(
         &self,
-        fulfillment: FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
     ) {
@@ -390,7 +390,7 @@ impl OracleClient {
         OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy,
     >(
         &self,
-        fulfillment: FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
     ) {
@@ -403,7 +403,7 @@ impl OracleClient {
     >(
         &self,
         escrow: EscrowParams<DemandData>,
-        fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
     ) -> eyre::Result<Vec<Decision<StatementData, DemandData>>>
     where
@@ -578,7 +578,7 @@ impl OracleClient {
     >(
         &self,
         escrow: EscrowParams<DemandData>,
-        fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
     ) -> eyre::Result<Vec<Decision<StatementData, DemandData>>>
     where
@@ -757,7 +757,7 @@ impl OracleClient {
     >(
         &self,
         escrow: EscrowParams<DemandData>,
-        fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
     ) {
@@ -773,7 +773,7 @@ impl OracleClient {
     >(
         &self,
         escrow: EscrowParams<DemandData>,
-        fulfillment: FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
     ) {
