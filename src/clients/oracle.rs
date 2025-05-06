@@ -461,7 +461,64 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-    ) {
+    ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
+        let mut decisions = self.arbitrate_past_async(fulfillment, arbitrate).await?;
+        let filter = self.make_filter(&fulfillment.filter);
+
+        let sub = self.public_provider.subscribe_logs(&filter).await?;
+        let mut stream = sub.into_stream();
+
+        let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
+        let trusted_oracle_arbiter =
+            TrustedOracleArbiter::new(self.addresses.trusted_oracle_arbiter, &self.wallet_provider);
+
+        while let Some(log) = stream.next().await {
+            let log = log.log_decode::<IEAS::Attested>()?;
+
+            let attestation = eas.getAttestation(log.inner.uid).call().await?._0;
+
+            if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
+                if attestation.refUID != *ref_uid {
+                    continue;
+                };
+            }
+            if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
+                if ref_uids.contains(&attestation.refUID) {
+                    continue;
+                };
+            }
+
+            let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+            if attestation.expirationTime != 0 && attestation.expirationTime < now {
+                continue;
+            }
+            if attestation.revocationTime != 0 && attestation.revocationTime < now {
+                continue;
+            }
+
+            let statement = StatementData::abi_decode(&attestation.data, true)?;
+            let decision = arbitrate(&statement).await;
+
+            if let Some(decision) = decision {
+                let tx = trusted_oracle_arbiter
+                    .arbitrate(attestation.uid, decision)
+                    .send()
+                    .await?;
+                let receipt = tx.get_receipt().await?;
+                let decision = Decision {
+                    attestation,
+                    statement,
+                    demand: None,
+                    decision,
+                    receipt,
+                };
+
+                on_after_arbitrate(&decision);
+                decisions.push(decision);
+            }
+        }
+
+        Ok(decisions)
     }
 
     pub async fn arbitrate_past_for_escrow<
