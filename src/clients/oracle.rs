@@ -383,7 +383,7 @@ impl OracleClient {
     pub async fn listen_and_arbitrate<
         StatementData: SolType,
         Arbitrate: Fn(&StatementData::RustType) -> Option<bool> + Copy,
-        OnAfterArbitrateFut: Future<Output = ()>,
+        OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
         OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy,
     >(
         &self,
@@ -442,7 +442,7 @@ impl OracleClient {
                     receipt,
                 };
 
-                on_after_arbitrate(&decision);
+                tokio::spawn(on_after_arbitrate(&decision));
                 decisions.push(decision);
             }
         }
@@ -454,7 +454,7 @@ impl OracleClient {
         StatementData: SolType,
         ArbitrateFut: Future<Output = Option<bool>>,
         Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy,
-        OnAfterArbitrateFut: Future<Output = ()>,
+        OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
         OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy,
     >(
         &self,
@@ -513,7 +513,7 @@ impl OracleClient {
                     receipt,
                 };
 
-                on_after_arbitrate(&decision);
+                tokio::spawn(on_after_arbitrate(&decision));
                 decisions.push(decision);
             }
         }
