@@ -17,9 +17,9 @@ use crate::{
         AllArbiter, AnyArbiter, AttestationBarterUtils, AttestationEscrowObligation,
         AttestationEscrowObligation2, ERC20EscrowObligation, ERC20PaymentObligation,
         ERC721EscrowObligation, ERC721PaymentObligation, ERC1155EscrowObligation,
-        ERC1155PaymentObligation, IntrinsicsArbiter, IntrinsicsArbiter2,
+        ERC1155PaymentObligation, IntrinsicsArbiter, IntrinsicsArbiter2, RecipientArbiter,
         SpecificAttestationArbiter, StringObligation, TokenBundleBarterUtils, TrivialArbiter,
-        TrustedOracleArbiter, TrustedPartyArbiter,
+        TrustedOracleArbiter, TrustedPartyArbiter, UidArbiter,
         erc20_barter_cross_token::ERC20BarterCrossToken,
         erc721_barter_cross_token::ERC721BarterCrossToken,
         erc1155_barter_cross_token::ERC1155BarterCrossToken,
@@ -71,6 +71,8 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let mock_erc1155_a = MockERC1155::deploy(&god_provider).await?;
     let mock_erc1155_b = MockERC1155::deploy(&god_provider).await?;
 
+    let uid_arbiter = UidArbiter::deploy(&god_provider).await?;
+    let recipient_arbiter = RecipientArbiter::deploy(&god_provider).await?;
     let specific_attestation_arbiter = SpecificAttestationArbiter::deploy(&god_provider).await?;
     let trivial_arbiter = TrivialArbiter::deploy(&god_provider).await?;
     let trusted_oracle_arbiter = TrustedOracleArbiter::deploy(&god_provider).await?;
@@ -153,6 +155,8 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
             intrinsics_arbiter_2: intrinsics_arbiter_2.address().clone(),
             any_arbiter: any_arbiter.address().clone(),
             all_arbiter: all_arbiter.address().clone(),
+            uid_arbiter: uid_arbiter.address().clone(),
+            recipient_arbiter: recipient_arbiter.address().clone(),
         }),
         string_obligation_addresses: Some(StringObligationAddresses {
             eas: eas.address().clone(),

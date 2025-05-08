@@ -26,6 +26,8 @@ pub struct ArbitersAddresses {
     pub intrinsics_arbiter_2: Address,
     pub any_arbiter: Address,
     pub all_arbiter: Address,
+    pub uid_arbiter: Address,
+    pub recipient_arbiter: Address,
 }
 
 #[derive(Clone)]
@@ -40,6 +42,24 @@ pub struct ArbitersClient {
 impl Default for ArbitersAddresses {
     fn default() -> Self {
         BASE_SEPOLIA_ADDRESSES.arbiters_addresses.unwrap()
+    }
+}
+
+sol! {
+    contract UidArbiter {
+        struct DemandData {
+            bytes32 uid;
+        }
+    }
+}
+
+sol! {
+    contract RecipientArbiter {
+        struct DemandData {
+            address baseArbiter;
+            bytes baseDemand;
+            address recipient;
+        }
     }
 }
 
@@ -124,6 +144,26 @@ impl ArbitersClient {
         Ok(MultiArbiter::DemandData::abi_decode(data, true)?)
     }
 
+    pub fn encode_uid_arbiter_demand(demand: &UidArbiter::DemandData) -> Bytes {
+        demand.abi_encode().into()
+    }
+
+    pub fn decode_uid_arbiter_demand(
+        data: &Bytes,
+    ) -> eyre::Result<UidArbiter::DemandData> {
+        Ok(UidArbiter::DemandData::abi_decode(data, true)?)
+    }
+
+    pub fn encode_recipient_arbiter_demand(demand: &RecipientArbiter::DemandData) -> Bytes {
+        demand.abi_encode().into()
+    }
+
+    pub fn decode_recipient_arbiter_demand(
+        data: &Bytes,
+    ) -> eyre::Result<RecipientArbiter::DemandData> {
+        Ok(RecipientArbiter::DemandData::abi_decode(data, true)?)
+    }
+
     pub fn encode_trusted_party_demand(demand: &TrustedPartyArbiter::DemandData) -> Bytes {
         demand.abi_encode().into()
     }
@@ -147,6 +187,10 @@ impl ArbitersClient {
             data, true,
         )?)
     }
+
+    // The following are recommended replacements for TrustedPartyArbiter and SpecificAttestationArbiter
+    // UidArbiter -> replaces SpecificAttestationArbiter
+    // RecipientArbiter -> replaces TrustedPartyArbiter
 
     pub fn encode_trusted_oracle_demand(demand: &TrustedOracleArbiter::DemandData) -> Bytes {
         demand.abi_encode().into()
@@ -225,8 +269,8 @@ mod tests {
 
     use crate::{
         clients::arbiters::{
-            ArbitersClient, IntrinsicsArbiter2, MultiArbiter, SpecificAttestationArbiter,
-            TrustedOracleArbiter, TrustedPartyArbiter,
+            ArbitersClient, IntrinsicsArbiter2, MultiArbiter, RecipientArbiter, SpecificAttestationArbiter,
+            TrustedOracleArbiter, TrustedPartyArbiter, UidArbiter,
         },
         contracts,
         utils::setup_test_environment,
@@ -316,51 +360,137 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_trusted_party_arbiter_with_correct_creator() -> eyre::Result<()> {
+    async fn test_trusted_party_arbiter_with_incorrect_creator_original() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
 
-        // Create mock addresses for testing
-        let creator = test.alice.address();
+        // Create a test attestation
+        let attestation = create_test_attestation(None, None);
 
-        // Create a test attestation with the correct recipient (creator)
-        let attestation = create_test_attestation(None, Some(creator));
-
-        // Create demand data with the correct creator and TrivialArbiter as base arbiter
+        // Create demand data with the correct creator
         let demand_data = TrustedPartyArbiter::DemandData {
             baseArbiter: test
                 .addresses
-                .clone()
                 .arbiters_addresses
                 .ok_or(eyre::eyre!("no arbiter addresses"))?
                 .trivial_arbiter,
-            baseDemand: Bytes::default(),
-            creator,
+            baseDemand: Bytes::from(vec![]),
+            creator: test.alice.address(),
         };
 
-        // Encode the demand data
+        // Encode demand data
         let demand = ArbitersClient::encode_trusted_party_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
-        // Check statement should return true
+        // Check statement should revert with NotTrustedParty
         let trusted_party_arbiter = contracts::TrustedPartyArbiter::new(
             test.addresses
                 .arbiters_addresses
-                .clone()
                 .ok_or(eyre::eyre!("no arbiter addresses"))?
                 .trusted_party_arbiter,
-            &test.alice_client.wallet_provider,
+            &test.bob_client.wallet_provider,
         );
 
+        // Call with Bob as the sender (different from demand_data.creator which is Alice)
         let result = trusted_party_arbiter
             .checkStatement(attestation.into(), demand, counteroffer)
+            .call()
+            .await;
+
+        // We expect this to revert because Bob is not the creator
+        assert!(
+            result.is_err(),
+            "TrustedPartyArbiter should revert with incorrect creator"
+        );
+
+        Ok(())
+    }
+    
+    #[tokio::test]
+    async fn test_recipient_arbiter_with_incorrect_recipient() -> eyre::Result<()> {
+        // Setup test environment
+        let test = setup_test_environment().await?;
+
+        // Create a test attestation with Bob as recipient
+        let bob_address = test.bob.address();
+        let attestation = create_test_attestation(None, Some(bob_address));
+
+        // Create demand data expecting Alice as recipient
+        let alice_address = test.alice.address();
+        let demand_data = RecipientArbiter::DemandData {
+            baseArbiter: test.addresses.arbiters_addresses.unwrap().trivial_arbiter,
+            baseDemand: Bytes::from(vec![]),
+            recipient: alice_address, // Different from attestation.recipient which is Bob
+        };
+
+        // Encode demand data
+        let demand = ArbitersClient::encode_recipient_arbiter_demand(&demand_data);
+        let counteroffer = FixedBytes::<32>::default();
+
+        // Create RecipientArbiter contract instance
+        let recipient_arbiter = contracts::RecipientArbiter::new(
+            test.addresses.arbiters_addresses.unwrap().recipient_arbiter,
+            &test.alice_client.public_provider,
+        );
+
+        // Call check_statement - should revert with RecipientMismatched
+        let result = recipient_arbiter
+            .checkStatement(attestation.clone().into(), demand, counteroffer)
+            .call()
+            .await;
+
+        // We expect this to revert because recipient mismatch
+        assert!(
+            result.is_err(),
+            "RecipientArbiter should revert with incorrect recipient"
+        );
+
+        Ok(())
+    }
+    
+    #[tokio::test]
+    async fn test_recipient_arbiter_with_correct_recipient() -> eyre::Result<()> {
+        // Setup test environment
+        let test = setup_test_environment().await?;
+
+        // Create a test attestation
+        let recipient = test.alice.address();
+        let attestation = create_test_attestation(None, Some(recipient));
+
+        // Create demand data with the correct recipient and TrivialArbiter as base arbiter
+        let demand_data = RecipientArbiter::DemandData {
+            baseArbiter: test
+                .addresses
+                .arbiters_addresses
+                .unwrap()
+                .trivial_arbiter,
+            baseDemand: Bytes::from(vec![]),
+            recipient,
+        };
+
+        // Encode demand data
+        let demand = ArbitersClient::encode_recipient_arbiter_demand(&demand_data);
+        let counteroffer = FixedBytes::<32>::default();
+
+        // Check statement should return true
+        let recipient_arbiter = contracts::RecipientArbiter::new(
+            test.addresses
+                .arbiters_addresses
+                .unwrap()
+                .recipient_arbiter,
+            &test.alice_client.public_provider,
+        );
+
+        // Call check_statement
+        let result = recipient_arbiter
+            .checkStatement(attestation.clone().into(), demand, counteroffer)
             .call()
             .await?
             ._0;
 
         assert!(
             result,
-            "TrustedPartyArbiter should return true with correct creator"
+            "RecipientArbiter should return true with correct recipient"
         );
 
         Ok(())
@@ -657,7 +787,89 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_specific_attestation_arbiter_with_correct_uid() -> eyre::Result<()> {
+    async fn test_specific_attestation_arbiter_with_incorrect_uid_original() -> eyre::Result<()> {
+        // Setup test environment
+        let test = setup_test_environment().await?;
+
+        // Create a test attestation
+        let uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
+        let attestation = create_test_attestation(Some(uid), None);
+
+        // Create demand data with non-matching UID
+        let different_uid = FixedBytes::<32>::from_slice(&[2u8; 32]);
+        let demand_data = SpecificAttestationArbiter::DemandData { uid: different_uid };
+
+        // Encode the demand data
+        let encoded =
+            ArbitersClient::encode_specific_attestation_demand(&demand_data);
+
+        // Check statement should revert with NotDemandedAttestation
+        let specific_attestation_arbiter = contracts::SpecificAttestationArbiter::new(
+            test.addresses
+                .arbiters_addresses
+                .unwrap()
+                .specific_attestation_arbiter,
+            &test.alice_client.public_provider,
+        );
+
+        let result = specific_attestation_arbiter
+            .checkStatement(
+                attestation.clone().into(),
+                encoded,
+                FixedBytes::<32>::ZERO,
+            )
+            .call()
+            .await;
+
+        assert!(
+            result.is_err(),
+            "SpecificAttestationArbiter should revert with incorrect UID"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_uid_arbiter_with_incorrect_uid() -> eyre::Result<()> {
+        // Setup test environment
+        let test = setup_test_environment().await?;
+
+        // Create a test attestation
+        let uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
+        let attestation = create_test_attestation(Some(uid), None);
+
+        // Create demand data with non-matching UID
+        let different_uid = FixedBytes::<32>::from_slice(&[2u8; 32]);
+        let demand_data = UidArbiter::DemandData { uid: different_uid };
+
+        // Encode the demand data
+        let encoded = ArbitersClient::encode_uid_arbiter_demand(&demand_data);
+
+        // Check statement should revert with UidMismatched
+        let uid_arbiter = contracts::UidArbiter::new(
+            test.addresses.arbiters_addresses.unwrap().uid_arbiter,
+            &test.alice_client.public_provider,
+        );
+
+        let result = uid_arbiter
+            .checkStatement(
+                attestation.clone().into(),
+                encoded,
+                FixedBytes::<32>::ZERO,
+            )
+            .call()
+            .await;
+
+        assert!(
+            result.is_err(),
+            "UidArbiter should revert with incorrect UID"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_uid_arbiter_with_correct_uid() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
 
@@ -666,30 +878,29 @@ mod tests {
         let attestation = create_test_attestation(Some(uid), None);
 
         // Create demand data with matching UID
-        let demand_data = SpecificAttestationArbiter::DemandData { uid };
+        let demand_data = UidArbiter::DemandData { uid };
 
-        // Encode demand data
-        let demand = ArbitersClient::encode_specific_attestation_demand(&demand_data);
-        let counteroffer = FixedBytes::<32>::default();
+        // Encode the demand data
+        let encoded = ArbitersClient::encode_uid_arbiter_demand(&demand_data);
 
         // Check statement - should return true
-        let specific_attestation_arbiter = contracts::SpecificAttestationArbiter::new(
-            test.addresses
-                .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .specific_attestation_arbiter,
-            &test.alice_client.wallet_provider,
+        let uid_arbiter = contracts::UidArbiter::new(
+            test.addresses.arbiters_addresses.unwrap().uid_arbiter,
+            &test.alice_client.public_provider,
         );
-
-        let result = specific_attestation_arbiter
-            .checkStatement(attestation.into(), demand, counteroffer)
+        let result = uid_arbiter
+            .checkStatement(
+                attestation.clone().into(),
+                encoded,
+                FixedBytes::<32>::ZERO,
+            )
             .call()
             .await?
             ._0;
 
         assert!(
             result,
-            "SpecificAttestationArbiter should return true with matching UID"
+            "UidArbiter should return true with matching UID"
         );
 
         Ok(())
@@ -786,8 +997,59 @@ mod tests {
         // Decode the demand data
         let decoded = ArbitersClient::decode_specific_attestation_demand(&encoded)?;
 
-        // Verify decoded data
-        assert_eq!(decoded.uid, uid, "UID should match");
+        // Verify the data was encoded and decoded correctly
+        assert_eq!(decoded.uid, uid, "UID did not round-trip correctly");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_encode_and_decode_uid_arbiter_demand() -> eyre::Result<()> {
+        // Setup test environment
+        let _test = setup_test_environment().await?;
+
+        // Create a test demand data
+        let uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
+        let demand_data = UidArbiter::DemandData { uid };
+
+        // Encode the demand data
+        let encoded = ArbitersClient::encode_uid_arbiter_demand(&demand_data);
+
+        // Decode the demand data
+        let decoded = ArbitersClient::decode_uid_arbiter_demand(&encoded)?;
+
+        // Verify the data was encoded and decoded correctly
+        assert_eq!(decoded.uid, uid, "UID did not round-trip correctly");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_encode_and_decode_recipient_arbiter_demand() -> eyre::Result<()> {
+        // Setup test environment
+        let test = setup_test_environment().await?;
+        
+        // Create a test demand data
+        let base_arbiter = test.addresses.arbiters_addresses.unwrap().trivial_arbiter;
+        let base_demand = Bytes::from(vec![1, 2, 3]);
+        let recipient = test.alice.address();
+        
+        let demand_data = RecipientArbiter::DemandData {
+            baseArbiter: base_arbiter,
+            baseDemand: base_demand.clone(),
+            recipient,
+        };
+
+        // Encode the demand data
+        let encoded = ArbitersClient::encode_recipient_arbiter_demand(&demand_data);
+
+        // Decode the demand data
+        let decoded = ArbitersClient::decode_recipient_arbiter_demand(&encoded)?;
+
+        // Verify the data was encoded and decoded correctly
+        assert_eq!(decoded.baseArbiter, base_arbiter, "Base arbiter did not round-trip correctly");
+        assert_eq!(decoded.baseDemand, base_demand, "Base demand did not round-trip correctly");
+        assert_eq!(decoded.recipient, recipient, "Recipient did not round-trip correctly");
 
         Ok(())
     }

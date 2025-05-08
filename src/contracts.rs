@@ -239,6 +239,22 @@ sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
     #[derive(Debug)]
+    UidArbiter,
+    "src/contracts/UidArbiter.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
+    RecipientArbiter,
+    "src/contracts/RecipientArbiter.json"
+);
+
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug)]
     SpecificAttestationArbiter,
     "src/contracts/SpecificAttestationArbiter.json"
 );

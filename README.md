@@ -120,10 +120,10 @@ async fn trade_erc20_for_custom() -> Result<()> {
     //
     // for custom cases, you'll have to implement your own arbiter
     //
-    // in the example, we'll use TrustedPartyArbiter and TrivialArbiter
+    // in the example, we'll use RecipientArbiter and TrivialArbiter
     // to make sure the result is from a particular trusted party,
     // without actually validating the result
-    // see https://github.com/CoopHive/alkahest-mocks/blob/main/src/Validators/TrustedPartyArbiter.sol
+    // see https://github.com/CoopHive/alkahest-mocks/blob/main/src/Validators/RecipientArbiter.sol
     // and https://github.com/CoopHive/alkahest-mocks/blob/main/src/Validators/TrivialArbiter.sol
 
     // construct custom demand. note that this could be anything, and is determined by the arbiter.
@@ -140,7 +140,7 @@ async fn trade_erc20_for_custom() -> Result<()> {
     }
         .abi_encode();
 
-    // we use TrustedPartyArbiter to wrap the base demand. This actually does decode DemandData,
+    // we use RecipientArbiter to wrap the base demand. This actually does decode DemandData,
     // and we use the DemandData format it defines,
     // to demand that only our trusted seller can fulfill the demand.
     // if the baseDemand were something other than TrivialArbiter,
@@ -176,9 +176,9 @@ async fn trade_erc20_for_custom() -> Result<()> {
     .await?;
 
     // make escrow with generic escrow function,
-    // passing in TrustedPartyArbiter's address and our custom demand,
+    // passing in RecipientArbiter's address and our custom demand,
     // and no expiration
-    let trusted_party_arbiter = address!("0x82FaE516dE4912C382FBF7D9D6d0194b7f532738");
+    let recipient_arbiter = address!("0x82FaE516dE4912C382FBF7D9D6d0194b7f532738");
     let escrow = client_buyer
         .erc20
         .buy_with_erc20(

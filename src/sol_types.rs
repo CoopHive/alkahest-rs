@@ -6,8 +6,8 @@ use alloy::{
 use crate::{
     contracts::{
         self, AllArbiter, AnyArbiter, AttestationBarterUtils, AttestationEscrowObligation, IEAS,
-        IntrinsicsArbiter, IntrinsicsArbiter2, SpecificAttestationArbiter, TrivialArbiter,
-        TrustedOracleArbiter, TrustedPartyArbiter,
+        IntrinsicsArbiter, IntrinsicsArbiter2, RecipientArbiter, SpecificAttestationArbiter, TrivialArbiter,
+        TrustedOracleArbiter, TrustedPartyArbiter, UidArbiter,
     },
     types::{ArbiterData, TokenBundleData},
 };
@@ -173,3 +173,5 @@ impl_from_attestation!(IntrinsicsArbiter);
 impl_from_attestation!(IntrinsicsArbiter2);
 impl_from_attestation!(AnyArbiter);
 impl_from_attestation!(AllArbiter);
+impl_from_attestation!(UidArbiter);
+impl_from_attestation!(RecipientArbiter);
