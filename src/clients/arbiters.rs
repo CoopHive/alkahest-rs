@@ -232,8 +232,8 @@ impl ArbitersClient {
             .from_block(from_block.unwrap_or(0))
             .address(self.addresses.trusted_oracle_arbiter)
             .event_signature(contracts::TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH)
-            .topic1(oracle.into_word())
-            .topic2(statement);
+            .topic1(statement)
+            .topic2(oracle.into_word());
 
         let logs = self.public_provider.get_logs(&filter).await?;
         if let Some(log) = logs
