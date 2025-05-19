@@ -75,7 +75,8 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let recipient_arbiter = RecipientArbiter::deploy(&god_provider).await?;
     let specific_attestation_arbiter = SpecificAttestationArbiter::deploy(&god_provider).await?;
     let trivial_arbiter = TrivialArbiter::deploy(&god_provider).await?;
-    let trusted_oracle_arbiter = TrustedOracleArbiter::deploy(&god_provider).await?;
+    let trusted_oracle_arbiter =
+        TrustedOracleArbiter::deploy(&god_provider, eas.address().clone()).await?;
     let trusted_party_arbiter = TrustedPartyArbiter::deploy(&god_provider).await?;
     let intrinsics_arbiter = IntrinsicsArbiter::deploy(&god_provider).await?;
     let intrinsics_arbiter_2 = IntrinsicsArbiter2::deploy(&god_provider).await?;
