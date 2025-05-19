@@ -370,6 +370,7 @@ mod tests {
             baseArbiter: test
                 .addresses
                 .arbiters_addresses
+                .clone()
                 .ok_or(eyre::eyre!("no arbiter addresses"))?
                 .trivial_arbiter,
             baseDemand: Bytes::from(vec![]),
@@ -416,7 +417,12 @@ mod tests {
         // Create demand data expecting Alice as recipient
         let alice_address = test.alice.address();
         let demand_data = RecipientArbiter::DemandData {
-            baseArbiter: test.addresses.arbiters_addresses.unwrap().trivial_arbiter,
+            baseArbiter: test
+                .addresses
+                .arbiters_addresses
+                .clone()
+                .unwrap()
+                .trivial_arbiter,
             baseDemand: Bytes::from(vec![]),
             recipient: alice_address, // Different from attestation.recipient which is Bob
         };
@@ -457,7 +463,12 @@ mod tests {
 
         // Create demand data with the correct recipient and TrivialArbiter as base arbiter
         let demand_data = RecipientArbiter::DemandData {
-            baseArbiter: test.addresses.arbiters_addresses.unwrap().trivial_arbiter,
+            baseArbiter: test
+                .addresses
+                .arbiters_addresses
+                .clone()
+                .unwrap()
+                .trivial_arbiter,
             baseDemand: Bytes::from(vec![]),
             recipient,
         };
@@ -859,8 +870,12 @@ mod tests {
         let uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
         let attestation = create_test_attestation(Some(uid), None);
 
-        // Create demand data with matching UID
-        let demand_data = UidArbiter::DemandData { uid };
+        // Create demand data with matching UID and use trivialArbiter as the baseArbiter
+        let demand_data = UidArbiter::DemandData { 
+            baseArbiter: test.addresses.arbiters_addresses.unwrap().trivial_arbiter,
+            baseDemand: Bytes::default(),
+            uid 
+        };
 
         // Encode the demand data
         let encoded = ArbitersClient::encode_uid_arbiter_demand(&demand_data);
