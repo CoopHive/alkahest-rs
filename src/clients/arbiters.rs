@@ -46,7 +46,7 @@ impl Default for ArbitersAddresses {
 }
 
 sol! {
-    contract UidArbiter {
+    contract UidArbiterComposing {
         struct DemandData {
             address baseArbiter;
             bytes baseDemand;
@@ -56,7 +56,7 @@ sol! {
 }
 
 sol! {
-    contract RecipientArbiter {
+    contract RecipientArbiterNoncomposing {
         struct DemandData {
             address baseArbiter;
             bytes baseDemand;
@@ -146,22 +146,28 @@ impl ArbitersClient {
         Ok(MultiArbiter::DemandData::abi_decode(data, true)?)
     }
 
-    pub fn encode_uid_arbiter_demand(demand: &UidArbiter::DemandData) -> Bytes {
+    pub fn encode_uid_arbiter_demand(demand: &UidArbiterComposing::DemandData) -> Bytes {
         demand.abi_encode().into()
     }
 
-    pub fn decode_uid_arbiter_demand(data: &Bytes) -> eyre::Result<UidArbiter::DemandData> {
-        Ok(UidArbiter::DemandData::abi_decode(data, true)?)
+    pub fn decode_uid_arbiter_demand(
+        data: &Bytes,
+    ) -> eyre::Result<UidArbiterComposing::DemandData> {
+        Ok(UidArbiterComposing::DemandData::abi_decode(data, true)?)
     }
 
-    pub fn encode_recipient_arbiter_demand(demand: &RecipientArbiter::DemandData) -> Bytes {
+    pub fn encode_recipient_arbiter_demand(
+        demand: &RecipientArbiterNoncomposing::DemandData,
+    ) -> Bytes {
         demand.abi_encode().into()
     }
 
     pub fn decode_recipient_arbiter_demand(
         data: &Bytes,
-    ) -> eyre::Result<RecipientArbiter::DemandData> {
-        Ok(RecipientArbiter::DemandData::abi_decode(data, true)?)
+    ) -> eyre::Result<RecipientArbiterNoncomposing::DemandData> {
+        Ok(RecipientArbiterNoncomposing::DemandData::abi_decode(
+            data, true,
+        )?)
     }
 
     pub fn encode_trusted_party_demand(demand: &TrustedPartyArbiter::DemandData) -> Bytes {
@@ -269,8 +275,9 @@ mod tests {
 
     use crate::{
         clients::arbiters::{
-            ArbitersClient, IntrinsicsArbiter2, MultiArbiter, RecipientArbiter,
-            SpecificAttestationArbiter, TrustedOracleArbiter, TrustedPartyArbiter, UidArbiter,
+            ArbitersClient, IntrinsicsArbiter2, MultiArbiter, RecipientArbiterNoncomposing,
+            SpecificAttestationArbiter, TrustedOracleArbiter, TrustedPartyArbiter,
+            UidArbiterComposing,
         },
         contracts,
         utils::setup_test_environment,
@@ -418,7 +425,7 @@ mod tests {
 
         // Create demand data expecting Alice as recipient
         let alice_address = test.alice.address();
-        let demand_data = RecipientArbiter::DemandData {
+        let demand_data = RecipientArbiterNoncomposing::DemandData {
             baseArbiter: test
                 .addresses
                 .arbiters_addresses
@@ -464,7 +471,7 @@ mod tests {
         let attestation = create_test_attestation(None, Some(recipient));
 
         // Create demand data with the correct recipient and TrivialArbiter as base arbiter
-        let demand_data = RecipientArbiter::DemandData {
+        let demand_data = RecipientArbiterNoncomposing::DemandData {
             baseArbiter: test
                 .addresses
                 .arbiters_addresses
@@ -839,8 +846,13 @@ mod tests {
 
         // Create demand data with non-matching UID
         let different_uid = FixedBytes::<32>::from_slice(&[2u8; 32]);
-        let trivial_arbiter = test.addresses.arbiters_addresses.clone().unwrap().trivial_arbiter;
-        let demand_data = UidArbiter::DemandData {
+        let trivial_arbiter = test
+            .addresses
+            .arbiters_addresses
+            .clone()
+            .unwrap()
+            .trivial_arbiter;
+        let demand_data = UidArbiterComposing::DemandData {
             baseArbiter: trivial_arbiter,
             baseDemand: Bytes::default(),
             uid: different_uid,
@@ -850,11 +862,14 @@ mod tests {
         let encoded = ArbitersClient::encode_uid_arbiter_demand(&demand_data);
 
         // Check statement should revert with UidMismatched
-        let uid_arbiter_address = test.addresses.arbiters_addresses.clone().unwrap().uid_arbiter;
-        let uid_arbiter = contracts::UidArbiter::new(
-            uid_arbiter_address,
-            &test.alice_client.public_provider,
-        );
+        let uid_arbiter_address = test
+            .addresses
+            .arbiters_addresses
+            .clone()
+            .unwrap()
+            .uid_arbiter;
+        let uid_arbiter =
+            contracts::UidArbiter::new(uid_arbiter_address, &test.alice_client.public_provider);
 
         let result = uid_arbiter
             .checkStatement(attestation.clone().into(), encoded, FixedBytes::<32>::ZERO)
@@ -879,8 +894,13 @@ mod tests {
         let attestation = create_test_attestation(Some(uid), None);
 
         // Create demand data with matching UID and use trivialArbiter as the baseArbiter
-        let trivial_arbiter = test.addresses.arbiters_addresses.clone().unwrap().trivial_arbiter;
-        let demand_data = UidArbiter::DemandData {
+        let trivial_arbiter = test
+            .addresses
+            .arbiters_addresses
+            .clone()
+            .unwrap()
+            .trivial_arbiter;
+        let demand_data = UidArbiterComposing::DemandData {
             baseArbiter: trivial_arbiter,
             baseDemand: Bytes::default(),
             uid,
@@ -890,11 +910,14 @@ mod tests {
         let encoded = ArbitersClient::encode_uid_arbiter_demand(&demand_data);
 
         // Check statement - should return true
-        let uid_arbiter_address = test.addresses.arbiters_addresses.clone().unwrap().uid_arbiter;
-        let uid_arbiter = contracts::UidArbiter::new(
-            uid_arbiter_address,
-            &test.alice_client.public_provider,
-        );
+        let uid_arbiter_address = test
+            .addresses
+            .arbiters_addresses
+            .clone()
+            .unwrap()
+            .uid_arbiter;
+        let uid_arbiter =
+            contracts::UidArbiter::new(uid_arbiter_address, &test.alice_client.public_provider);
         let result = uid_arbiter
             .checkStatement(attestation.clone().into(), encoded, FixedBytes::<32>::ZERO)
             .call()
@@ -1010,8 +1033,13 @@ mod tests {
 
         // Create a test demand data
         let uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
-        let trivial_arbiter = test.addresses.arbiters_addresses.clone().unwrap().trivial_arbiter;
-        let demand_data = UidArbiter::DemandData {
+        let trivial_arbiter = test
+            .addresses
+            .arbiters_addresses
+            .clone()
+            .unwrap()
+            .trivial_arbiter;
+        let demand_data = UidArbiterComposing::DemandData {
             baseArbiter: trivial_arbiter,
             baseDemand: Bytes::default(),
             uid,
@@ -1039,7 +1067,7 @@ mod tests {
         let base_demand = Bytes::from(vec![1, 2, 3]);
         let recipient = test.alice.address();
 
-        let demand_data = RecipientArbiter::DemandData {
+        let demand_data = RecipientArbiterNoncomposing::DemandData {
             baseArbiter: base_arbiter,
             baseDemand: base_demand.clone(),
             recipient,
