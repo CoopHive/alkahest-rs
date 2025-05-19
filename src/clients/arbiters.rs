@@ -48,6 +48,8 @@ impl Default for ArbitersAddresses {
 sol! {
     contract UidArbiter {
         struct DemandData {
+            address baseArbiter;
+            bytes baseDemand;
             bytes32 uid;
         }
     }
@@ -837,14 +839,20 @@ mod tests {
 
         // Create demand data with non-matching UID
         let different_uid = FixedBytes::<32>::from_slice(&[2u8; 32]);
-        let demand_data = UidArbiter::DemandData { uid: different_uid };
+        let trivial_arbiter = test.addresses.arbiters_addresses.clone().unwrap().trivial_arbiter;
+        let demand_data = UidArbiter::DemandData {
+            baseArbiter: trivial_arbiter,
+            baseDemand: Bytes::default(),
+            uid: different_uid,
+        };
 
         // Encode the demand data
         let encoded = ArbitersClient::encode_uid_arbiter_demand(&demand_data);
 
         // Check statement should revert with UidMismatched
+        let uid_arbiter_address = test.addresses.arbiters_addresses.clone().unwrap().uid_arbiter;
         let uid_arbiter = contracts::UidArbiter::new(
-            test.addresses.arbiters_addresses.unwrap().uid_arbiter,
+            uid_arbiter_address,
             &test.alice_client.public_provider,
         );
 
@@ -871,18 +879,20 @@ mod tests {
         let attestation = create_test_attestation(Some(uid), None);
 
         // Create demand data with matching UID and use trivialArbiter as the baseArbiter
-        let demand_data = UidArbiter::DemandData { 
-            baseArbiter: test.addresses.arbiters_addresses.unwrap().trivial_arbiter,
+        let trivial_arbiter = test.addresses.arbiters_addresses.clone().unwrap().trivial_arbiter;
+        let demand_data = UidArbiter::DemandData {
+            baseArbiter: trivial_arbiter,
             baseDemand: Bytes::default(),
-            uid 
+            uid,
         };
 
         // Encode the demand data
         let encoded = ArbitersClient::encode_uid_arbiter_demand(&demand_data);
 
         // Check statement - should return true
+        let uid_arbiter_address = test.addresses.arbiters_addresses.clone().unwrap().uid_arbiter;
         let uid_arbiter = contracts::UidArbiter::new(
-            test.addresses.arbiters_addresses.unwrap().uid_arbiter,
+            uid_arbiter_address,
             &test.alice_client.public_provider,
         );
         let result = uid_arbiter
@@ -996,11 +1006,16 @@ mod tests {
     #[tokio::test]
     async fn test_encode_and_decode_uid_arbiter_demand() -> eyre::Result<()> {
         // Setup test environment
-        let _test = setup_test_environment().await?;
+        let test = setup_test_environment().await?;
 
         // Create a test demand data
         let uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
-        let demand_data = UidArbiter::DemandData { uid };
+        let trivial_arbiter = test.addresses.arbiters_addresses.clone().unwrap().trivial_arbiter;
+        let demand_data = UidArbiter::DemandData {
+            baseArbiter: trivial_arbiter,
+            baseDemand: Bytes::default(),
+            uid,
+        };
 
         // Encode the demand data
         let encoded = ArbitersClient::encode_uid_arbiter_demand(&demand_data);
