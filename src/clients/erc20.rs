@@ -357,6 +357,43 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    pub async fn permit_and_buy_with_erc20(
+        &self,
+        price: &Erc20Data,
+        item: &ArbiterData,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
+        let permit = self
+            .get_permit_signature(
+                self.addresses.escrow_obligation,
+                price,
+                deadline.try_into()?,
+            )
+            .await?;
+
+        let barter_utils_contract =
+            contracts::ERC20BarterUtils::new(self.addresses.barter_utils, &self.wallet_provider);
+        let receipt = barter_utils_contract
+            .permitAndBuyWithErc20(
+                price.address,
+                price.value,
+                item.arbiter,
+                item.demand.clone(),
+                expiration,
+                deadline.try_into()?,
+                27 + permit.v() as u8,
+                permit.r().into(),
+                permit.s().into(),
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
     /// Makes a direct payment with ERC20 tokens.
     ///
     /// # Arguments
