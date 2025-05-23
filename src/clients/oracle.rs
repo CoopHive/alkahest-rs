@@ -410,6 +410,7 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        max_decisions: Option<usize>,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
         let mut decisions = self.arbitrate_past(fulfillment, arbitrate).await?;
         let filter = self.make_filter(&fulfillment.filter);
