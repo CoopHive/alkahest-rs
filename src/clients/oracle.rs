@@ -465,6 +465,12 @@ impl OracleClient {
 
                 tokio::spawn(on_after_arbitrate(&decision));
                 decisions.push(decision);
+
+                if let Some(max) = max_decisions {
+                    if decisions.len() >= max {
+                        break;
+                    }
+                }
             }
         }
 
@@ -482,6 +488,7 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        max_decisions: Option<usize>,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
         let mut decisions = self.arbitrate_past_async(fulfillment, arbitrate).await?;
         let filter = self.make_filter(&fulfillment.filter);
@@ -519,7 +526,6 @@ impl OracleClient {
 
             let statement = StatementData::abi_decode(&attestation.data, true)?;
             let decision = arbitrate(&statement).await;
-
             if let Some(decision) = decision {
                 let tx = trusted_oracle_arbiter
                     .arbitrate(attestation.uid, decision)
@@ -536,6 +542,12 @@ impl OracleClient {
 
                 tokio::spawn(on_after_arbitrate(&decision));
                 decisions.push(decision);
+
+                if let Some(max) = max_decisions {
+                    if decisions.len() >= max {
+                        break;
+                    }
+                }
             }
         }
 
