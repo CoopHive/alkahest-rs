@@ -325,7 +325,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_trivival_listen_and_arbitrate_past() -> eyre::Result<()> {
+    async fn test_trivival_listen_and_arbitrate() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
 
         // give alice some erc20 tokens
@@ -471,7 +471,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_conditonal_listen_and_arbitrate_past() -> eyre::Result<()> {
+    async fn test_conditonal_listen_and_arbitrate() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
 
         // give alice some erc20 tokens
