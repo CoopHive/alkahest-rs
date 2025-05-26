@@ -357,6 +357,43 @@ impl Erc20Client {
         Ok(receipt)
     }
 
+    pub async fn permit_and_buy_with_erc20(
+        &self,
+        price: &Erc20Data,
+        item: &ArbiterData,
+        expiration: u64,
+    ) -> eyre::Result<TransactionReceipt> {
+        let deadline = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
+        let permit = self
+            .get_permit_signature(
+                self.addresses.escrow_obligation,
+                price,
+                deadline.try_into()?,
+            )
+            .await?;
+
+        let barter_utils_contract =
+            contracts::ERC20BarterUtils::new(self.addresses.barter_utils, &self.wallet_provider);
+        let receipt = barter_utils_contract
+            .permitAndBuyWithErc20(
+                price.address,
+                price.value,
+                item.arbiter,
+                item.demand.clone(),
+                expiration,
+                deadline.try_into()?,
+                27 + permit.v() as u8,
+                permit.r().into(),
+                permit.s().into(),
+            )
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
     /// Makes a direct payment with ERC20 tokens.
     ///
     /// # Arguments
@@ -1394,6 +1431,73 @@ mod tests {
             .alice_client
             .erc20
             .buy_with_erc20(&price, &item, 0)
+            .await?;
+
+        // Verify escrow happened
+        let alice_balance = mock_erc20_a
+            .balanceOf(test.alice.address())
+            .call()
+            .await?
+            ._0;
+
+        let escrow_balance = mock_erc20_a
+            .balanceOf(
+                test.addresses
+                    .erc20_addresses
+                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
+                    .escrow_obligation,
+            )
+            .call()
+            .await?
+            ._0;
+
+        // all tokens in escrow
+        assert_eq!(alice_balance, 0.try_into()?);
+        assert_eq!(escrow_balance, 100.try_into()?);
+
+        // escrow statement made
+        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        assert_ne!(attested_event.uid, FixedBytes::<32>::default());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_permit_and_buy_with_erc20() -> eyre::Result<()> {
+        // test setup
+        let test = setup_test_environment().await?;
+
+        // give alice some erc20 tokens
+        let mock_erc20_a = MockERC20Permit::new(test.mock_addresses.erc20_a, &test.god_provider);
+        mock_erc20_a
+            .transfer(test.alice.address(), 100.try_into()?)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        let price = Erc20Data {
+            address: test.mock_addresses.erc20_a,
+            value: 100.try_into()?,
+        };
+
+        // Create custom arbiter data
+        let arbiter = test
+            .addresses
+            .erc20_addresses
+            .clone()
+            .ok_or(eyre::eyre!("no erc20-related addresses"))?
+            .payment_obligation;
+        let demand = Bytes::from(b"custom demand data");
+        let item = ArbiterData { arbiter, demand };
+
+        let expiration = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600; // 1 hour
+
+        // alice makes direct payment to bob using permit (no pre-approval needed)
+        let receipt = test
+            .alice_client
+            .erc20
+            .permit_and_buy_with_erc20(&price, &item, expiration)
             .await?;
 
         // Verify escrow happened
