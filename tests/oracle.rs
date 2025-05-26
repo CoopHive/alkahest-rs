@@ -2,7 +2,10 @@
 mod tests {
     use alkahest_rs::{
         AlkahestClient,
-        clients::oracle::{AttestationFilter, FulfillmentParams},
+        clients::oracle::{
+            AttestationFilter, AttestationFilterWithoutRefUid, EscrowParams, FulfillmentParams,
+            FulfillmentParamsWithoutRefUid,
+        },
         contracts::StringObligation,
         fixtures::MockERC20Permit,
         types::{ArbiterData, Erc20Data},
@@ -105,10 +108,55 @@ mod tests {
         }
     }
 
+    fn make_filter_for_escrow(
+        test: &TestContext,
+        ref_uid: Option<FixedBytes<32>>,
+    ) -> AttestationFilter {
+        AttestationFilter {
+            attester: Some(ValueOrArray::Value(
+                test.addresses
+                    .erc20_addresses
+                    .as_ref()
+                    .unwrap()
+                    .escrow_obligation,
+            )),
+            recipient: Some(ValueOrArray::Value(test.bob.address())),
+            schema_uid: None,
+            uid: None,
+            ref_uid: ref_uid.map(ValueOrArray::Value),
+        }
+    }
+
     fn make_fulfillment_params(
         filter: AttestationFilter,
     ) -> FulfillmentParams<StringObligation::StatementData> {
         FulfillmentParams {
+            statement_abi: StringObligation::StatementData {
+                item: "".to_string(),
+            },
+            filter,
+        }
+    }
+
+    fn make_filter_without_refuid(test: &TestContext) -> AttestationFilterWithoutRefUid {
+        AttestationFilterWithoutRefUid {
+            attester: Some(ValueOrArray::Value(
+                test.addresses
+                    .string_obligation_addresses
+                    .as_ref()
+                    .unwrap()
+                    .obligation,
+            )),
+            recipient: Some(ValueOrArray::Value(test.bob.address())),
+            schema_uid: None,
+            uid: None,
+        }
+    }
+
+    fn make_fulfillment_params_without_refuid(
+        filter: AttestationFilterWithoutRefUid,
+    ) -> FulfillmentParamsWithoutRefUid<StringObligation::StatementData> {
+        FulfillmentParamsWithoutRefUid {
             statement_abi: StringObligation::StatementData {
                 item: "".to_string(),
             },
@@ -441,7 +489,51 @@ mod tests {
         );
 
         let decisions = listener_handle.await??;
-        assert_eq!(decisions.len(), 2); // Only one good fulfillment should pass
+        assert_eq!(decisions.len(), 2);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_trivival_arbitrate_past_for_escrow() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, item, escrow_uid) = setup_escrow(&test).await?;
+
+        let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+
+        let filter = make_filter_without_refuid(&test);
+        let fulfillment = make_fulfillment_params_without_refuid(filter);
+
+        let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand, true)?;
+        let escrow = EscrowParams {
+            filter: make_filter_for_escrow(&test, None),
+            demand_abi: demand_data.clone(),
+        };
+        let (decisions, _, _) = test
+            .bob_client
+            .oracle
+            .arbitrate_past_for_escrow(&escrow, &fulfillment, |_statement, _demand| {
+                println!(
+                    "🔍 Checking item: '{}', demand: {:?}",
+                    _statement.item, _demand.oracle
+                );
+                let item = _statement.item.clone();
+                let oracle_addr = _demand.oracle;
+                println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
+                Some(item == "good")
+            })
+            .await?;
+
+        assert_eq!(decisions.len(), 1);
+        assert_eq!(decisions[0].decision, true);
+
+        let collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment_uid)
+            .await?;
+
+        println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
 
         Ok(())
     }
