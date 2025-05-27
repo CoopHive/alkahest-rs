@@ -51,7 +51,7 @@ mod tests {
             .addresses
             .arbiters_addresses
             .as_ref()
-            .ok_or(eyre::eyre!("Missing arbiter"))?
+            .ok_or(eyre::eyre!("Missing arbiter addresses"))?
             .trusted_oracle_arbiter;
 
         let demand_data = TrustedOracleArbiter::DemandData {
@@ -165,7 +165,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_trivival_arbitrate_past() -> eyre::Result<()> {
+    async fn test_trivial_arbitrate_past() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
 
@@ -241,7 +241,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_trivival_listen_and_arbitrate() -> eyre::Result<()> {
+    async fn test_trivial_listen_and_arbitrate() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
 
@@ -288,7 +288,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_conditonal_listen_and_arbitrate() -> eyre::Result<()> {
+    async fn test_conditional_listen_and_arbitrate() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
 
@@ -359,7 +359,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_trivival_listen_and_arbitrate_async() -> eyre::Result<()> {
+    async fn test_trivial_listen_and_arbitrate_async() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
 
@@ -495,7 +495,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_trivival_arbitrate_past_for_escrow() -> eyre::Result<()> {
+    async fn test_trivial_arbitrate_past_for_escrow() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, item, escrow_uid) = setup_escrow(&test).await?;
 
