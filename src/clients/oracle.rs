@@ -9,7 +9,7 @@ use alloy::{
     eips::BlockNumberOrTag,
     primitives::{Address, FixedBytes},
     providers::Provider,
-    rpc::types::{Filter, TransactionReceipt, ValueOrArray},
+    rpc::types::{Filter, FilterBlockOption, FilterSet, TransactionReceipt, ValueOrArray},
     signers::local::PrivateKeySigner,
     sol,
     sol_types::SolEvent,
@@ -56,6 +56,7 @@ impl Default for OracleAddresses {
 
 #[derive(Clone)]
 pub struct AttestationFilter {
+    pub block_option: FilterBlockOption,
     pub attester: Option<ValueOrArray<Address>>,
     pub recipient: Option<ValueOrArray<Address>>,
     pub schema_uid: Option<ValueOrArray<FixedBytes<32>>>,
@@ -65,6 +66,7 @@ pub struct AttestationFilter {
 
 #[derive(Clone)]
 pub struct AttestationFilterWithoutRefUid {
+    pub block_option: FilterBlockOption,
     pub attester: Option<ValueOrArray<Address>>,
     pub recipient: Option<ValueOrArray<Address>>,
     pub schema_uid: Option<ValueOrArray<FixedBytes<32>>>,
@@ -86,6 +88,7 @@ impl
         let (filter, ref_uid) = filter_and_ref_uid;
 
         Self {
+            block_option: filter.block_option,
             attester: filter.attester,
             recipient: filter.recipient,
             schema_uid: filter.schema_uid,
@@ -147,7 +150,18 @@ impl OracleClient {
         let mut filter = Filter::new()
             .address(self.addresses.eas)
             .event_signature(IEAS::Attested::SIGNATURE_HASH)
-            .from_block(BlockNumberOrTag::Earliest);
+            .from_block(
+                p.block_option
+                    .get_from_block()
+                    .cloned()
+                    .unwrap_or(BlockNumberOrTag::Earliest),
+            )
+            .to_block(
+                p.block_option
+                    .get_to_block()
+                    .cloned()
+                    .unwrap_or(BlockNumberOrTag::Latest),
+            );
 
         if let Some(ValueOrArray::Value(a)) = &p.recipient {
             filter = filter.topic1(a.into_word());
@@ -180,8 +194,19 @@ impl OracleClient {
         let mut filter = Filter::new()
             .address(self.addresses.eas)
             .event_signature(IEAS::Attested::SIGNATURE_HASH)
-            .from_block(BlockNumberOrTag::Earliest);
-
+            .from_block(
+                p.block_option
+                    .get_from_block()
+                    .cloned()
+                    .unwrap_or(BlockNumberOrTag::Earliest),
+            )
+            .to_block(
+                p.block_option
+                    .get_to_block()
+                    .cloned()
+                    .unwrap_or(BlockNumberOrTag::Latest),
+            );
+            
         if let Some(ValueOrArray::Value(a)) = &p.recipient {
             filter = filter.topic1(a.into_word());
         }
@@ -1051,7 +1076,10 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-    ) -> eyre::Result<Vec<Decision<StatementData, DemandData>>>
+    ) -> eyre::Result<(
+        Vec<Decision<StatementData, DemandData>>,
+        Vec<IEAS::Attestation>,
+    )>
     where
         DemandData::RustType: Clone,
     {
@@ -1145,7 +1173,7 @@ impl OracleClient {
                 }
             }
         }
-        Ok(decisions)
+        Ok((decisions, escrow_attestations))
     }
 
     pub async fn listen_and_arbitrate_for_escrow_async<

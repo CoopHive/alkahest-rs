@@ -12,9 +12,10 @@ mod tests {
         utils::TestContext,
     };
     use alloy::{
+        eips::BlockNumberOrTag,
         primitives::{Address, Bytes, FixedBytes, bytes},
         providers::Provider as _,
-        rpc::types::ValueOrArray,
+        rpc::types::{FilterBlockOption, ValueOrArray},
         sol,
         sol_types::SolValue,
     };
@@ -105,6 +106,10 @@ mod tests {
             schema_uid: None,
             uid: None,
             ref_uid: ref_uid.map(ValueOrArray::Value),
+            block_option: FilterBlockOption::Range {
+                from_block: Some(BlockNumberOrTag::Earliest),
+                to_block: Some(BlockNumberOrTag::Latest),
+            },
         }
     }
 
@@ -124,6 +129,10 @@ mod tests {
             schema_uid: None,
             uid: None,
             ref_uid: ref_uid.map(ValueOrArray::Value),
+            block_option: FilterBlockOption::Range {
+                from_block: Some(BlockNumberOrTag::Earliest),
+                to_block: Some(BlockNumberOrTag::Latest),
+            },
         }
     }
 
@@ -150,6 +159,10 @@ mod tests {
             recipient: Some(ValueOrArray::Value(test.bob.address())),
             schema_uid: None,
             uid: None,
+            block_option: FilterBlockOption::Range {
+                from_block: Some(BlockNumberOrTag::Earliest),
+                to_block: Some(BlockNumberOrTag::Latest),
+            },
         }
     }
 
