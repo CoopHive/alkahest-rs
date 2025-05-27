@@ -354,6 +354,71 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_conditional_listen_and_arbitrate_new_fulfillment() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, _, escrow_uid) = setup_escrow(&test).await?;
+
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
+
+        println!("Listening for decisions...");
+
+        let oracle = test.bob_client.oracle.clone();
+        let unsubscribe = oracle
+            .listen_and_arbitrate_new_fulfillment(
+                fulfillment,
+                |_statement: &StringObligation::StatementData| -> Option<bool> {
+                    Some(_statement.item == "good")
+                },
+                |decision| {
+                    let statement_item = decision.statement.item.clone();
+                    let decision_value = decision.decision;
+                    async move {
+                        assert_eq!(
+                            decision_value,
+                            statement_item == "good",
+                            "❌ Expected decision to be {} for item '{}'",
+                            statement_item == "good",
+                            statement_item
+                        );
+                    }
+                },
+            )
+            .await?;
+
+        let fulfillment1_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        let fulfillment2_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let collection1 = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment1_uid)
+            .await?;
+
+        println!(
+            "✅ Expected collection1 to succeed, got receipt: {:?}",
+            collection1
+        );
+
+        let collection2 = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment2_uid)
+            .await;
+
+        assert!(
+            collection2.is_err(),
+            "❌ Expected collection2 to fail due to failed arbitration, but it succeeded"
+        );
+
+        unsubscribe().await?; // clean up
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_trivial_listen_and_arbitrate_async() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;

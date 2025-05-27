@@ -426,14 +426,12 @@ impl OracleClient {
         let local_id = *sub.local_id();
         let stream = sub.into_stream();
 
-        // ✅ Clone only necessary data before the task
         let provider = self.public_provider.clone();
         let wallet_provider = self.wallet_provider.clone(); // Must be Arc or Send + Sync
         let eas_address = self.addresses.eas;
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
         let fulfillment = fulfillment.clone();
 
-        // ✅ Spawn the stream listener
         tokio::spawn(async move {
             let eas = IEAS::new(eas_address, &wallet_provider);
             let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
@@ -501,7 +499,6 @@ impl OracleClient {
             }
         });
 
-        // ✅ Provide unsubscribe handle
         let unsubscribe_handle = {
             let provider = provider.clone();
             move || {
@@ -588,6 +585,112 @@ impl OracleClient {
         }
 
         Ok(decisions)
+    }
+
+    pub async fn listen_and_arbitrate_new_fulfillment<
+        StatementData: SolType + Clone + Send + 'static,
+        Arbitrate: Fn(&StatementData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
+        OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
+    >(
+        &self,
+        fulfillment: FulfillmentParams<StatementData>,
+        arbitrate: Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
+    ) -> eyre::Result<
+        Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = eyre::Result<()>> + Send>> + Send>,
+    >
+    where
+        <StatementData as SolType>::RustType: Send,
+    {
+        let filter = self.make_filter(&fulfillment.filter);
+
+        let sub = self.public_provider.subscribe_logs(&filter).await?;
+        let local_id = *sub.local_id();
+        let stream = sub.into_stream();
+
+        let provider = self.public_provider.clone();
+        let wallet_provider = self.wallet_provider.clone(); // Must be Arc or Send + Sync
+        let eas_address = self.addresses.eas;
+        let arbiter_address = self.addresses.trusted_oracle_arbiter;
+        let fulfillment = fulfillment.clone();
+
+        tokio::spawn(async move {
+            let eas = IEAS::new(eas_address, &wallet_provider);
+            let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
+            let mut stream = stream;
+
+            while let Some(log) = stream.next().await {
+                println!("Received log: {:?}", log);
+
+                let Ok(log) = log.log_decode::<IEAS::Attested>() else {
+                    continue;
+                };
+                let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
+                    continue;
+                };
+                let attestation = attestation._0;
+
+                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
+                    if attestation.refUID != *ref_uid {
+                        continue;
+                    }
+                }
+                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
+                    if !ref_uids.contains(&attestation.refUID) {
+                        continue;
+                    }
+                }
+
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                if (attestation.expirationTime != 0 && attestation.expirationTime < now)
+                    || (attestation.revocationTime != 0 && attestation.revocationTime < now)
+                {
+                    continue;
+                }
+
+                let Ok(statement) = StatementData::abi_decode(&attestation.data, true) else {
+                    continue;
+                };
+                let Some(decision_value) = arbitrate(&statement) else {
+                    continue;
+                };
+
+                let Ok(tx) = arbiter
+                    .arbitrate(attestation.uid, decision_value)
+                    .send()
+                    .await
+                else {
+                    continue;
+                };
+                let Ok(receipt) = tx.get_receipt().await else {
+                    continue;
+                };
+
+                let decision = Decision {
+                    attestation,
+                    statement,
+                    demand: None,
+                    decision: decision_value,
+                    receipt,
+                };
+
+                tokio::spawn(on_after_arbitrate(&decision));
+            }
+        });
+
+        let unsubscribe_handle = {
+            let provider = provider.clone();
+            move || {
+                Box::pin(async move { provider.unsubscribe(local_id).await.map_err(Into::into) })
+                    as Pin<Box<dyn Future<Output = eyre::Result<()>> + Send>>
+            }
+        };
+
+        Ok(Box::new(unsubscribe_handle))
     }
 
     pub async fn arbitrate_past_for_escrow<
