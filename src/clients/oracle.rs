@@ -56,7 +56,7 @@ impl Default for OracleAddresses {
 
 #[derive(Clone)]
 pub struct AttestationFilter {
-    pub block_option: FilterBlockOption,
+    pub block_option: Option<FilterBlockOption>,
     pub attester: Option<ValueOrArray<Address>>,
     pub recipient: Option<ValueOrArray<Address>>,
     pub schema_uid: Option<ValueOrArray<FixedBytes<32>>>,
@@ -66,7 +66,7 @@ pub struct AttestationFilter {
 
 #[derive(Clone)]
 pub struct AttestationFilterWithoutRefUid {
-    pub block_option: FilterBlockOption,
+    pub block_option: Option<FilterBlockOption>,
     pub attester: Option<ValueOrArray<Address>>,
     pub recipient: Option<ValueOrArray<Address>>,
     pub schema_uid: Option<ValueOrArray<FixedBytes<32>>>,
@@ -145,6 +145,12 @@ impl OracleClient {
             addresses: addresses.unwrap_or_default(),
         })
     }
+    pub async fn unsubscribe(&self, local_id: FixedBytes<32>) -> eyre::Result<()> {
+        self.public_provider
+            .unsubscribe(local_id)
+            .await
+            .map_err(Into::into)
+    }
 
     fn make_filter(&self, p: &AttestationFilter) -> Filter {
         let mut filter = Filter::new()
@@ -152,13 +158,15 @@ impl OracleClient {
             .event_signature(IEAS::Attested::SIGNATURE_HASH)
             .from_block(
                 p.block_option
-                    .get_from_block()
+                    .as_ref()
+                    .and_then(|b| b.get_from_block())
                     .cloned()
                     .unwrap_or(BlockNumberOrTag::Earliest),
             )
             .to_block(
                 p.block_option
-                    .get_to_block()
+                    .as_ref()
+                    .and_then(|b| b.get_to_block())
                     .cloned()
                     .unwrap_or(BlockNumberOrTag::Latest),
             );
@@ -196,17 +204,19 @@ impl OracleClient {
             .event_signature(IEAS::Attested::SIGNATURE_HASH)
             .from_block(
                 p.block_option
-                    .get_from_block()
+                    .as_ref()
+                    .and_then(|b| b.get_from_block())
                     .cloned()
                     .unwrap_or(BlockNumberOrTag::Earliest),
             )
             .to_block(
                 p.block_option
-                    .get_to_block()
+                    .as_ref()
+                    .and_then(|b| b.get_to_block())
                     .cloned()
                     .unwrap_or(BlockNumberOrTag::Latest),
             );
-            
+
         if let Some(ValueOrArray::Value(a)) = &p.recipient {
             filter = filter.topic1(a.into_word());
         }
@@ -434,13 +444,10 @@ impl OracleClient {
         OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
     >(
         &self,
-        fulfillment: FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-    ) -> eyre::Result<(
-        Vec<Decision<StatementData, ()>>,
-        Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = eyre::Result<()>> + Send>> + Send>,
-    )>
+    ) -> eyre::Result<(Vec<Decision<StatementData, ()>>, FixedBytes<32>)>
     where
         <StatementData as SolType>::RustType: Send,
     {
@@ -451,8 +458,7 @@ impl OracleClient {
         let local_id = *sub.local_id();
         let stream = sub.into_stream();
 
-        let provider = self.public_provider.clone();
-        let wallet_provider = self.wallet_provider.clone(); // Must be Arc or Send + Sync
+        let wallet_provider = self.wallet_provider.clone();
         let eas_address = self.addresses.eas;
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
         let fulfillment = fulfillment.clone();
@@ -524,15 +530,7 @@ impl OracleClient {
             }
         });
 
-        let unsubscribe_handle = {
-            let provider = provider.clone();
-            move || {
-                Box::pin(async move { provider.unsubscribe(local_id).await.map_err(Into::into) })
-                    as Pin<Box<dyn Future<Output = eyre::Result<()>> + Send>>
-            }
-        };
-
-        Ok((decisions, Box::new(unsubscribe_handle)))
+        Ok((decisions, local_id))
     }
 
     pub async fn listen_and_arbitrate_async<
@@ -619,12 +617,10 @@ impl OracleClient {
         OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
     >(
         &self,
-        fulfillment: FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-    ) -> eyre::Result<
-        Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = eyre::Result<()>> + Send>> + Send>,
-    >
+    ) -> eyre::Result<FixedBytes<32>>
     where
         <StatementData as SolType>::RustType: Send,
     {
@@ -634,7 +630,6 @@ impl OracleClient {
         let local_id = *sub.local_id();
         let stream = sub.into_stream();
 
-        let provider = self.public_provider.clone();
         let wallet_provider = self.wallet_provider.clone(); // Must be Arc or Send + Sync
         let eas_address = self.addresses.eas;
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
@@ -707,15 +702,7 @@ impl OracleClient {
             }
         });
 
-        let unsubscribe_handle = {
-            let provider = provider.clone();
-            move || {
-                Box::pin(async move { provider.unsubscribe(local_id).await.map_err(Into::into) })
-                    as Pin<Box<dyn Future<Output = eyre::Result<()>> + Send>>
-            }
-        };
-
-        Ok(Box::new(unsubscribe_handle))
+        Ok(local_id)
     }
 
     pub async fn arbitrate_past_for_escrow<

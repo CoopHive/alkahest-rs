@@ -106,10 +106,10 @@ mod tests {
             schema_uid: None,
             uid: None,
             ref_uid: ref_uid.map(ValueOrArray::Value),
-            block_option: FilterBlockOption::Range {
+            block_option: Some(FilterBlockOption::Range {
                 from_block: Some(BlockNumberOrTag::Earliest),
                 to_block: Some(BlockNumberOrTag::Latest),
-            },
+            }),
         }
     }
 
@@ -129,10 +129,10 @@ mod tests {
             schema_uid: None,
             uid: None,
             ref_uid: ref_uid.map(ValueOrArray::Value),
-            block_option: FilterBlockOption::Range {
+            block_option: Some(FilterBlockOption::Range {
                 from_block: Some(BlockNumberOrTag::Earliest),
                 to_block: Some(BlockNumberOrTag::Latest),
-            },
+            }),
         }
     }
 
@@ -159,10 +159,10 @@ mod tests {
             recipient: Some(ValueOrArray::Value(test.bob.address())),
             schema_uid: None,
             uid: None,
-            block_option: FilterBlockOption::Range {
+            block_option: Some(FilterBlockOption::Range {
                 from_block: Some(BlockNumberOrTag::Earliest),
                 to_block: Some(BlockNumberOrTag::Latest),
-            },
+            }),
         }
     }
 
@@ -266,9 +266,9 @@ mod tests {
         let oracle = test.bob_client.oracle.clone();
 
         // ⬇️ Directly call listen_and_arbitrate (no need to spawn)
-        let (decisions, unsubscribe) = oracle
+        let (decisions, local_id) = oracle
             .listen_and_arbitrate(
-                fulfillment,
+                &fulfillment,
                 |_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
                 |decision| {
                     let statement_item = decision.statement.item.clone();
@@ -296,7 +296,7 @@ mod tests {
         println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
 
         // Cleanup
-        unsubscribe().await?;
+        oracle.unsubscribe(local_id).await?;
 
         Ok(())
     }
@@ -312,9 +312,9 @@ mod tests {
         println!("Listening for decisions...");
 
         let oracle = test.bob_client.oracle.clone();
-        let (decisions, unsubscribe) = oracle
+        let (decisions, local_id) = oracle
             .listen_and_arbitrate(
-                fulfillment,
+                &fulfillment,
                 |_statement: &StringObligation::StatementData| -> Option<bool> {
                     Some(_statement.item == "good")
                 },
@@ -361,7 +361,7 @@ mod tests {
             "❌ Expected collection2 to fail due to failed arbitration, but it succeeded"
         );
 
-        unsubscribe().await?; // clean up
+        oracle.unsubscribe(local_id).await?;
 
         Ok(())
     }
@@ -377,9 +377,9 @@ mod tests {
         println!("Listening for decisions...");
 
         let oracle = test.bob_client.oracle.clone();
-        let unsubscribe = oracle
+        let local_id = oracle
             .listen_and_arbitrate_new_fulfillment(
-                fulfillment,
+                &fulfillment,
                 |_statement: &StringObligation::StatementData| -> Option<bool> {
                     Some(_statement.item == "good")
                 },
@@ -426,7 +426,7 @@ mod tests {
             "❌ Expected collection2 to fail due to failed arbitration, but it succeeded"
         );
 
-        unsubscribe().await?; // clean up
+        oracle.unsubscribe(local_id).await?;
 
         Ok(())
     }
