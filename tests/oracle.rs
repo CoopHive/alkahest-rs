@@ -12,9 +12,10 @@ mod tests {
         utils::TestContext,
     };
     use alloy::{
+        eips::BlockNumberOrTag,
         primitives::{Address, Bytes, FixedBytes, bytes},
         providers::Provider as _,
-        rpc::types::ValueOrArray,
+        rpc::types::{FilterBlockOption, ValueOrArray},
         sol,
         sol_types::SolValue,
     };
@@ -51,7 +52,7 @@ mod tests {
             .addresses
             .arbiters_addresses
             .as_ref()
-            .ok_or(eyre::eyre!("Missing arbiter"))?
+            .ok_or(eyre::eyre!("Missing arbiter addresses"))?
             .trusted_oracle_arbiter;
 
         let demand_data = TrustedOracleArbiter::DemandData {
@@ -105,6 +106,10 @@ mod tests {
             schema_uid: None,
             uid: None,
             ref_uid: ref_uid.map(ValueOrArray::Value),
+            block_option: Some(FilterBlockOption::Range {
+                from_block: Some(BlockNumberOrTag::Earliest),
+                to_block: Some(BlockNumberOrTag::Latest),
+            }),
         }
     }
 
@@ -124,6 +129,10 @@ mod tests {
             schema_uid: None,
             uid: None,
             ref_uid: ref_uid.map(ValueOrArray::Value),
+            block_option: Some(FilterBlockOption::Range {
+                from_block: Some(BlockNumberOrTag::Earliest),
+                to_block: Some(BlockNumberOrTag::Latest),
+            }),
         }
     }
 
@@ -150,6 +159,10 @@ mod tests {
             recipient: Some(ValueOrArray::Value(test.bob.address())),
             schema_uid: None,
             uid: None,
+            block_option: Some(FilterBlockOption::Range {
+                from_block: Some(BlockNumberOrTag::Earliest),
+                to_block: Some(BlockNumberOrTag::Latest),
+            }),
         }
     }
 
@@ -165,7 +178,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_trivival_arbitrate_past() -> eyre::Result<()> {
+    async fn test_trivial_arbitrate_past() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
 
@@ -241,7 +254,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_trivival_listen_and_arbitrate() -> eyre::Result<()> {
+    async fn test_trivial_listen_and_arbitrate() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
 
@@ -250,32 +263,29 @@ mod tests {
 
         println!("Listening for decisions...");
 
-        let listener_handle = tokio::spawn({
-            let oracle = test.bob_client.oracle.clone(); // make sure it's Arc or Clone
-            async move {
-                oracle
-                    .listen_and_arbitrate(
-                        &fulfillment,
-                        |_statement: &StringObligation::StatementData| -> Option<bool> {
-                            Some(true)
-                        },
-                        |decision| {
-                            let statement_item = decision.statement.item.clone();
-                            let decision_value = decision.decision;
-                            async move {
-                                assert_eq!(statement_item, "good");
-                                assert!(decision_value);
-                            }
-                        },
-                        Some(1),
-                    )
-                    .await
-            }
-        });
+        let oracle = test.bob_client.oracle.clone();
 
+        // ⬇️ Directly call listen_and_arbitrate (no need to spawn)
+        let listen_result = oracle
+            .listen_and_arbitrate(
+                &fulfillment,
+                |_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
+                |decision| {
+                    let statement_item = decision.statement.item.clone();
+                    let decision_value = decision.decision;
+                    async move {
+                        assert_eq!(statement_item, "good");
+                        assert!(decision_value);
+                    }
+                },
+            )
+            .await?;
+
+        // Trigger fulfillment
         let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Allow time for listener to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
         let collection = test
             .bob_client
@@ -284,11 +294,15 @@ mod tests {
             .await?;
 
         println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
+
+        // Cleanup
+        oracle.unsubscribe(listen_result.subscription_id).await?;
+
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_conditonal_listen_and_arbitrate() -> eyre::Result<()> {
+    async fn test_conditional_listen_and_arbitrate() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
 
@@ -297,38 +311,32 @@ mod tests {
 
         println!("Listening for decisions...");
 
-        let listener_handle = tokio::spawn({
-            let oracle = test.bob_client.oracle.clone(); // make sure it's Arc or Clone
-            async move {
-                oracle
-                    .listen_and_arbitrate(
-                        &fulfillment,
-                        |_statement: &StringObligation::StatementData| -> Option<bool> {
-                            Some(_statement.item == "good")
-                        },
-                        |decision| {
-                            let statement_item = decision.statement.item.clone();
-                            let decision_value = decision.decision;
-                            async move {
-                                assert_eq!(
-                                    decision_value,
-                                    statement_item == "good",
-                                    "❌ Expected decision to be {} for item '{}'",
-                                    statement_item == "good",
-                                    statement_item
-                                );
-                            }
-                        },
-                        Some(2),
-                    )
-                    .await
-            }
-        });
+        let oracle = test.bob_client.oracle.clone();
+        let listen_result = oracle
+            .listen_and_arbitrate(
+                &fulfillment,
+                |_statement: &StringObligation::StatementData| -> Option<bool> {
+                    Some(_statement.item == "good")
+                },
+                |decision| {
+                    let statement_item = decision.statement.item.clone();
+                    let decision_value = decision.decision;
+                    async move {
+                        assert_eq!(
+                            decision_value,
+                            statement_item == "good",
+                            "❌ Expected decision to be {} for item '{}'",
+                            statement_item == "good",
+                            statement_item
+                        );
+                    }
+                },
+            )
+            .await?;
 
         let fulfillment1_uid = make_fulfillment(&test, "good", escrow_uid).await?;
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         let fulfillment2_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
-
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         let collection1 = test
@@ -353,47 +361,107 @@ mod tests {
             "❌ Expected collection2 to fail due to failed arbitration, but it succeeded"
         );
 
-        let decisions = listener_handle.await??;
-        assert_eq!(decisions.len(), 2);
+        oracle.unsubscribe(listen_result.subscription_id).await?;
+
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_trivival_listen_and_arbitrate_async() -> eyre::Result<()> {
+    async fn test_conditional_listen_and_arbitrate_new_fulfillments() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
 
         let filter = make_filter(&test, Some(escrow_uid));
         let fulfillment = make_fulfillment_params(filter);
 
-        let listener_handle = tokio::spawn({
-            let oracle = test.bob_client.oracle.clone();
-            async move {
-                oracle
-                    .listen_and_arbitrate_async(
-                        &fulfillment,
-                        |_stmt: &StringObligation::StatementData| {
-                            let item = _stmt.item.clone();
-                            println!("Arbitrating for item: {}", item);
-                            async move { Some(item == "async good") }
-                        },
-                        |decision| {
-                            let statement_item = decision.statement.item.clone();
-                            let decision_value = decision.decision;
-                            println!(
-                                "Decision made for item '{}': {}",
-                                statement_item, decision_value
-                            );
-                            async move {
-                                assert_eq!(statement_item, "async good");
-                                assert!(decision_value);
-                            }
-                        },
-                        Some(1),
-                    )
-                    .await
-            }
-        });
+        println!("Listening for decisions...");
+
+        let oracle = test.bob_client.oracle.clone();
+        let listen_result = oracle
+            .listen_and_arbitrate_new_fulfillments(
+                &fulfillment,
+                |_statement: &StringObligation::StatementData| -> Option<bool> {
+                    Some(_statement.item == "good")
+                },
+                |decision| {
+                    let statement_item = decision.statement.item.clone();
+                    let decision_value = decision.decision;
+                    async move {
+                        assert_eq!(
+                            decision_value,
+                            statement_item == "good",
+                            "❌ Expected decision to be {} for item '{}'",
+                            statement_item == "good",
+                            statement_item
+                        );
+                    }
+                },
+            )
+            .await?;
+
+        let fulfillment1_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        let fulfillment2_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let collection1 = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment1_uid)
+            .await?;
+
+        println!(
+            "✅ Expected collection1 to succeed, got receipt: {:?}",
+            collection1
+        );
+
+        let collection2 = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment2_uid)
+            .await;
+
+        assert!(
+            collection2.is_err(),
+            "❌ Expected collection2 to fail due to failed arbitration, but it succeeded"
+        );
+
+        oracle.unsubscribe(listen_result.subscription_id).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_trivial_listen_and_arbitrate_async() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, _, escrow_uid) = setup_escrow(&test).await?;
+
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
+
+        let oracle = test.bob_client.oracle.clone();
+        let listen_result = oracle
+            .listen_and_arbitrate_async(
+                &fulfillment,
+                |_stmt: &StringObligation::StatementData| {
+                    let item = _stmt.item.clone();
+                    println!("Arbitrating for item: {}", item);
+                    async move { Some(item == "async good") }
+                },
+                |decision| {
+                    let statement_item = decision.statement.item.clone();
+                    let decision_value = decision.decision;
+                    println!(
+                        "Decision made for item '{}': {}",
+                        statement_item, decision_value
+                    );
+                    async move {
+                        assert_eq!(statement_item, "async good");
+                        assert!(decision_value);
+                    }
+                },
+            )
+            .await?;
 
         // Ensure listener starts
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -408,9 +476,7 @@ mod tests {
             .collect_payment(escrow_uid, fulfillment_uid)
             .await?;
 
-        // ✅ Wait for listener to complete
-        let decisions = listener_handle.await??;
-        assert_eq!(decisions.len(), 1);
+        oracle.unsubscribe(listen_result.subscription_id).await?;
 
         Ok(())
     }
@@ -424,41 +490,33 @@ mod tests {
         let fulfillment = make_fulfillment_params(filter);
 
         // ✅ Spawn async listener
-        let listener_handle = tokio::spawn({
-            let oracle = test.bob_client.oracle.clone();
-            async move {
-                oracle
-                    .listen_and_arbitrate_async(
-                        &fulfillment,
-                        |_stmt: &StringObligation::StatementData| {
-                            let item = _stmt.item.clone();
-                            async move {
-                                println!("🧠 Arbitrating for item: {}", item);
-                                Some(item == "async good")
-                            }
-                        },
-                        |decision| {
-                            let statement_item = decision.statement.item.clone();
-                            let decision_value = decision.decision;
-                            async move {
-                                println!(
-                                    "📣 Decision for '{}': {}",
-                                    statement_item, decision_value
-                                );
-                                assert_eq!(
-                                    decision_value,
-                                    statement_item == "async good",
-                                    "❌ Expected decision to be {} for item '{}'",
-                                    statement_item == "async good",
-                                    statement_item
-                                );
-                            }
-                        },
-                        Some(2),
-                    )
-                    .await
-            }
-        });
+        let oracle = test.bob_client.oracle.clone();
+        let listen_result = oracle
+            .listen_and_arbitrate_async(
+                &fulfillment,
+                |_stmt: &StringObligation::StatementData| {
+                    let item = _stmt.item.clone();
+                    async move {
+                        println!("🧠 Arbitrating for item: {}", item);
+                        Some(item == "async good")
+                    }
+                },
+                |decision| {
+                    let statement_item = decision.statement.item.clone();
+                    let decision_value = decision.decision;
+                    async move {
+                        println!("📣 Decision for '{}': {}", statement_item, decision_value);
+                        assert_eq!(
+                            decision_value,
+                            statement_item == "async good",
+                            "❌ Expected decision to be {} for item '{}'",
+                            statement_item == "async good",
+                            statement_item
+                        );
+                    }
+                },
+            )
+            .await?;
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
@@ -488,14 +546,76 @@ mod tests {
             "❌ Expected collection 2 to fail due to arbitration rejection"
         );
 
-        let decisions = listener_handle.await??;
-        assert_eq!(decisions.len(), 2);
+        oracle.unsubscribe(listen_result.subscription_id).await?;
+        Ok(())
+    }
+    #[tokio::test]
+    async fn test_conditional_listen_and_arbitrate_new_fulfillments_async() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, _, escrow_uid) = setup_escrow(&test).await?;
+
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
+
+        println!("Listening for decisions...");
+
+        let oracle = test.bob_client.oracle.clone();
+        let listen_result = oracle
+            .listen_and_arbitrate_new_fulfillments_async(
+                &fulfillment,
+                |_statement: &StringObligation::StatementData| {
+                    let result = _statement.item == "good";
+                    async move { Some(result) }
+                },
+                |decision| {
+                    let statement_item = decision.statement.item.clone();
+                    let decision_value = decision.decision;
+                    async move {
+                        assert_eq!(
+                            decision_value,
+                            statement_item == "good",
+                            "❌ Expected decision to be {} for item '{}'",
+                            statement_item == "good",
+                            statement_item
+                        );
+                    }
+                },
+            )
+            .await?;
+
+        let fulfillment1_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        let fulfillment2_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let collection1 = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment1_uid)
+            .await?;
+
+        println!(
+            "✅ Expected collection1 to succeed, got receipt: {:?}",
+            collection1
+        );
+
+        let collection2 = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment2_uid)
+            .await;
+
+        assert!(
+            collection2.is_err(),
+            "❌ Expected collection2 to fail due to failed arbitration, but it succeeded"
+        );
+
+        oracle.unsubscribe(listen_result.subscription_id).await?;
 
         Ok(())
     }
-
     #[tokio::test]
-    async fn test_trivival_arbitrate_past_for_escrow() -> eyre::Result<()> {
+    async fn test_trivial_arbitrate_past_for_escrow() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, item, escrow_uid) = setup_escrow(&test).await?;
 

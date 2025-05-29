@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    pin::Pin,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -8,7 +9,7 @@ use alloy::{
     eips::BlockNumberOrTag,
     primitives::{Address, FixedBytes},
     providers::Provider,
-    rpc::types::{Filter, TransactionReceipt, ValueOrArray},
+    rpc::types::{Filter, FilterBlockOption, FilterSet, TransactionReceipt, ValueOrArray},
     signers::local::PrivateKeySigner,
     sol,
     sol_types::SolEvent,
@@ -53,7 +54,9 @@ impl Default for OracleAddresses {
     }
 }
 
+#[derive(Clone)]
 pub struct AttestationFilter {
+    pub block_option: Option<FilterBlockOption>,
     pub attester: Option<ValueOrArray<Address>>,
     pub recipient: Option<ValueOrArray<Address>>,
     pub schema_uid: Option<ValueOrArray<FixedBytes<32>>>,
@@ -63,6 +66,7 @@ pub struct AttestationFilter {
 
 #[derive(Clone)]
 pub struct AttestationFilterWithoutRefUid {
+    pub block_option: Option<FilterBlockOption>,
     pub attester: Option<ValueOrArray<Address>>,
     pub recipient: Option<ValueOrArray<Address>>,
     pub schema_uid: Option<ValueOrArray<FixedBytes<32>>>,
@@ -84,6 +88,7 @@ impl
         let (filter, ref_uid) = filter_and_ref_uid;
 
         Self {
+            block_option: filter.block_option,
             attester: filter.attester,
             recipient: filter.recipient,
             schema_uid: filter.schema_uid,
@@ -92,7 +97,7 @@ impl
         }
     }
 }
-
+#[derive(Clone)]
 pub struct FulfillmentParams<T: SolType> {
     pub statement_abi: T,
     pub filter: AttestationFilter,
@@ -123,6 +128,14 @@ sol! {
     }
 }
 
+pub struct ListenAndArbitrateResult<StatementData: SolType> {
+    pub decisions: Vec<Decision<StatementData, ()>>,
+    pub subscription_id: FixedBytes<32>,
+}
+pub struct ListenAndArbitrateNewFulfillmentsResult {
+    pub subscription_id: FixedBytes<32>,
+}
+
 impl OracleClient {
     pub async fn new(
         signer: PrivateKeySigner,
@@ -140,12 +153,31 @@ impl OracleClient {
             addresses: addresses.unwrap_or_default(),
         })
     }
+    pub async fn unsubscribe(&self, local_id: FixedBytes<32>) -> eyre::Result<()> {
+        self.public_provider
+            .unsubscribe(local_id)
+            .await
+            .map_err(Into::into)
+    }
 
     fn make_filter(&self, p: &AttestationFilter) -> Filter {
         let mut filter = Filter::new()
             .address(self.addresses.eas)
             .event_signature(IEAS::Attested::SIGNATURE_HASH)
-            .from_block(BlockNumberOrTag::Earliest);
+            .from_block(
+                p.block_option
+                    .as_ref()
+                    .and_then(|b| b.get_from_block())
+                    .cloned()
+                    .unwrap_or(BlockNumberOrTag::Earliest),
+            )
+            .to_block(
+                p.block_option
+                    .as_ref()
+                    .and_then(|b| b.get_to_block())
+                    .cloned()
+                    .unwrap_or(BlockNumberOrTag::Latest),
+            );
 
         if let Some(ValueOrArray::Value(a)) = &p.recipient {
             filter = filter.topic1(a.into_word());
@@ -178,7 +210,20 @@ impl OracleClient {
         let mut filter = Filter::new()
             .address(self.addresses.eas)
             .event_signature(IEAS::Attested::SIGNATURE_HASH)
-            .from_block(BlockNumberOrTag::Earliest);
+            .from_block(
+                p.block_option
+                    .as_ref()
+                    .and_then(|b| b.get_from_block())
+                    .cloned()
+                    .unwrap_or(BlockNumberOrTag::Earliest),
+            )
+            .to_block(
+                p.block_option
+                    .as_ref()
+                    .and_then(|b| b.get_to_block())
+                    .cloned()
+                    .unwrap_or(BlockNumberOrTag::Latest),
+            );
 
         if let Some(ValueOrArray::Value(a)) = &p.recipient {
             filter = filter.topic1(a.into_word());
@@ -401,157 +446,396 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate<
-        StatementData: SolType,
-        Arbitrate: Fn(&StatementData::RustType) -> Option<bool> + Copy,
+        StatementData: SolType + Clone + Send + 'static,
+        Arbitrate: Fn(&StatementData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
     >(
         &self,
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        max_decisions: Option<usize>,
-    ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
-        let mut decisions = self.arbitrate_past(fulfillment, arbitrate).await?;
+    ) -> eyre::Result<ListenAndArbitrateResult<StatementData>>
+    where
+        <StatementData as SolType>::RustType: Send,
+    {
+        let decisions = self.arbitrate_past(&fulfillment, arbitrate).await?;
         let filter = self.make_filter(&fulfillment.filter);
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
-        let mut stream = sub.into_stream();
+        let local_id = *sub.local_id();
+        let stream = sub.into_stream();
+        let wallet_provider = self.wallet_provider.clone();
+        let eas_address = self.addresses.eas;
+        let arbiter_address = self.addresses.trusted_oracle_arbiter;
+        let fulfillment = fulfillment.clone();
 
-        let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
-        let trusted_oracle_arbiter =
-            TrustedOracleArbiter::new(self.addresses.trusted_oracle_arbiter, &self.wallet_provider);
+        tokio::spawn(async move {
+            let eas = IEAS::new(eas_address, &wallet_provider);
+            let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
+            let mut stream = stream;
 
-        while let Some(log) = stream.next().await {
-            let log = log.log_decode::<IEAS::Attested>()?;
+            while let Some(log) = stream.next().await {
+                println!("Received log: {:?}", log);
 
-            let attestation = eas.getAttestation(log.inner.uid).call().await?._0;
-
-            if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
-                if attestation.refUID != *ref_uid {
+                let Ok(log) = log.log_decode::<IEAS::Attested>() else {
                     continue;
                 };
-            }
-            if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
-                if ref_uids.contains(&attestation.refUID) {
+                let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
                     continue;
                 };
-            }
+                let attestation = attestation._0;
 
-            let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-            if attestation.expirationTime != 0 && attestation.expirationTime < now {
-                continue;
-            }
-            if attestation.revocationTime != 0 && attestation.revocationTime < now {
-                continue;
-            }
+                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
+                    if attestation.refUID != *ref_uid {
+                        continue;
+                    }
+                }
+                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
+                    if !ref_uids.contains(&attestation.refUID) {
+                        continue;
+                    }
+                }
 
-            let statement = StatementData::abi_decode(&attestation.data, true)?;
-            let decision = arbitrate(&statement);
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                if (attestation.expirationTime != 0 && attestation.expirationTime < now)
+                    || (attestation.revocationTime != 0 && attestation.revocationTime < now)
+                {
+                    continue;
+                }
 
-            if let Some(decision) = decision {
-                let tx = trusted_oracle_arbiter
-                    .arbitrate(attestation.uid, decision)
+                let Ok(statement) = StatementData::abi_decode(&attestation.data, true) else {
+                    continue;
+                };
+                let Some(decision_value) = arbitrate(&statement) else {
+                    continue;
+                };
+
+                let Ok(tx) = arbiter
+                    .arbitrate(attestation.uid, decision_value)
                     .send()
-                    .await?;
-                let receipt = tx.get_receipt().await?;
+                    .await
+                else {
+                    continue;
+                };
+                let Ok(receipt) = tx.get_receipt().await else {
+                    continue;
+                };
+
                 let decision = Decision {
                     attestation,
                     statement,
                     demand: None,
-                    decision,
+                    decision: decision_value,
                     receipt,
                 };
 
                 tokio::spawn(on_after_arbitrate(&decision));
-                decisions.push(decision);
-
-                if let Some(max) = max_decisions {
-                    if decisions.len() >= max {
-                        break;
-                    }
-                }
             }
-        }
+        });
 
-        Ok(decisions)
+        Ok(ListenAndArbitrateResult {
+            decisions,
+            subscription_id: local_id,
+        })
     }
 
     pub async fn listen_and_arbitrate_async<
-        StatementData: SolType,
-        ArbitrateFut: Future<Output = Option<bool>>,
-        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy,
+        StatementData: SolType + Clone + Send + 'static,
+        ArbitrateFut: Future<Output = Option<bool>> + Send,
+        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy + Send + Sync + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
     >(
         &self,
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        max_decisions: Option<usize>,
-    ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
-        let mut decisions = self.arbitrate_past_async(fulfillment, arbitrate).await?;
+    ) -> eyre::Result<ListenAndArbitrateResult<StatementData>>
+    where
+        <StatementData as SolType>::RustType: Send,
+    {
+        let decisions = self.arbitrate_past_async(fulfillment, arbitrate).await?;
         let filter = self.make_filter(&fulfillment.filter);
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
-        let mut stream = sub.into_stream();
+        let local_id = *sub.local_id();
+        let stream = sub.into_stream();
 
-        let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
-        let trusted_oracle_arbiter =
-            TrustedOracleArbiter::new(self.addresses.trusted_oracle_arbiter, &self.wallet_provider);
+        let wallet_provider = self.wallet_provider.clone();
+        let eas_address = self.addresses.eas;
+        let arbiter_address = self.addresses.trusted_oracle_arbiter;
+        let fulfillment = fulfillment.clone();
 
-        while let Some(log) = stream.next().await {
-            let log = log.log_decode::<IEAS::Attested>()?;
+        tokio::spawn(async move {
+            let eas = IEAS::new(eas_address, &wallet_provider);
+            let trusted_oracle_arbiter =
+                TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
+            let mut stream = stream;
 
-            let attestation = eas.getAttestation(log.inner.uid).call().await?._0;
-
-            if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
-                if attestation.refUID != *ref_uid {
+            while let Some(log_result) = stream.next().await {
+                let Ok(log) = log_result.log_decode::<IEAS::Attested>() else {
                     continue;
                 };
-            }
-            if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
-                if ref_uids.contains(&attestation.refUID) {
+
+                let Ok(attestation_result) = eas.getAttestation(log.inner.uid).call().await else {
                     continue;
                 };
-            }
+                let attestation = attestation_result._0;
 
-            let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-            if attestation.expirationTime != 0 && attestation.expirationTime < now {
-                continue;
-            }
-            if attestation.revocationTime != 0 && attestation.revocationTime < now {
-                continue;
-            }
+                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
+                    if attestation.refUID != *ref_uid {
+                        continue;
+                    }
+                }
+                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
+                    if !ref_uids.contains(&attestation.refUID) {
+                        continue;
+                    }
+                }
 
-            let statement = StatementData::abi_decode(&attestation.data, true)?;
-            let decision = arbitrate(&statement).await;
-            if let Some(decision) = decision {
-                let tx = trusted_oracle_arbiter
-                    .arbitrate(attestation.uid, decision)
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                if (attestation.expirationTime != 0 && attestation.expirationTime < now)
+                    || (attestation.revocationTime != 0 && attestation.revocationTime < now)
+                {
+                    continue;
+                }
+
+                let Ok(statement) = StatementData::abi_decode(&attestation.data, true) else {
+                    continue;
+                };
+
+                if let Some(decision_value) = arbitrate(&statement).await {
+                    let Ok(tx) = trusted_oracle_arbiter
+                        .arbitrate(attestation.uid, decision_value)
+                        .send()
+                        .await
+                    else {
+                        continue;
+                    };
+
+                    let Ok(receipt) = tx.get_receipt().await else {
+                        continue;
+                    };
+
+                    let decision = Decision {
+                        attestation,
+                        statement,
+                        demand: None,
+                        decision: decision_value,
+                        receipt,
+                    };
+
+                    tokio::spawn(on_after_arbitrate(&decision));
+                }
+            }
+        });
+
+        Ok(ListenAndArbitrateResult {
+            decisions,
+            subscription_id: local_id,
+        })
+    }
+
+    pub async fn listen_and_arbitrate_new_fulfillments<
+        StatementData: SolType + Clone + Send + 'static,
+        Arbitrate: Fn(&StatementData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
+        OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
+    >(
+        &self,
+        fulfillment: &FulfillmentParams<StatementData>,
+        arbitrate: Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
+    ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
+    where
+        <StatementData as SolType>::RustType: Send,
+    {
+        let filter = self.make_filter(&fulfillment.filter);
+
+        let sub = self.public_provider.subscribe_logs(&filter).await?;
+        let local_id = *sub.local_id();
+        let stream = sub.into_stream();
+
+        let wallet_provider = self.wallet_provider.clone(); // Must be Arc or Send + Sync
+        let eas_address = self.addresses.eas;
+        let arbiter_address = self.addresses.trusted_oracle_arbiter;
+        let fulfillment = fulfillment.clone();
+
+        tokio::spawn(async move {
+            let eas = IEAS::new(eas_address, &wallet_provider);
+            let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
+            let mut stream = stream;
+
+            while let Some(log) = stream.next().await {
+                println!("Received log: {:?}", log);
+
+                let Ok(log) = log.log_decode::<IEAS::Attested>() else {
+                    continue;
+                };
+                let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
+                    continue;
+                };
+                let attestation = attestation._0;
+
+                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
+                    if attestation.refUID != *ref_uid {
+                        continue;
+                    }
+                }
+                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
+                    if !ref_uids.contains(&attestation.refUID) {
+                        continue;
+                    }
+                }
+
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                if (attestation.expirationTime != 0 && attestation.expirationTime < now)
+                    || (attestation.revocationTime != 0 && attestation.revocationTime < now)
+                {
+                    continue;
+                }
+
+                let Ok(statement) = StatementData::abi_decode(&attestation.data, true) else {
+                    continue;
+                };
+                let Some(decision_value) = arbitrate(&statement) else {
+                    continue;
+                };
+
+                let Ok(tx) = arbiter
+                    .arbitrate(attestation.uid, decision_value)
                     .send()
-                    .await?;
-                let receipt = tx.get_receipt().await?;
+                    .await
+                else {
+                    continue;
+                };
+                let Ok(receipt) = tx.get_receipt().await else {
+                    continue;
+                };
+
                 let decision = Decision {
                     attestation,
                     statement,
                     demand: None,
-                    decision,
+                    decision: decision_value,
                     receipt,
                 };
 
                 tokio::spawn(on_after_arbitrate(&decision));
-                decisions.push(decision);
+            }
+        });
 
-                if let Some(max) = max_decisions {
-                    if decisions.len() >= max {
-                        break;
+        Ok(ListenAndArbitrateNewFulfillmentsResult {
+            subscription_id: local_id,
+        })
+    }
+
+    pub async fn listen_and_arbitrate_new_fulfillments_async<
+        StatementData: SolType + Clone + Send + 'static,
+        ArbitrateFut: Future<Output = Option<bool>> + Send,
+        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy + Send + Sync + 'static,
+        OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
+    >(
+        &self,
+        fulfillment: &FulfillmentParams<StatementData>,
+        arbitrate: Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
+    ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
+    where
+        <StatementData as SolType>::RustType: Send,
+    {
+        let filter = self.make_filter(&fulfillment.filter);
+
+        let sub = self.public_provider.subscribe_logs(&filter).await?;
+        let local_id = *sub.local_id();
+        let stream = sub.into_stream();
+
+        let wallet_provider = self.wallet_provider.clone();
+        let eas_address = self.addresses.eas;
+        let arbiter_address = self.addresses.trusted_oracle_arbiter;
+        let fulfillment = fulfillment.clone();
+
+        tokio::spawn(async move {
+            let eas = IEAS::new(eas_address, &wallet_provider);
+            let trusted_oracle_arbiter =
+                TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
+            let mut stream = stream;
+
+            while let Some(log_result) = stream.next().await {
+                let Ok(log) = log_result.log_decode::<IEAS::Attested>() else {
+                    continue;
+                };
+
+                let Ok(attestation_result) = eas.getAttestation(log.inner.uid).call().await else {
+                    continue;
+                };
+                let attestation = attestation_result._0;
+
+                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
+                    if attestation.refUID != *ref_uid {
+                        continue;
                     }
                 }
-            }
-        }
+                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
+                    if !ref_uids.contains(&attestation.refUID) {
+                        continue;
+                    }
+                }
 
-        Ok(decisions)
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                if (attestation.expirationTime != 0 && attestation.expirationTime < now)
+                    || (attestation.revocationTime != 0 && attestation.revocationTime < now)
+                {
+                    continue;
+                }
+
+                let Ok(statement) = StatementData::abi_decode(&attestation.data, true) else {
+                    continue;
+                };
+
+                if let Some(decision_value) = arbitrate(&statement).await {
+                    let Ok(tx) = trusted_oracle_arbiter
+                        .arbitrate(attestation.uid, decision_value)
+                        .send()
+                        .await
+                    else {
+                        continue;
+                    };
+
+                    let Ok(receipt) = tx.get_receipt().await else {
+                        continue;
+                    };
+
+                    let decision = Decision {
+                        attestation,
+                        statement,
+                        demand: None,
+                        decision: decision_value,
+                        receipt,
+                    };
+
+                    tokio::spawn(on_after_arbitrate(&decision));
+                }
+            }
+        });
+
+        Ok(ListenAndArbitrateNewFulfillmentsResult {
+            subscription_id: local_id,
+        })
     }
 
     pub async fn arbitrate_past_for_escrow<
@@ -912,7 +1196,10 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-    ) -> eyre::Result<Vec<Decision<StatementData, DemandData>>>
+    ) -> eyre::Result<(
+        Vec<Decision<StatementData, DemandData>>,
+        Vec<IEAS::Attestation>,
+    )>
     where
         DemandData::RustType: Clone,
     {
@@ -1006,7 +1293,7 @@ impl OracleClient {
                 }
             }
         }
-        Ok(decisions)
+        Ok((decisions, escrow_attestations))
     }
 
     pub async fn listen_and_arbitrate_for_escrow_async<

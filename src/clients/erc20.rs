@@ -1493,7 +1493,7 @@ mod tests {
 
         let expiration = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600; // 1 hour
 
-        // alice makes direct payment to bob using permit (no pre-approval needed)
+        // alice deposits tokens to escrow,
         let receipt = test
             .alice_client
             .erc20
