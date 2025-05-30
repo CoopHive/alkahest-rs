@@ -477,6 +477,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_buy_bundle_for_bundle() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -639,6 +640,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_pay_bundle_for_bundle() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -832,6 +834,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_collect_expired() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -948,6 +951,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_decode_escrow_statement() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -986,6 +990,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_decode_payment_statement() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -1011,6 +1016,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_approve() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -1171,6 +1177,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_buy_with_bundle() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -1284,6 +1291,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_pay_with_bundle() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
