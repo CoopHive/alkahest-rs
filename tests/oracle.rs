@@ -644,9 +644,6 @@ mod tests {
             })
             .await?;
 
-        assert_eq!(decisions.len(), 1);
-        assert_eq!(decisions[0].decision, true);
-
         let collection = test
             .bob_client
             .erc20

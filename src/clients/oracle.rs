@@ -22,7 +22,10 @@ use itertools::izip;
 
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
-    contracts::{IEAS, TrustedOracleArbiter},
+    contracts::{
+        IEAS::{self, Attestation},
+        TrustedOracleArbiter,
+    },
     types::{PublicProvider, WalletProvider},
     utils,
 };
@@ -252,14 +255,10 @@ impl OracleClient {
         filter
     }
 
-    pub async fn arbitrate_past<
-        StatementData: SolType,
-        Arbitrate: Fn(&StatementData::RustType) -> Option<bool>,
-    >(
+    async fn get_attestations_and_statements<StatementData: SolType>(
         &self,
         fulfillment: &FulfillmentParams<StatementData>,
-        arbitrate: Arbitrate,
-    ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
+    ) -> eyre::Result<(Vec<Attestation>, Vec<StatementData::RustType>)> {
         let filter = self.make_filter(&fulfillment.filter);
         let logs = self
             .public_provider
@@ -275,7 +274,7 @@ impl OracleClient {
         });
 
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        let attestations = try_join_all(attestation_futs)
+        let attestations: Vec<Attestation> = try_join_all(attestation_futs)
             .await?
             .into_iter()
             .map(|a| a._0)
@@ -307,6 +306,19 @@ impl OracleClient {
             .iter()
             .map(|a| StatementData::abi_decode(&a.data, true))
             .collect::<Result<Vec<_>, _>>()?;
+
+        Ok((attestations, statements))
+    }
+
+    pub async fn arbitrate_past<
+        StatementData: SolType,
+        Arbitrate: Fn(&StatementData::RustType) -> Option<bool>,
+    >(
+        &self,
+        fulfillment: &FulfillmentParams<StatementData>,
+        arbitrate: Arbitrate,
+    ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
+        let (attestations, statements) = self.get_attestations_and_statements(fulfillment).await?;
 
         let decisions = statements.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
 
@@ -350,53 +362,7 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
-        let filter = self.make_filter(&fulfillment.filter);
-        let logs = self
-            .public_provider
-            .get_logs(&filter)
-            .await?
-            .into_iter()
-            .map(|log| log.log_decode::<IEAS::Attested>())
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let attestation_futs = logs.into_iter().map(|log| {
-            let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
-            async move { eas.getAttestation(log.inner.uid).call().await }
-        });
-
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        let attestations = try_join_all(attestation_futs)
-            .await?
-            .into_iter()
-            .map(|a| a._0)
-            .filter(|a| {
-                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
-                    if a.refUID != *ref_uid {
-                        return false;
-                    };
-                }
-                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
-                    if ref_uids.contains(&a.refUID) {
-                        return false;
-                    };
-                }
-
-                if a.expirationTime != 0 && a.expirationTime < now {
-                    return false;
-                }
-
-                if a.revocationTime != 0 && a.revocationTime < now {
-                    return false;
-                }
-
-                return true;
-            })
-            .collect::<Vec<_>>();
-
-        let statements = attestations
-            .iter()
-            .map(|a| StatementData::abi_decode(&a.data, true))
-            .collect::<Result<Vec<_>, _>>()?;
+        let (attestations, statements) = self.get_attestations_and_statements(fulfillment).await?;
 
         let decision_futs = statements.iter().map(|s| async move { arbitrate(s).await });
         let decisions = join_all(decision_futs).await;
@@ -476,7 +442,7 @@ impl OracleClient {
             let mut stream = stream;
 
             while let Some(log) = stream.next().await {
-                println!("Received log: {:?}", log);
+              
 
                 let Ok(log) = log.log_decode::<IEAS::Attested>() else {
                     continue;
@@ -674,7 +640,7 @@ impl OracleClient {
             let mut stream = stream;
 
             while let Some(log) = stream.next().await {
-                println!("Received log: {:?}", log);
+              
 
                 let Ok(log) = log.log_decode::<IEAS::Attested>() else {
                     continue;
