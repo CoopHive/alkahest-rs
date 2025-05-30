@@ -62,9 +62,9 @@ impl StringObligationClient {
     ) -> eyre::Result<DecodedAttestation<contracts::StringObligation::StatementData>> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
-        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let attestation = eas_contract.getAttestation(uid).call().await?;
         let statement_data =
-            contracts::StringObligation::StatementData::abi_decode(&attestation.data, true)?;
+            contracts::StringObligation::StatementData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
@@ -76,7 +76,7 @@ impl StringObligationClient {
         statement_data: &Bytes,
     ) -> eyre::Result<contracts::StringObligation::StatementData> {
         let statementdata =
-            contracts::StringObligation::StatementData::abi_decode(statement_data.as_ref(), true)?;
+            contracts::StringObligation::StatementData::abi_decode(statement_data.as_ref())?;
         Ok(statementdata)
     }
 

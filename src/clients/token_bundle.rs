@@ -82,7 +82,6 @@ impl TokenBundleClient {
     ) -> eyre::Result<contracts::TokenBundleEscrowObligation::StatementData> {
         let statement_data = contracts::TokenBundleEscrowObligation::StatementData::abi_decode(
             statement_data.as_ref(),
-            true,
         )?;
         return Ok(statement_data);
     }
@@ -101,7 +100,6 @@ impl TokenBundleClient {
     ) -> eyre::Result<contracts::TokenBundlePaymentObligation::StatementData> {
         let statement_data = contracts::TokenBundlePaymentObligation::StatementData::abi_decode(
             statement_data.as_ref(),
-            true,
         )?;
         return Ok(statement_data);
     }
@@ -114,11 +112,10 @@ impl TokenBundleClient {
     > {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
-        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let attestation = eas_contract.getAttestation(uid).call().await?;
         let statement_data =
             contracts::token_bundle::TokenBundleEscrowObligation::StatementData::abi_decode(
                 &attestation.data,
-                true,
             )?;
 
         Ok(DecodedAttestation {
@@ -135,11 +132,10 @@ impl TokenBundleClient {
     > {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
-        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let attestation = eas_contract.getAttestation(uid).call().await?;
         let statement_data =
             contracts::token_bundle::TokenBundlePaymentObligation::StatementData::abi_decode(
                 &attestation.data,
-                true,
             )?;
 
         Ok(DecodedAttestation {
@@ -481,6 +477,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_buy_bundle_for_bundle() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -551,10 +548,9 @@ mod tests {
                     .escrow_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
-        let _initial_erc721_a_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?._0;
+        let _initial_erc721_a_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?;
 
         let initial_erc1155_a_escrow_balance = mock_erc1155_a
             .balanceOf(
@@ -566,8 +562,7 @@ mod tests {
                 U256::from(1),
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Alice approves her tokens for escrow
         test.alice_client
@@ -603,10 +598,9 @@ mod tests {
                     .escrow_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
-        let final_erc721_a_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?._0;
+        let final_erc721_a_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?;
 
         let final_erc1155_a_escrow_balance = mock_erc1155_a
             .balanceOf(
@@ -618,8 +612,7 @@ mod tests {
                 U256::from(1),
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Verify tokens were escrowed
         assert_eq!(
@@ -647,6 +640,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_pay_bundle_for_bundle() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -741,26 +735,20 @@ mod tests {
         let buy_attestation = AlkahestClient::get_attested_event(buy_receipt)?.uid;
 
         // Check balances before fulfillment
-        let alice_initial_erc20_b_balance = mock_erc20_b
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
+        let alice_initial_erc20_b_balance =
+            mock_erc20_b.balanceOf(test.alice.address()).call().await?;
 
-        let bob_initial_erc20_a_balance =
-            mock_erc20_a.balanceOf(test.bob.address()).call().await?._0;
+        let bob_initial_erc20_a_balance = mock_erc20_a.balanceOf(test.bob.address()).call().await?;
 
         let alice_initial_erc1155_b_balance = mock_erc1155_b
             .balanceOf(test.alice.address(), U256::from(1))
             .call()
-            .await?
-            ._0;
+            .await?;
 
         let bob_initial_erc1155_a_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), U256::from(1))
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Alice approves her tokens for payment
         test.alice_client
@@ -784,29 +772,24 @@ mod tests {
         );
 
         // Check balances after fulfillment
-        let alice_final_erc20_b_balance = mock_erc20_b
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
+        let alice_final_erc20_b_balance =
+            mock_erc20_b.balanceOf(test.alice.address()).call().await?;
 
-        let bob_final_erc20_a_balance = mock_erc20_a.balanceOf(test.bob.address()).call().await?._0;
+        let bob_final_erc20_a_balance = mock_erc20_a.balanceOf(test.bob.address()).call().await?;
 
         let alice_final_erc1155_b_balance = mock_erc1155_b
             .balanceOf(test.alice.address(), U256::from(1))
             .call()
-            .await?
-            ._0;
+            .await?;
 
         let bob_final_erc1155_a_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), U256::from(1))
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Check ERC721 ownerships
-        let alice_erc721_b_owner = mock_erc721_b.ownerOf(U256::from(1)).call().await?._0;
-        let bob_erc721_a_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?._0;
+        let alice_erc721_b_owner = mock_erc721_b.ownerOf(U256::from(1)).call().await?;
+        let bob_erc721_a_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?;
 
         // Verify token transfers
         // Alice receives Bob's tokens
@@ -851,6 +834,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_collect_expired() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -909,19 +893,14 @@ mod tests {
         test.god_provider.anvil_increase_time(120).await?; // Advance by 120 seconds
 
         // Check balances before collecting
-        let escrow_erc721_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?._0;
+        let escrow_erc721_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?;
 
-        let initial_erc20_balance = mock_erc20_a
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
+        let initial_erc20_balance = mock_erc20_a.balanceOf(test.alice.address()).call().await?;
 
         let initial_erc1155_balance = mock_erc1155_a
             .balanceOf(test.alice.address(), U256::from(1))
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Verify tokens are in escrow
         assert_eq!(
@@ -940,19 +919,14 @@ mod tests {
             .await?;
 
         // Verify Alice got her tokens back
-        let final_erc20_balance = mock_erc20_a
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
+        let final_erc20_balance = mock_erc20_a.balanceOf(test.alice.address()).call().await?;
 
-        let final_erc721_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?._0;
+        let final_erc721_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?;
 
         let final_erc1155_balance = mock_erc1155_a
             .balanceOf(test.alice.address(), U256::from(1))
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Verify tokens returned to Alice
         assert_eq!(
@@ -977,6 +951,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_decode_escrow_statement() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -1015,6 +990,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_decode_payment_statement() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -1040,6 +1016,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_approve() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -1093,8 +1070,7 @@ mod tests {
                     .payment_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             erc20_payment_allowance >= alice_bundle.erc20s[0].value,
@@ -1112,8 +1088,7 @@ mod tests {
                     .payment_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             erc721_payment_approved,
@@ -1131,8 +1106,7 @@ mod tests {
                     .payment_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             erc1155_payment_approved,
@@ -1157,8 +1131,7 @@ mod tests {
                     .escrow_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             erc20_escrow_allowance >= alice_bundle.erc20s[0].value,
@@ -1176,8 +1149,7 @@ mod tests {
                     .escrow_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             erc721_escrow_approved,
@@ -1194,8 +1166,7 @@ mod tests {
                     .escrow_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             erc1155_escrow_approved,
@@ -1206,6 +1177,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_buy_with_bundle() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -1266,7 +1238,7 @@ mod tests {
 
         // Verify escrow happened
         // Check token ownerships and balances
-        let erc721_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?._0;
+        let erc721_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?;
 
         let erc20_escrow_balance = mock_erc20_a
             .balanceOf(
@@ -1277,8 +1249,7 @@ mod tests {
                     .escrow_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         let erc1155_escrow_balance = mock_erc1155_a
             .balanceOf(
@@ -1290,8 +1261,7 @@ mod tests {
                 U256::from(1),
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Verify tokens are in escrow
         assert_eq!(
@@ -1321,6 +1291,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_pay_with_bundle() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -1357,13 +1328,12 @@ mod tests {
         let alice_bundle = create_alice_bundle(&test)?;
 
         // Check initial balances
-        let initial_bob_erc20_balance = mock_erc20_a.balanceOf(test.bob.address()).call().await?._0;
+        let initial_bob_erc20_balance = mock_erc20_a.balanceOf(test.bob.address()).call().await?;
 
         let initial_bob_erc1155_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), U256::from(1))
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Alice approves tokens for payment
         test.alice_client
@@ -1380,15 +1350,14 @@ mod tests {
 
         // Verify payment happened
         // Check token ownerships and balances
-        let erc721_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?._0;
+        let erc721_owner = mock_erc721_a.ownerOf(U256::from(1)).call().await?;
 
-        let final_bob_erc20_balance = mock_erc20_a.balanceOf(test.bob.address()).call().await?._0;
+        let final_bob_erc20_balance = mock_erc20_a.balanceOf(test.bob.address()).call().await?;
 
         let final_bob_erc1155_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), U256::from(1))
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Verify tokens were transferred to Bob
         assert_eq!(

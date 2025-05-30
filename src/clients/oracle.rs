@@ -22,7 +22,10 @@ use itertools::izip;
 
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
-    contracts::{IEAS, TrustedOracleArbiter},
+    contracts::{
+        IEAS::{self, Attestation},
+        TrustedOracleArbiter,
+    },
     types::{PublicProvider, WalletProvider},
     utils,
 };
@@ -252,14 +255,10 @@ impl OracleClient {
         filter
     }
 
-    pub async fn arbitrate_past<
-        StatementData: SolType,
-        Arbitrate: Fn(&StatementData::RustType) -> Option<bool>,
-    >(
+    async fn get_attestations_and_statements<StatementData: SolType>(
         &self,
         fulfillment: &FulfillmentParams<StatementData>,
-        arbitrate: Arbitrate,
-    ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
+    ) -> eyre::Result<(Vec<Attestation>, Vec<StatementData::RustType>)> {
         let filter = self.make_filter(&fulfillment.filter);
         let logs = self
             .public_provider
@@ -275,10 +274,9 @@ impl OracleClient {
         });
 
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        let attestations = try_join_all(attestation_futs)
+        let attestations: Vec<Attestation> = try_join_all(attestation_futs)
             .await?
             .into_iter()
-            .map(|a| a._0)
             .filter(|a| {
                 if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
                     if a.refUID != *ref_uid {
@@ -305,8 +303,21 @@ impl OracleClient {
 
         let statements = attestations
             .iter()
-            .map(|a| StatementData::abi_decode(&a.data, true))
+            .map(|a| StatementData::abi_decode(&a.data))
             .collect::<Result<Vec<_>, _>>()?;
+
+        Ok((attestations, statements))
+    }
+
+    pub async fn arbitrate_past<
+        StatementData: SolType,
+        Arbitrate: Fn(&StatementData::RustType) -> Option<bool>,
+    >(
+        &self,
+        fulfillment: &FulfillmentParams<StatementData>,
+        arbitrate: Arbitrate,
+    ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
+        let (attestations, statements) = self.get_attestations_and_statements(fulfillment).await?;
 
         let decisions = statements.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
 
@@ -350,53 +361,7 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
-        let filter = self.make_filter(&fulfillment.filter);
-        let logs = self
-            .public_provider
-            .get_logs(&filter)
-            .await?
-            .into_iter()
-            .map(|log| log.log_decode::<IEAS::Attested>())
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let attestation_futs = logs.into_iter().map(|log| {
-            let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
-            async move { eas.getAttestation(log.inner.uid).call().await }
-        });
-
-        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        let attestations = try_join_all(attestation_futs)
-            .await?
-            .into_iter()
-            .map(|a| a._0)
-            .filter(|a| {
-                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
-                    if a.refUID != *ref_uid {
-                        return false;
-                    };
-                }
-                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
-                    if ref_uids.contains(&a.refUID) {
-                        return false;
-                    };
-                }
-
-                if a.expirationTime != 0 && a.expirationTime < now {
-                    return false;
-                }
-
-                if a.revocationTime != 0 && a.revocationTime < now {
-                    return false;
-                }
-
-                return true;
-            })
-            .collect::<Vec<_>>();
-
-        let statements = attestations
-            .iter()
-            .map(|a| StatementData::abi_decode(&a.data, true))
-            .collect::<Result<Vec<_>, _>>()?;
+        let (attestations, statements) = self.get_attestations_and_statements(fulfillment).await?;
 
         let decision_futs = statements.iter().map(|s| async move { arbitrate(s).await });
         let decisions = join_all(decision_futs).await;
@@ -465,6 +430,7 @@ impl OracleClient {
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
         let stream = sub.into_stream();
+
         let wallet_provider = self.wallet_provider.clone();
         let eas_address = self.addresses.eas;
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
@@ -476,15 +442,13 @@ impl OracleClient {
             let mut stream = stream;
 
             while let Some(log) = stream.next().await {
-                println!("Received log: {:?}", log);
-
                 let Ok(log) = log.log_decode::<IEAS::Attested>() else {
                     continue;
                 };
                 let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
                     continue;
                 };
-                let attestation = attestation._0;
+                let attestation = attestation;
 
                 if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
                     if attestation.refUID != *ref_uid {
@@ -507,7 +471,7 @@ impl OracleClient {
                     continue;
                 }
 
-                let Ok(statement) = StatementData::abi_decode(&attestation.data, true) else {
+                let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
                     continue;
                 };
                 let Some(decision_value) = arbitrate(&statement) else {
@@ -584,7 +548,7 @@ impl OracleClient {
                 let Ok(attestation_result) = eas.getAttestation(log.inner.uid).call().await else {
                     continue;
                 };
-                let attestation = attestation_result._0;
+                let attestation = attestation_result;
 
                 if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
                     if attestation.refUID != *ref_uid {
@@ -607,7 +571,7 @@ impl OracleClient {
                     continue;
                 }
 
-                let Ok(statement) = StatementData::abi_decode(&attestation.data, true) else {
+                let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
                     continue;
                 };
 
@@ -663,7 +627,7 @@ impl OracleClient {
         let local_id = *sub.local_id();
         let stream = sub.into_stream();
 
-        let wallet_provider = self.wallet_provider.clone(); // Must be Arc or Send + Sync
+        let wallet_provider = self.wallet_provider.clone();
         let eas_address = self.addresses.eas;
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
         let fulfillment = fulfillment.clone();
@@ -674,15 +638,13 @@ impl OracleClient {
             let mut stream = stream;
 
             while let Some(log) = stream.next().await {
-                println!("Received log: {:?}", log);
-
                 let Ok(log) = log.log_decode::<IEAS::Attested>() else {
                     continue;
                 };
                 let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
                     continue;
                 };
-                let attestation = attestation._0;
+                let attestation = attestation;
 
                 if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
                     if attestation.refUID != *ref_uid {
@@ -705,7 +667,7 @@ impl OracleClient {
                     continue;
                 }
 
-                let Ok(statement) = StatementData::abi_decode(&attestation.data, true) else {
+                let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
                     continue;
                 };
                 let Some(decision_value) = arbitrate(&statement) else {
@@ -780,7 +742,7 @@ impl OracleClient {
                 let Ok(attestation_result) = eas.getAttestation(log.inner.uid).call().await else {
                     continue;
                 };
-                let attestation = attestation_result._0;
+                let attestation = attestation_result;
 
                 if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
                     if attestation.refUID != *ref_uid {
@@ -803,7 +765,7 @@ impl OracleClient {
                     continue;
                 }
 
-                let Ok(statement) = StatementData::abi_decode(&attestation.data, true) else {
+                let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
                     continue;
                 };
 
@@ -896,7 +858,7 @@ impl OracleClient {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let escrow_attestations = escrow_attestations
             .into_iter()
-            .map(|a| a._0)
+            .map(|a| a)
             .filter(|a| {
                 if let Some(ValueOrArray::Value(ref_uid)) = &escrow.filter.ref_uid {
                     if a.refUID != *ref_uid {
@@ -923,12 +885,12 @@ impl OracleClient {
 
         let escrow_statements = escrow_attestations
             .iter()
-            .map(|a| ArbiterDemand::abi_decode(&a.data, true))
+            .map(|a| ArbiterDemand::abi_decode(&a.data))
             .collect::<Result<Vec<_>, _>>()?;
 
         let escrow_demands = escrow_statements
             .iter()
-            .map(|s| DemandData::abi_decode(&s.demand, true))
+            .map(|s| DemandData::abi_decode(&s.demand))
             .collect::<Result<Vec<_>, _>>()?;
 
         let demands_map: HashMap<_, _> = escrow_attestations
@@ -939,13 +901,13 @@ impl OracleClient {
 
         let fulfillment_attestations = fulfillment_attestations
             .iter()
-            .map(|a| a._0.clone())
+            .map(|a| a.clone())
             .filter(|a| demands_map.contains_key(&a.refUID))
             .collect::<Vec<_>>();
 
         let fulfillment_statements = fulfillment_attestations
             .iter()
-            .map(|a| StatementData::abi_decode(&a.data, true))
+            .map(|a| StatementData::abi_decode(&a.data))
             .collect::<Result<Vec<_>, _>>()?;
 
         let decisions = fulfillment_statements
@@ -1068,7 +1030,7 @@ impl OracleClient {
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let escrow_attestations = escrow_attestations
             .into_iter()
-            .map(|a| a._0)
+            .map(|a| a)
             .filter(|a| {
                 if let Some(ValueOrArray::Value(ref_uid)) = &escrow.filter.ref_uid {
                     if a.refUID != *ref_uid {
@@ -1095,12 +1057,12 @@ impl OracleClient {
 
         let escrow_statements = escrow_attestations
             .iter()
-            .map(|a| ArbiterDemand::abi_decode(&a.data, true))
+            .map(|a| ArbiterDemand::abi_decode(&a.data))
             .collect::<Result<Vec<_>, _>>()?;
 
         let escrow_demands = escrow_statements
             .iter()
-            .map(|s| DemandData::abi_decode(&s.demand, true))
+            .map(|s| DemandData::abi_decode(&s.demand))
             .collect::<Result<Vec<_>, _>>()?;
 
         let demands_map: HashMap<_, _> = escrow_attestations
@@ -1111,13 +1073,13 @@ impl OracleClient {
 
         let fulfillment_attestations = fulfillment_attestations
             .iter()
-            .map(|a| a._0.clone())
+            .map(|a| a.clone())
             .filter(|a| demands_map.contains_key(&a.refUID))
             .collect::<Vec<_>>();
 
         let fulfillment_statements = fulfillment_attestations
             .iter()
-            .map(|a| StatementData::abi_decode(&a.data, true))
+            .map(|a| StatementData::abi_decode(&a.data))
             .collect::<Result<Vec<_>, _>>()?;
 
         let decisions_fut = fulfillment_statements
@@ -1224,7 +1186,7 @@ impl OracleClient {
         while let Some(log) = escrow_stream.next().await {
             let log = log.log_decode::<IEAS::Attested>()?;
 
-            let attestation = eas.getAttestation(log.inner.uid).call().await?._0;
+            let attestation = eas.getAttestation(log.inner.uid).call().await?;
 
             let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
             if attestation.expirationTime != 0 && attestation.expirationTime < now {
@@ -1234,8 +1196,8 @@ impl OracleClient {
                 continue;
             }
 
-            let statement = ArbiterDemand::abi_decode(&attestation.data, true)?;
-            let demand = DemandData::abi_decode(&statement.demand, true)?;
+            let statement = ArbiterDemand::abi_decode(&attestation.data)?;
+            let demand = DemandData::abi_decode(&statement.demand)?;
 
             demands_map.insert(attestation.uid, demand);
         }
@@ -1255,7 +1217,7 @@ impl OracleClient {
         while let Some(log) = stream.next().await {
             let log = log.log_decode::<IEAS::Attested>()?;
 
-            let attestation = eas.getAttestation(log.inner.uid).call().await?._0;
+            let attestation = eas.getAttestation(log.inner.uid).call().await?;
 
             let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
             if attestation.expirationTime != 0 && attestation.expirationTime < now {
@@ -1270,7 +1232,7 @@ impl OracleClient {
                 continue;
             }
 
-            let statement = StatementData::abi_decode(&attestation.data, true)?;
+            let statement = StatementData::abi_decode(&attestation.data)?;
             if let Some(ref demand) = demand {
                 let decision = arbitrate(&statement, demand);
 

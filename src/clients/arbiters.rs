@@ -135,7 +135,7 @@ impl ArbitersClient {
     pub fn decode_intrinsics_demand_2(
         data: &Bytes,
     ) -> eyre::Result<IntrinsicsArbiter2::DemandData> {
-        Ok(IntrinsicsArbiter2::DemandData::abi_decode(data, true)?)
+        Ok(IntrinsicsArbiter2::DemandData::abi_decode(data)?)
     }
 
     pub fn encode_multi_demand(demand: &MultiArbiter::DemandData) -> Bytes {
@@ -143,7 +143,7 @@ impl ArbitersClient {
     }
 
     pub fn decode_multi_demand(data: &Bytes) -> eyre::Result<MultiArbiter::DemandData> {
-        Ok(MultiArbiter::DemandData::abi_decode(data, true)?)
+        Ok(MultiArbiter::DemandData::abi_decode(data)?)
     }
 
     pub fn encode_uid_arbiter_demand(demand: &UidArbiterComposing::DemandData) -> Bytes {
@@ -153,7 +153,7 @@ impl ArbitersClient {
     pub fn decode_uid_arbiter_demand(
         data: &Bytes,
     ) -> eyre::Result<UidArbiterComposing::DemandData> {
-        Ok(UidArbiterComposing::DemandData::abi_decode(data, true)?)
+        Ok(UidArbiterComposing::DemandData::abi_decode(data)?)
     }
 
     pub fn encode_recipient_arbiter_demand(
@@ -165,9 +165,7 @@ impl ArbitersClient {
     pub fn decode_recipient_arbiter_demand(
         data: &Bytes,
     ) -> eyre::Result<RecipientArbiterNoncomposing::DemandData> {
-        Ok(RecipientArbiterNoncomposing::DemandData::abi_decode(
-            data, true,
-        )?)
+        Ok(RecipientArbiterNoncomposing::DemandData::abi_decode(data)?)
     }
 
     pub fn encode_trusted_party_demand(demand: &TrustedPartyArbiter::DemandData) -> Bytes {
@@ -177,7 +175,7 @@ impl ArbitersClient {
     pub fn decode_trusted_party_demand(
         data: &Bytes,
     ) -> eyre::Result<TrustedPartyArbiter::DemandData> {
-        Ok(TrustedPartyArbiter::DemandData::abi_decode(data, true)?)
+        Ok(TrustedPartyArbiter::DemandData::abi_decode(data)?)
     }
 
     pub fn encode_specific_attestation_demand(
@@ -189,9 +187,7 @@ impl ArbitersClient {
     pub fn decode_specific_attestation_demand(
         data: &Bytes,
     ) -> eyre::Result<SpecificAttestationArbiter::DemandData> {
-        Ok(SpecificAttestationArbiter::DemandData::abi_decode(
-            data, true,
-        )?)
+        Ok(SpecificAttestationArbiter::DemandData::abi_decode(data)?)
     }
 
     // The following are recommended replacements for TrustedPartyArbiter and SpecificAttestationArbiter
@@ -205,7 +201,7 @@ impl ArbitersClient {
     pub fn decode_trusted_oracle_demand(
         data: &Bytes,
     ) -> eyre::Result<TrustedOracleArbiter::DemandData> {
-        Ok(TrustedOracleArbiter::DemandData::abi_decode(data, true)?)
+        Ok(TrustedOracleArbiter::DemandData::abi_decode(data)?)
     }
 
     pub async fn arbitrate_as_trusted_oracle(
@@ -307,6 +303,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_trivial_arbiter_always_returns_true() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -330,8 +327,7 @@ mod tests {
         let result = trivial_arbiter
             .checkStatement(attestation.clone().into(), demand.clone(), counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Should always return true
         assert!(result, "TrivialArbiter should always return true");
@@ -354,8 +350,7 @@ mod tests {
         let result2 = trivial_arbiter
             .checkStatement(attestation2.into(), demand2, counteroffer2)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Should still return true
         assert!(
@@ -367,6 +362,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_trusted_party_arbiter_with_incorrect_creator_original() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -415,6 +411,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_recipient_arbiter_with_incorrect_recipient() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -462,6 +459,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_recipient_arbiter_with_correct_recipient() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -496,8 +494,7 @@ mod tests {
         let result = recipient_arbiter
             .checkStatement(attestation.clone().into(), demand, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             result,
@@ -508,6 +505,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_trusted_party_arbiter_with_incorrect_creator() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -556,6 +554,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_trusted_oracle_arbiter_constructor() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -587,8 +586,7 @@ mod tests {
         let result = trusted_oracle_arbiter
             .checkStatement(attestation.into(), demand, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Should be false initially
         assert!(
@@ -600,6 +598,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_trusted_oracle_arbiter_arbitrate() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -632,8 +631,7 @@ mod tests {
         let initial_result = trusted_oracle_arbiter
             .checkStatement(attestation.clone().into(), demand.clone(), counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(!initial_result, "Decision should initially be false");
 
@@ -656,8 +654,7 @@ mod tests {
         let final_result = trusted_oracle_arbiter
             .checkStatement(attestation.into(), demand, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             final_result,
@@ -668,6 +665,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_trusted_oracle_arbiter_with_different_oracles() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -729,8 +727,7 @@ mod tests {
         let result1 = trusted_oracle_arbiter
             .checkStatement(attestation.clone().into(), demand1, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(result1, "Decision for Oracle 1 (Bob) should be true");
 
@@ -744,8 +741,7 @@ mod tests {
         let result2 = trusted_oracle_arbiter
             .checkStatement(attestation.into(), demand2, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(!result2, "Decision for Oracle 2 (Alice) should be false");
 
@@ -753,6 +749,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_trusted_oracle_arbiter_with_no_decision() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -786,8 +783,7 @@ mod tests {
         let result = trusted_oracle_arbiter
             .checkStatement(attestation.into(), demand, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             !result,
@@ -798,6 +794,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_specific_attestation_arbiter_with_incorrect_uid_original() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -836,6 +833,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_uid_arbiter_with_incorrect_uid() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -885,6 +883,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_uid_arbiter_with_correct_uid() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -921,8 +920,7 @@ mod tests {
         let result = uid_arbiter
             .checkStatement(attestation.clone().into(), encoded, FixedBytes::<32>::ZERO)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(result, "UidArbiter should return true with matching UID");
 
@@ -930,6 +928,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_specific_attestation_arbiter_with_incorrect_uid() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -967,6 +966,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_encode_and_decode_trusted_party_demand() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1006,6 +1006,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_encode_and_decode_specific_attestation_demand() -> eyre::Result<()> {
         // Setup test environment
         let _test = setup_test_environment().await?;
@@ -1027,6 +1028,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_encode_and_decode_uid_arbiter_demand() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1058,6 +1060,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_encode_and_decode_recipient_arbiter_demand() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1097,6 +1100,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_encode_and_decode_trusted_oracle_demand() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1121,6 +1125,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_wait_for_trusted_oracle_arbitration() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1174,6 +1179,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_intrinsics_arbiter() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1227,8 +1233,7 @@ mod tests {
                 FixedBytes::<32>::default(),
             )
             .call()
-            .await?
-            ._0;
+            .await?;
         assert!(
             result_valid,
             "Valid attestation should pass intrinsic checks"
@@ -1268,6 +1273,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_intrinsics_arbiter_2() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1321,8 +1327,7 @@ mod tests {
                 FixedBytes::<32>::default(),
             )
             .call()
-            .await?
-            ._0;
+            .await?;
         assert!(
             result_matching,
             "Attestation with matching schema should pass"
@@ -1347,6 +1352,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_any_arbiter() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1400,8 +1406,7 @@ mod tests {
                 FixedBytes::<32>::default(),
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             result_any1,
@@ -1432,7 +1437,7 @@ mod tests {
 
         // Should fail since both arbiters would fail
         assert!(
-            result_any2.is_err() || !result_any2.unwrap()._0,
+            result_any2.is_err() || !result_any2.unwrap(),
             "AnyArbiter should return false if all arbiters return false"
         );
 
@@ -1452,8 +1457,7 @@ mod tests {
         let result_any3 = any_arbiter
             .checkStatement(attestation.into(), any_demand3, FixedBytes::<32>::default())
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             result_any3,
@@ -1464,6 +1468,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_all_arbiter() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1545,8 +1550,7 @@ mod tests {
                 FixedBytes::<32>::default(),
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             result_all2,
@@ -1563,8 +1567,7 @@ mod tests {
         let result_all3 = all_arbiter
             .checkStatement(attestation.into(), all_demand3, FixedBytes::<32>::default())
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             result_all3,
@@ -1575,6 +1578,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_encode_and_decode_intrinsics_demand_2() -> eyre::Result<()> {
         // Create a test demand data
         let schema = FixedBytes::<32>::from_slice(&[1u8; 32]);
@@ -1593,6 +1597,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_encode_and_decode_multi_demand() -> eyre::Result<()> {
         // Set up test environment
         let test = setup_test_environment().await?;

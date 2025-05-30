@@ -76,7 +76,7 @@ impl Erc1155Client {
         statement_data: &Bytes,
     ) -> eyre::Result<contracts::ERC1155EscrowObligation::StatementData> {
         let statement_data =
-            contracts::ERC1155EscrowObligation::StatementData::abi_decode(statement_data, true)?;
+            contracts::ERC1155EscrowObligation::StatementData::abi_decode(statement_data)?;
         return Ok(statement_data);
     }
 
@@ -93,7 +93,7 @@ impl Erc1155Client {
         statement_data: &Bytes,
     ) -> eyre::Result<contracts::ERC1155PaymentObligation::StatementData> {
         let statement_data =
-            contracts::ERC1155PaymentObligation::StatementData::abi_decode(statement_data, true)?;
+            contracts::ERC1155PaymentObligation::StatementData::abi_decode(statement_data)?;
         return Ok(statement_data);
     }
 
@@ -103,9 +103,9 @@ impl Erc1155Client {
     ) -> eyre::Result<DecodedAttestation<contracts::ERC1155EscrowObligation::StatementData>> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
-        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let attestation = eas_contract.getAttestation(uid).call().await?;
         let statement_data =
-            contracts::ERC1155EscrowObligation::StatementData::abi_decode(&attestation.data, true)?;
+            contracts::ERC1155EscrowObligation::StatementData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
@@ -119,11 +119,9 @@ impl Erc1155Client {
     ) -> eyre::Result<DecodedAttestation<contracts::ERC1155PaymentObligation::StatementData>> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
-        let attestation = eas_contract.getAttestation(uid).call().await?._0;
-        let statement_data = contracts::ERC1155PaymentObligation::StatementData::abi_decode(
-            &attestation.data,
-            true,
-        )?;
+        let attestation = eas_contract.getAttestation(uid).call().await?;
+        let statement_data =
+            contracts::ERC1155PaymentObligation::StatementData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
@@ -593,6 +591,7 @@ mod tests {
     };
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_decode_escrow_statement() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -633,6 +632,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_decode_payment_statement() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -666,6 +666,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_approve_all() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -697,8 +698,7 @@ mod tests {
                     .payment_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             payment_approved,
@@ -722,8 +722,7 @@ mod tests {
                     .escrow_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             escrow_approved,
@@ -734,6 +733,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_revoke_all() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -771,8 +771,7 @@ mod tests {
                     .payment_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(!payment_approved, "Payment approval should be revoked");
 
@@ -780,6 +779,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_buy_with_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -826,8 +826,7 @@ mod tests {
         let alice_balance = mock_erc1155_a
             .balanceOf(test.alice.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Check escrow contract's balance increased
         let escrow_balance = mock_erc1155_a
@@ -839,8 +838,7 @@ mod tests {
                 1.try_into()?,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // token in escrow
         assert_eq!(
@@ -858,6 +856,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_pay_with_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -887,8 +886,7 @@ mod tests {
         let initial_bob_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // alice makes direct payment to bob
         let receipt = test
@@ -901,8 +899,7 @@ mod tests {
         let final_bob_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // tokens paid to bob
         assert_eq!(
@@ -919,6 +916,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_buy_erc1155_for_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -967,8 +965,7 @@ mod tests {
                 1.try_into()?,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert_eq!(
             escrow_balance,
@@ -984,6 +981,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_pay_erc1155_for_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1041,13 +1039,11 @@ mod tests {
         let initial_alice_balance_b = mock_erc1155_b
             .balanceOf(test.alice.address(), 2.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
         let initial_bob_balance_a = mock_erc1155_a
             .balanceOf(test.bob.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // bob fulfills the buy attestation
         let _sell_receipt = test
@@ -1060,13 +1056,11 @@ mod tests {
         let final_alice_balance_b = mock_erc1155_b
             .balanceOf(test.alice.address(), 2.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
         let final_bob_balance_a = mock_erc1155_a
             .balanceOf(test.bob.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // both sides received the tokens
         assert_eq!(
@@ -1084,6 +1078,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_collect_expired() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1119,8 +1114,7 @@ mod tests {
         let initial_alice_balance = mock_erc1155_a
             .balanceOf(test.alice.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // alice makes escrow with a short expiration
         let expiration = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 10;
@@ -1146,8 +1140,7 @@ mod tests {
         let final_alice_balance = mock_erc1155_a
             .balanceOf(test.alice.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert_eq!(
             final_alice_balance, initial_alice_balance,
@@ -1158,6 +1151,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_buy_erc20_with_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1205,8 +1199,7 @@ mod tests {
                 1.try_into()?,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert_eq!(
             escrow_balance,
@@ -1222,6 +1215,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_buy_erc721_with_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1269,8 +1263,7 @@ mod tests {
                 1.try_into()?,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert_eq!(
             escrow_balance,
@@ -1286,6 +1279,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_buy_bundle_with_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1346,8 +1340,7 @@ mod tests {
                 1.try_into()?,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert_eq!(
             escrow_balance,
@@ -1363,6 +1356,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_pay_erc1155_for_erc20() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1419,17 +1413,13 @@ mod tests {
             .await?;
 
         // Check initial balances
-        let initial_alice_erc20_balance = mock_erc20_a
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
+        let initial_alice_erc20_balance =
+            mock_erc20_a.balanceOf(test.alice.address()).call().await?;
 
         let initial_bob_erc1155_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // alice fulfills bob's buy attestation with her ERC1155
         let _sell_receipt = test
@@ -1439,17 +1429,12 @@ mod tests {
             .await?;
 
         // verify token transfers
-        let final_alice_erc20_balance = mock_erc20_a
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
+        let final_alice_erc20_balance = mock_erc20_a.balanceOf(test.alice.address()).call().await?;
 
         let final_bob_erc1155_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // both sides received the tokens
         assert_eq!(
@@ -1467,6 +1452,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_pay_erc1155_for_erc721() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1526,8 +1512,7 @@ mod tests {
         let initial_bob_erc1155_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // alice fulfills bob's buy attestation with her ERC1155
         let _sell_receipt = test
@@ -1537,12 +1522,11 @@ mod tests {
             .await?;
 
         // verify token transfers
-        let alice_now_owns_erc721 = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let alice_now_owns_erc721 = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
         let final_bob_erc1155_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // both sides received the tokens
         assert_eq!(
@@ -1560,6 +1544,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_pay_erc1155_for_bundle() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1603,21 +1588,16 @@ mod tests {
 
         // begin test
         // Check balances before the exchange
-        let initial_alice_erc20_balance = mock_erc20_b
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
+        let initial_alice_erc20_balance =
+            mock_erc20_b.balanceOf(test.alice.address()).call().await?;
         let initial_alice_erc1155b_balance = mock_erc1155_b
             .balanceOf(test.alice.address(), 3.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
         let initial_bob_erc1155a_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Bob's bundle that he'll escrow
         let bundle = TokenBundleData {
@@ -1689,26 +1669,20 @@ mod tests {
 
         // verify token transfers
         // Check alice received all tokens from the bundle
-        let final_alice_erc20_balance = mock_erc20_b
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
+        let final_alice_erc20_balance = mock_erc20_b.balanceOf(test.alice.address()).call().await?;
 
-        let alice_erc721_owner = mock_erc721_b.ownerOf(1.try_into()?).call().await?._0;
+        let alice_erc721_owner = mock_erc721_b.ownerOf(1.try_into()?).call().await?;
 
         let final_alice_erc1155b_balance = mock_erc1155_b
             .balanceOf(test.alice.address(), 3.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Check bob received the ERC1155 tokens
         let final_bob_erc1155a_balance = mock_erc1155_a
             .balanceOf(test.bob.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Verify alice received the bundle
         assert_eq!(
