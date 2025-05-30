@@ -146,8 +146,7 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
     let buy_statement = Erc20Client::decode_escrow_statement(&buy_statement.data)?;
 
     let decoded_demand = ArbitersClient::decode_trusted_party_demand(&buy_statement.demand)?;
-    let decoded_base_demand =
-        ResultDemandData::abi_decode(decoded_demand.baseDemand.as_ref(), true);
+    let decoded_base_demand = ResultDemandData::abi_decode(decoded_demand.baseDemand.as_ref());
 
     // uppercase string for the example;
     // this could be anything as agreed upon between buyer and seller
@@ -218,7 +217,7 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
         .get_attestation(fulfillment.fulfillment)
         .await?;
 
-    let result = JobResultObligation::StatementData::abi_decode(fulfillment.data.as_ref(), true);
+    let result = JobResultObligation::StatementData::abi_decode(fulfillment.data.as_ref());
     println!("result: {}", result?.result);
 
     Ok(())

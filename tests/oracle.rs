@@ -624,7 +624,7 @@ mod tests {
         let filter = make_filter_without_refuid(&test);
         let fulfillment = make_fulfillment_params_without_refuid(filter);
 
-        let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand, true)?;
+        let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
             demand_abi: demand_data.clone(),

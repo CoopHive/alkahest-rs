@@ -65,10 +65,8 @@ impl AttestationClient {
     pub fn decode_escrow_statement(
         statement_data: &Bytes,
     ) -> eyre::Result<contracts::AttestationEscrowObligation::StatementData> {
-        let statement_data = contracts::AttestationEscrowObligation::StatementData::abi_decode(
-            statement_data,
-            true,
-        )?;
+        let statement_data =
+            contracts::AttestationEscrowObligation::StatementData::abi_decode(statement_data)?;
         return Ok(statement_data);
     }
 
@@ -82,10 +80,8 @@ impl AttestationClient {
     pub fn decode_escrow_statement_2(
         statement_data: &Bytes,
     ) -> eyre::Result<contracts::AttestationEscrowObligation2::StatementData> {
-        let statement_data = contracts::AttestationEscrowObligation2::StatementData::abi_decode(
-            statement_data,
-            true,
-        )?;
+        let statement_data =
+            contracts::AttestationEscrowObligation2::StatementData::abi_decode(statement_data)?;
         return Ok(statement_data);
     }
 
@@ -96,11 +92,9 @@ impl AttestationClient {
     {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
-        let attestation = eas_contract.getAttestation(uid).call().await?._0;
-        let statement_data = contracts::AttestationEscrowObligation::StatementData::abi_decode(
-            &attestation.data,
-            true,
-        )?;
+        let attestation = eas_contract.getAttestation(uid).call().await?;
+        let statement_data =
+            contracts::AttestationEscrowObligation::StatementData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
@@ -115,11 +109,9 @@ impl AttestationClient {
     {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
-        let attestation = eas_contract.getAttestation(uid).call().await?._0;
-        let statement_data = contracts::AttestationEscrowObligation2::StatementData::abi_decode(
-            &attestation.data,
-            true,
-        )?;
+        let attestation = eas_contract.getAttestation(uid).call().await?;
+        let statement_data =
+            contracts::AttestationEscrowObligation2::StatementData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
@@ -134,7 +126,7 @@ impl AttestationClient {
     pub async fn get_attestation(&self, uid: FixedBytes<32>) -> eyre::Result<Attestation> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
-        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let attestation = eas_contract.getAttestation(uid).call().await?;
         Ok(attestation)
     }
 
@@ -862,7 +854,7 @@ mod tests {
             &test.god_provider,
         );
 
-        let attestation_schema = escrow_contract.ATTESTATION_SCHEMA().call().await?._0;
+        let attestation_schema = escrow_contract.ATTESTATION_SCHEMA().call().await?;
 
         // Verify escrow attestation details
         assert_eq!(
@@ -1115,7 +1107,7 @@ mod tests {
             &test.god_provider,
         );
 
-        let validation_schema = escrow_contract.VALIDATION_SCHEMA().call().await?._0;
+        let validation_schema = escrow_contract.VALIDATION_SCHEMA().call().await?;
 
         // Verify validation attestation details
         assert_eq!(
