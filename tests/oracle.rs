@@ -616,6 +616,7 @@ mod tests {
 
         Ok(())
     }
+
     #[tokio::test]
     async fn test_trivial_arbitrate_past_for_escrow() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
@@ -709,6 +710,64 @@ mod tests {
             collection2.is_err(),
             "❌ Expected collection2 to fail due to failed arbitration, but it succeeded"
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_trivial_listen_and_arbitrate_past_for_escrow() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, item, escrow_uid) = setup_escrow(&test).await?;
+
+        let filter = make_filter_without_refuid(&test);
+        let fulfillment = make_fulfillment_params_without_refuid(filter);
+
+        let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
+        let escrow = EscrowParams {
+            filter: make_filter_for_escrow(&test, None),
+            demand_abi: demand_data.clone(),
+        };
+        let oracle = test.bob_client.oracle.clone();
+
+        let listen_result = oracle
+            .listen_and_arbitrate_for_escrow(
+                &escrow,
+                &fulfillment,
+                |_statement, _demand| {
+                    println!(
+                        "🔍 Checking item: '{}', demand: {:?}",
+                        _statement.item, _demand.oracle
+                    );
+                    let item = _statement.item.clone();
+                    let oracle_addr = _demand.oracle;
+                    println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
+                    Some(item == "good")
+                },
+                |_decision| {
+                    let statement_item = _decision.statement.item.clone();
+                    let decision_value = _decision.decision;
+                    async move {
+                        assert_eq!(statement_item, "good");
+                        assert!(decision_value);
+                    }
+                },
+            )
+            .await?;
+
+        // Ensure listener starts
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let _collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment_uid)
+            .await?;
+
+        // oracle.unsubscribe(listen_result.subscription_id).await?;
 
         Ok(())
     }
