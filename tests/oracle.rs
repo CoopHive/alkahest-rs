@@ -125,7 +125,7 @@ mod tests {
                     .unwrap()
                     .escrow_obligation,
             )),
-            recipient: Some(ValueOrArray::Value(test.bob.address())),
+            recipient: None,
             schema_uid: None,
             uid: None,
             ref_uid: ref_uid.map(ValueOrArray::Value),
@@ -653,6 +653,62 @@ mod tests {
             .await?;
 
         println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_conditional_arbitrate_past_for_escrow() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, item, escrow_uid) = setup_escrow(&test).await?;
+
+        let fulfillment1_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+        let fulfillment2_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
+
+        let filter = make_filter_without_refuid(&test);
+        let fulfillment = make_fulfillment_params_without_refuid(filter);
+
+        let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
+        let escrow = EscrowParams {
+            filter: make_filter_for_escrow(&test, None),
+            demand_abi: demand_data.clone(),
+        };
+        let (decisions, _, _) = test
+            .bob_client
+            .oracle
+            .arbitrate_past_for_escrow(&escrow, &fulfillment, |_statement, _demand| {
+                println!(
+                    "🔍 Checking item: '{}', demand: {:?}",
+                    _statement.item, _demand.oracle
+                );
+                let item = _statement.item.clone();
+                let oracle_addr = _demand.oracle;
+                println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
+                Some(item == "good")
+            })
+            .await?;
+
+        let collection1 = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment1_uid)
+            .await?;
+
+        println!(
+            "✅ Expected collection1 to succeed, got receipt: {:?}",
+            collection1
+        );
+
+        let collection2 = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment2_uid)
+            .await;
+
+        assert!(
+            collection2.is_err(),
+            "❌ Expected collection2 to fail due to failed arbitration, but it succeeded"
+        );
 
         Ok(())
     }
