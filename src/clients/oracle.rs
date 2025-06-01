@@ -330,31 +330,44 @@ impl OracleClient {
 
         let decisions = statements.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
 
-        let mut receipts = Vec::new();
-        let trusted_oracle_arbiter =
-            TrustedOracleArbiter::new(self.addresses.trusted_oracle_arbiter, &self.wallet_provider);
+        let arbitration_futs = attestations
+            .iter()
+            .zip(decisions.iter())
+            .map(|(attestation, decision)| {
+                let trusted_oracle_arbiter = TrustedOracleArbiter::new(
+                    self.addresses.trusted_oracle_arbiter,
+                    &self.wallet_provider,
+                );
 
-        for (attestation, decision) in attestations.iter().zip(decisions.iter()) {
-            if let Some(decision) = decision {
-                let tx = trusted_oracle_arbiter
-                    .arbitrate(attestation.uid, *decision)
-                    .send()
-                    .await?;
-                let receipt = tx.get_receipt().await?;
-                receipts.push(Some(receipt));
-            } else {
-                receipts.push(None);
-            }
-        }
+                if let Some(decision) = decision {
+                    Some(async move {
+                        trusted_oracle_arbiter
+                            .arbitrate(attestation.uid, *decision)
+                            .send()
+                            .await
+                    })
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let pending_txs = try_join_all(arbitration_futs).await?;
+        let receipt_futs = pending_txs
+            .into_iter()
+            .map(|tx| async move { tx.get_receipt().await });
+
+        let receipts = try_join_all(receipt_futs).await?;
 
         let result = izip!(attestations, statements, decisions, receipts)
-            .filter(|(_, _, d, r)| d.is_some() && r.is_some())
+            .filter(|(_, _, d, _)| d.is_some())
             .map(|(attestation, statement, decision, receipt)| Decision {
                 attestation,
                 statement,
                 demand: None,
                 decision: decision.unwrap(),
-                receipt: receipt.unwrap(),
+                receipt,
             })
             .collect::<Vec<Decision<StatementData, ()>>>();
 
