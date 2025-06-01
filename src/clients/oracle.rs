@@ -891,7 +891,7 @@ impl OracleClient {
         Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> ArbitrateFut + Copy,
     >(
         &self,
-        escrow: EscrowParams<DemandData>,
+        escrow: &EscrowParams<DemandData>,
         fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
     ) -> eyre::Result<(
