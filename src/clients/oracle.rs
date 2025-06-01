@@ -381,25 +381,28 @@ impl OracleClient {
                 let Ok(log) = log.log_decode::<IEAS::Attested>() else {
                     continue;
                 };
+
                 let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
                     continue;
                 };
 
-                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
-                    if attestation.refUID != *ref_uid {
+                match &fulfillment.filter.ref_uid {
+                    Some(ValueOrArray::Value(ref_uid)) if attestation.refUID != *ref_uid => {
                         continue;
                     }
-                }
-                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
-                    if !ref_uids.contains(&attestation.refUID) {
+                    Some(ValueOrArray::Array(ref_uids))
+                        if !ref_uids.contains(&attestation.refUID) =>
+                    {
                         continue;
                     }
+                    _ => {}
                 }
 
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_secs();
+
                 if (attestation.expirationTime != 0 && attestation.expirationTime < now)
                     || (attestation.revocationTime != 0 && attestation.revocationTime < now)
                 {
@@ -409,6 +412,7 @@ impl OracleClient {
                 let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
                     continue;
                 };
+
                 let Some(decision_value) = arbitrate(&statement) else {
                     continue;
                 };
@@ -420,6 +424,7 @@ impl OracleClient {
                 else {
                     continue;
                 };
+
                 let Ok(receipt) = tx.get_receipt().await else {
                     continue;
                 };
@@ -436,6 +441,7 @@ impl OracleClient {
             }
         });
     }
+
     pub async fn spawn_fulfillment_listener_async<
         StatementData: SolType + Clone + Send + 'static,
         ArbitrateFut: Future<Output = Option<bool>> + Send,
@@ -460,30 +466,32 @@ impl OracleClient {
             let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
             let mut stream = stream;
 
-            while let Some(log_result) = stream.next().await {
-                let Ok(log) = log_result.log_decode::<IEAS::Attested>() else {
+            while let Some(log) = stream.next().await {
+                let Ok(log) = log.log_decode::<IEAS::Attested>() else {
                     continue;
                 };
+
                 let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
                     continue;
                 };
 
-                // Filter by refUID
-                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
-                    if attestation.refUID != *ref_uid {
+                match &fulfillment.filter.ref_uid {
+                    Some(ValueOrArray::Value(ref_uid)) if attestation.refUID != *ref_uid => {
                         continue;
                     }
-                }
-                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
-                    if !ref_uids.contains(&attestation.refUID) {
+                    Some(ValueOrArray::Array(ref_uids))
+                        if !ref_uids.contains(&attestation.refUID) =>
+                    {
                         continue;
                     }
+                    _ => {}
                 }
 
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_secs();
+
                 if (attestation.expirationTime != 0 && attestation.expirationTime < now)
                     || (attestation.revocationTime != 0 && attestation.revocationTime < now)
                 {
@@ -598,13 +606,8 @@ impl OracleClient {
         let local_id = *sub.local_id();
         let stream: SubscriptionStream<Log> = sub.into_stream();
 
-        self.spawn_fulfillment_listener(
-            stream,
-            fulfillment.clone(),
-            arbitrate,
-            on_after_arbitrate,
-        )
-        .await;
+        self.spawn_fulfillment_listener(stream, fulfillment.clone(), arbitrate, on_after_arbitrate)
+            .await;
 
         Ok(ListenAndArbitrateResult {
             decisions,
@@ -668,13 +671,8 @@ impl OracleClient {
         let local_id = *sub.local_id();
         let stream = sub.into_stream();
 
-        self.spawn_fulfillment_listener(
-            stream,
-            fulfillment.clone(),
-            arbitrate,
-            on_after_arbitrate,
-        )
-        .await;
+        self.spawn_fulfillment_listener(stream, fulfillment.clone(), arbitrate, on_after_arbitrate)
+            .await;
 
         Ok(ListenAndArbitrateNewFulfillmentsResult {
             subscription_id: local_id,
