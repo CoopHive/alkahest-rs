@@ -141,6 +141,12 @@ pub struct ListenAndArbitrateResult<StatementData: SolType> {
 pub struct ListenAndArbitrateNewFulfillmentsResult {
     pub subscription_id: FixedBytes<32>,
 }
+pub struct ListenAndArbitrateForEscrowResult<StatementData: SolType, DemandData: SolType> {
+    pub decisions: Vec<Decision<StatementData, DemandData>>,
+    pub escrow_attestations: Vec<IEAS::Attestation>,
+    pub escrow_subscription_id: FixedBytes<32>,
+    pub fulfillment_subscription_id: FixedBytes<32>,
+}
 
 impl OracleClient {
     pub async fn new(
@@ -630,7 +636,7 @@ impl OracleClient {
     where
         <StatementData as SolType>::RustType: Send,
     {
-        let decisions = self.arbitrate_past_async(fulfillment, arbitrate).await?;
+        let decisions = self.arbitrate_past_async(&fulfillment, arbitrate).await?;
         let filter = self.make_filter(&fulfillment.filter);
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
@@ -1079,16 +1085,13 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-    ) -> eyre::Result<(
-        Vec<Decision<StatementData, DemandData>>,
-        Vec<IEAS::Attestation>,
-    )>
+    ) -> eyre::Result<ListenAndArbitrateForEscrowResult<StatementData, DemandData>>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
         <StatementData as SolType>::RustType: Send + 'static,
     {
-        let (mut decisions, escrow_attestations, escrow_demands) = self
-            .arbitrate_past_for_escrow(escrow, fulfillment, arbitrate)
+        let (decisions, escrow_attestations, escrow_demands) = self
+            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate)
             .await?;
 
         let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
@@ -1104,11 +1107,16 @@ impl OracleClient {
         let eas_address = self.addresses.eas;
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
 
+        let escrow_subscription_id;
+        let fulfillment_subscription_id;
+
         // Listen for escrow demands
         {
             let demands_map = Arc::clone(&demands_map);
             let filter = self.make_filter(&escrow.filter);
             let sub = self.public_provider.subscribe_logs(&filter).await?;
+            escrow_subscription_id = *sub.local_id();
+
             let mut stream = sub.into_stream();
             let eas_address = eas_address.clone();
             let wallet_provider = wallet_provider.clone();
@@ -1145,12 +1153,11 @@ impl OracleClient {
             let demands_map = Arc::clone(&demands_map);
             let filter = self.make_filter_without_refuid(&fulfillment.filter);
             let sub = self.public_provider.subscribe_logs(&filter).await?;
-            let mut stream = sub.into_stream();
-            let wallet_provider_fulfillment = Arc::new(wallet_provider.clone());
-            let eas = IEAS::new(eas_address, &*wallet_provider_fulfillment);
-            let arbiter = TrustedOracleArbiter::new(arbiter_address, &*wallet_provider_fulfillment);
+            fulfillment_subscription_id = *sub.local_id();
 
-            let wallet_provider_fulfillment = Arc::clone(&wallet_provider_fulfillment);
+            let mut stream = sub.into_stream();
+            let eas_address = eas_address.clone();
+            let wallet_provider_fulfillment = Arc::new(wallet_provider.clone());
 
             tokio::spawn(async move {
                 let eas = IEAS::new(eas_address, &*wallet_provider_fulfillment);
@@ -1206,22 +1213,168 @@ impl OracleClient {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
-        Ok((decisions, escrow_attestations))
+        Ok(ListenAndArbitrateForEscrowResult {
+            decisions,
+            escrow_attestations,
+            escrow_subscription_id,
+            fulfillment_subscription_id,
+        })
     }
 
     pub async fn listen_and_arbitrate_for_escrow_async<
         StatementData: SolType,
         DemandData: SolType,
-        ArbitrateFut: Future<Output = Option<bool>>,
-        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> ArbitrateFut + Copy,
-        OnAfterArbitrateFut: Future<Output = ()>,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy,
+        ArbitrateFut: Future<Output = Option<bool>> + Send,
+        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> ArbitrateFut
+            + Copy
+            + Send
+            + Sync
+            + 'static,
+        OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
+        OnAfterArbitrate: Fn(&Decision<StatementData, DemandData>) -> OnAfterArbitrateFut
+            + Copy
+            + Send
+            + Sync
+            + 'static,
     >(
         &self,
-        escrow: EscrowParams<DemandData>,
+        escrow: &EscrowParams<DemandData>,
         fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-    ) {
+    ) -> eyre::Result<ListenAndArbitrateForEscrowResult<StatementData, DemandData>>
+    where
+        <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
+        <StatementData as SolType>::RustType: Send + 'static,
+    {
+        let (decisions, escrow_attestations, escrow_demands) = self
+            .arbitrate_past_for_escrow_async(&escrow, &fulfillment, arbitrate)
+            .await?;
+
+        let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
+            Arc::new(RwLock::new(
+                escrow_attestations
+                    .iter()
+                    .zip(escrow_demands.iter())
+                    .map(|(a, d)| (a.uid, d.clone()))
+                    .collect(),
+            ));
+
+        let wallet_provider = self.wallet_provider.clone();
+        let eas_address = self.addresses.eas;
+        let arbiter_address = self.addresses.trusted_oracle_arbiter;
+
+        let escrow_subscription_id;
+        let fulfillment_subscription_id;
+
+        // Listen for escrow demands
+        {
+            let demands_map = Arc::clone(&demands_map);
+            let filter = self.make_filter(&escrow.filter);
+            let sub = self.public_provider.subscribe_logs(&filter).await?;
+            escrow_subscription_id = *sub.local_id();
+
+            let mut stream = sub.into_stream();
+            let eas_address = eas_address.clone();
+            let wallet_provider = wallet_provider.clone();
+
+            tokio::spawn(async move {
+                let eas = IEAS::new(eas_address, &wallet_provider);
+                while let Some(log) = stream.next().await {
+                    if let Ok(log) = log.log_decode::<IEAS::Attested>() {
+                        if let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await {
+                            let now = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs();
+                            if attestation.expirationTime != 0 && attestation.expirationTime < now {
+                                continue;
+                            }
+                            if attestation.revocationTime != 0 && attestation.revocationTime < now {
+                                continue;
+                            }
+
+                            if let Ok(statement) = ArbiterDemand::abi_decode(&attestation.data) {
+                                if let Ok(demand) = DemandData::abi_decode(&statement.demand) {
+                                    demands_map.write().await.insert(attestation.uid, demand);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Listen for fulfillments
+        {
+            let demands_map = Arc::clone(&demands_map);
+            let filter = self.make_filter_without_refuid(&fulfillment.filter);
+            let sub = self.public_provider.subscribe_logs(&filter).await?;
+            fulfillment_subscription_id = *sub.local_id();
+
+            let mut stream = sub.into_stream();
+            let eas_address = eas_address.clone();
+            let wallet_provider_fulfillment = Arc::new(wallet_provider.clone());
+
+            tokio::spawn(async move {
+                let eas = IEAS::new(eas_address, &*wallet_provider_fulfillment);
+                let arbiter =
+                    TrustedOracleArbiter::new(arbiter_address, &*wallet_provider_fulfillment);
+                while let Some(log) = stream.next().await {
+                    if let Ok(log) = log.log_decode::<IEAS::Attested>() {
+                        if let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await {
+                            let now = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs();
+                            if attestation.expirationTime != 0 && attestation.expirationTime < now {
+                                continue;
+                            }
+                            if attestation.revocationTime != 0 && attestation.revocationTime < now {
+                                continue;
+                            }
+
+                            let Some(demand) =
+                                demands_map.read().await.get(&attestation.refUID).cloned()
+                            else {
+                                continue;
+                            };
+
+                            if let Ok(statement) = StatementData::abi_decode(&attestation.data) {
+                                if let Some(decision_value) = arbitrate(&statement, &demand).await {
+                                    if let Ok(tx) = arbiter
+                                        .arbitrate(attestation.uid, decision_value)
+                                        .send()
+                                        .await
+                                    {
+                                        if let Ok(receipt) = tx.get_receipt().await {
+                                            let decision = Decision {
+                                                attestation,
+                                                statement,
+                                                demand: Some(demand.clone()),
+                                                decision: decision_value,
+                                                receipt,
+                                            };
+
+                                            tokio::spawn(on_after_arbitrate(&decision));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Wait briefly to allow async spawn setup (optional)
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+
+        Ok(ListenAndArbitrateForEscrowResult {
+            decisions,
+            escrow_attestations,
+            escrow_subscription_id,
+            fulfillment_subscription_id,
+        })
     }
 }
