@@ -1,16 +1,16 @@
-use alloy::{
-    primitives::{Address, Bytes, FixedBytes},
-    rpc::types::TransactionReceipt,
-    signers::local::PrivateKeySigner,
-    sol_types::SolValue as _,
-};
-use serde::de::DeserializeOwned;
-
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
     contracts,
     types::{DecodedAttestation, WalletProvider},
 };
+use alloy::{
+    primitives::{Address, Bytes, FixedBytes, TxKind},
+    rpc::types::TransactionReceipt,
+    signers::local::PrivateKeySigner,
+    sol_types::SolValue as _,
+};
+use alloy::{providers::Provider, rpc::types::TransactionRequest};
+use serde::de::DeserializeOwned;
 
 #[derive(Debug, Clone)]
 pub struct StringObligationAddresses {
@@ -104,11 +104,15 @@ impl StringObligationClient {
         let contract =
             contracts::StringObligation::new(self.addresses.obligation, &self.wallet_provider);
 
+        let address = self._signer.address();
+        let nonce = self.wallet_provider.get_transaction_count(address).await?;
+
         let receipt = contract
             .makeStatement(
                 statement_data,
                 ref_uid.unwrap_or(FixedBytes::<32>::default()),
             )
+            .nonce(nonce)
             .send()
             .await?
             .get_receipt()
