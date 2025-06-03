@@ -1221,9 +1221,6 @@ impl OracleClient {
                     }
                 }
             });
-
-            // Wait briefly to allow async spawn setup (optional)
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
         Ok(ListenAndArbitrateForEscrowResult {
@@ -1378,9 +1375,6 @@ impl OracleClient {
                     }
                 }
             });
-
-            // Wait briefly to allow async spawn setup (optional)
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
 
         Ok(ListenAndArbitrateForEscrowResult {
