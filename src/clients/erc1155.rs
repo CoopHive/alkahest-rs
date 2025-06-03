@@ -591,7 +591,6 @@ mod tests {
     };
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_decode_escrow_statement() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -632,7 +631,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_decode_payment_statement() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -666,7 +664,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_approve_all() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -733,7 +730,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_revoke_all() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -779,7 +775,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_buy_with_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -856,7 +851,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_pay_with_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -916,7 +910,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_buy_erc1155_for_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -981,7 +974,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_pay_erc1155_for_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1078,7 +1070,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_collect_expired() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1151,7 +1142,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_buy_erc20_with_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1215,7 +1205,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_buy_erc721_with_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1279,7 +1268,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_buy_bundle_with_erc1155() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1356,7 +1344,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_pay_erc1155_for_erc20() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1452,7 +1439,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_pay_erc1155_for_erc721() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
@@ -1544,7 +1530,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_pay_erc1155_for_bundle() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;

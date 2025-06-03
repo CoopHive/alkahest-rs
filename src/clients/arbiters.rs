@@ -303,7 +303,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_trivial_arbiter_always_returns_true() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -362,7 +361,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_trusted_party_arbiter_with_incorrect_creator_original() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -411,7 +409,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_recipient_arbiter_with_incorrect_recipient() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -459,7 +456,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_recipient_arbiter_with_correct_recipient() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -505,7 +501,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_trusted_party_arbiter_with_incorrect_creator() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -554,7 +549,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_trusted_oracle_arbiter_constructor() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -598,7 +592,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_trusted_oracle_arbiter_arbitrate() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -665,7 +658,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_trusted_oracle_arbiter_with_different_oracles() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -749,7 +741,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_trusted_oracle_arbiter_with_no_decision() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -794,7 +785,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_specific_attestation_arbiter_with_incorrect_uid_original() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -833,7 +823,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_uid_arbiter_with_incorrect_uid() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -883,7 +872,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_uid_arbiter_with_correct_uid() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -928,7 +916,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_specific_attestation_arbiter_with_incorrect_uid() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -966,7 +953,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_encode_and_decode_trusted_party_demand() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1006,7 +992,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_encode_and_decode_specific_attestation_demand() -> eyre::Result<()> {
         // Setup test environment
         let _test = setup_test_environment().await?;
@@ -1028,7 +1013,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_encode_and_decode_uid_arbiter_demand() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1060,7 +1044,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_encode_and_decode_recipient_arbiter_demand() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1100,7 +1083,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_encode_and_decode_trusted_oracle_demand() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1125,7 +1107,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_wait_for_trusted_oracle_arbitration() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1179,7 +1160,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_intrinsics_arbiter() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1273,7 +1253,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_intrinsics_arbiter_2() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1352,7 +1331,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_any_arbiter() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1468,7 +1446,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_all_arbiter() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1578,7 +1555,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_encode_and_decode_intrinsics_demand_2() -> eyre::Result<()> {
         // Create a test demand data
         let schema = FixedBytes::<32>::from_slice(&[1u8; 32]);
@@ -1597,7 +1573,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_encode_and_decode_multi_demand() -> eyre::Result<()> {
         // Set up test environment
         let test = setup_test_environment().await?;

@@ -447,7 +447,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_decode_escrow_statement() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -500,7 +499,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_decode_escrow_statement_2() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
@@ -538,7 +536,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_get_attestation() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -582,7 +579,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_register_schema() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -628,7 +624,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_attest() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -684,7 +679,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_create_escrow() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -776,7 +770,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_create_escrow_2() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -881,7 +874,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_collect_payment() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -997,7 +989,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_collect_payment_2() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
@@ -1148,7 +1139,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn test_attest_and_create_escrow() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
