@@ -135,7 +135,7 @@ impl ArbitersClient {
     pub fn decode_intrinsics_demand_2(
         data: &Bytes,
     ) -> eyre::Result<IntrinsicsArbiter2::DemandData> {
-        Ok(IntrinsicsArbiter2::DemandData::abi_decode(data, true)?)
+        Ok(IntrinsicsArbiter2::DemandData::abi_decode(data)?)
     }
 
     pub fn encode_multi_demand(demand: &MultiArbiter::DemandData) -> Bytes {
@@ -143,7 +143,7 @@ impl ArbitersClient {
     }
 
     pub fn decode_multi_demand(data: &Bytes) -> eyre::Result<MultiArbiter::DemandData> {
-        Ok(MultiArbiter::DemandData::abi_decode(data, true)?)
+        Ok(MultiArbiter::DemandData::abi_decode(data)?)
     }
 
     pub fn encode_uid_arbiter_demand(demand: &UidArbiterComposing::DemandData) -> Bytes {
@@ -153,7 +153,7 @@ impl ArbitersClient {
     pub fn decode_uid_arbiter_demand(
         data: &Bytes,
     ) -> eyre::Result<UidArbiterComposing::DemandData> {
-        Ok(UidArbiterComposing::DemandData::abi_decode(data, true)?)
+        Ok(UidArbiterComposing::DemandData::abi_decode(data)?)
     }
 
     pub fn encode_recipient_arbiter_demand(
@@ -165,9 +165,7 @@ impl ArbitersClient {
     pub fn decode_recipient_arbiter_demand(
         data: &Bytes,
     ) -> eyre::Result<RecipientArbiterNoncomposing::DemandData> {
-        Ok(RecipientArbiterNoncomposing::DemandData::abi_decode(
-            data, true,
-        )?)
+        Ok(RecipientArbiterNoncomposing::DemandData::abi_decode(data)?)
     }
 
     pub fn encode_trusted_party_demand(demand: &TrustedPartyArbiter::DemandData) -> Bytes {
@@ -177,7 +175,7 @@ impl ArbitersClient {
     pub fn decode_trusted_party_demand(
         data: &Bytes,
     ) -> eyre::Result<TrustedPartyArbiter::DemandData> {
-        Ok(TrustedPartyArbiter::DemandData::abi_decode(data, true)?)
+        Ok(TrustedPartyArbiter::DemandData::abi_decode(data)?)
     }
 
     pub fn encode_specific_attestation_demand(
@@ -189,9 +187,7 @@ impl ArbitersClient {
     pub fn decode_specific_attestation_demand(
         data: &Bytes,
     ) -> eyre::Result<SpecificAttestationArbiter::DemandData> {
-        Ok(SpecificAttestationArbiter::DemandData::abi_decode(
-            data, true,
-        )?)
+        Ok(SpecificAttestationArbiter::DemandData::abi_decode(data)?)
     }
 
     // The following are recommended replacements for TrustedPartyArbiter and SpecificAttestationArbiter
@@ -205,7 +201,7 @@ impl ArbitersClient {
     pub fn decode_trusted_oracle_demand(
         data: &Bytes,
     ) -> eyre::Result<TrustedOracleArbiter::DemandData> {
-        Ok(TrustedOracleArbiter::DemandData::abi_decode(data, true)?)
+        Ok(TrustedOracleArbiter::DemandData::abi_decode(data)?)
     }
 
     pub async fn arbitrate_as_trusted_oracle(
@@ -330,8 +326,7 @@ mod tests {
         let result = trivial_arbiter
             .checkStatement(attestation.clone().into(), demand.clone(), counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Should always return true
         assert!(result, "TrivialArbiter should always return true");
@@ -354,8 +349,7 @@ mod tests {
         let result2 = trivial_arbiter
             .checkStatement(attestation2.into(), demand2, counteroffer2)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Should still return true
         assert!(
@@ -496,8 +490,7 @@ mod tests {
         let result = recipient_arbiter
             .checkStatement(attestation.clone().into(), demand, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             result,
@@ -587,8 +580,7 @@ mod tests {
         let result = trusted_oracle_arbiter
             .checkStatement(attestation.into(), demand, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Should be false initially
         assert!(
@@ -632,8 +624,7 @@ mod tests {
         let initial_result = trusted_oracle_arbiter
             .checkStatement(attestation.clone().into(), demand.clone(), counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(!initial_result, "Decision should initially be false");
 
@@ -656,8 +647,7 @@ mod tests {
         let final_result = trusted_oracle_arbiter
             .checkStatement(attestation.into(), demand, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             final_result,
@@ -729,8 +719,7 @@ mod tests {
         let result1 = trusted_oracle_arbiter
             .checkStatement(attestation.clone().into(), demand1, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(result1, "Decision for Oracle 1 (Bob) should be true");
 
@@ -744,8 +733,7 @@ mod tests {
         let result2 = trusted_oracle_arbiter
             .checkStatement(attestation.into(), demand2, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(!result2, "Decision for Oracle 2 (Alice) should be false");
 
@@ -786,8 +774,7 @@ mod tests {
         let result = trusted_oracle_arbiter
             .checkStatement(attestation.into(), demand, counteroffer)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             !result,
@@ -921,8 +908,7 @@ mod tests {
         let result = uid_arbiter
             .checkStatement(attestation.clone().into(), encoded, FixedBytes::<32>::ZERO)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(result, "UidArbiter should return true with matching UID");
 
@@ -1227,8 +1213,7 @@ mod tests {
                 FixedBytes::<32>::default(),
             )
             .call()
-            .await?
-            ._0;
+            .await?;
         assert!(
             result_valid,
             "Valid attestation should pass intrinsic checks"
@@ -1321,8 +1306,7 @@ mod tests {
                 FixedBytes::<32>::default(),
             )
             .call()
-            .await?
-            ._0;
+            .await?;
         assert!(
             result_matching,
             "Attestation with matching schema should pass"
@@ -1400,8 +1384,7 @@ mod tests {
                 FixedBytes::<32>::default(),
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             result_any1,
@@ -1432,7 +1415,7 @@ mod tests {
 
         // Should fail since both arbiters would fail
         assert!(
-            result_any2.is_err() || !result_any2.unwrap()._0,
+            result_any2.is_err() || !result_any2.unwrap(),
             "AnyArbiter should return false if all arbiters return false"
         );
 
@@ -1452,8 +1435,7 @@ mod tests {
         let result_any3 = any_arbiter
             .checkStatement(attestation.into(), any_demand3, FixedBytes::<32>::default())
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             result_any3,
@@ -1545,8 +1527,7 @@ mod tests {
                 FixedBytes::<32>::default(),
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             result_all2,
@@ -1563,8 +1544,7 @@ mod tests {
         let result_all3 = all_arbiter
             .checkStatement(attestation.into(), all_demand3, FixedBytes::<32>::default())
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             result_all3,

@@ -75,10 +75,8 @@ impl Erc721Client {
     pub fn decode_escrow_statement(
         statement_data: &Bytes,
     ) -> eyre::Result<contracts::ERC721EscrowObligation::StatementData> {
-        let statement_data = contracts::ERC721EscrowObligation::StatementData::abi_decode(
-            statement_data.as_ref(),
-            true,
-        )?;
+        let statement_data =
+            contracts::ERC721EscrowObligation::StatementData::abi_decode(statement_data.as_ref())?;
         return Ok(statement_data);
     }
 
@@ -94,10 +92,8 @@ impl Erc721Client {
     pub fn decode_payment_statement(
         statement_data: &Bytes,
     ) -> eyre::Result<contracts::ERC721PaymentObligation::StatementData> {
-        let statement_data = contracts::ERC721PaymentObligation::StatementData::abi_decode(
-            statement_data.as_ref(),
-            true,
-        )?;
+        let statement_data =
+            contracts::ERC721PaymentObligation::StatementData::abi_decode(statement_data.as_ref())?;
         return Ok(statement_data);
     }
 
@@ -107,9 +103,9 @@ impl Erc721Client {
     ) -> eyre::Result<DecodedAttestation<contracts::ERC721EscrowObligation::StatementData>> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
-        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let attestation = eas_contract.getAttestation(uid).call().await?;
         let statement_data =
-            contracts::ERC721EscrowObligation::StatementData::abi_decode(&attestation.data, true)?;
+            contracts::ERC721EscrowObligation::StatementData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
@@ -123,9 +119,9 @@ impl Erc721Client {
     ) -> eyre::Result<DecodedAttestation<contracts::ERC721PaymentObligation::StatementData>> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
-        let attestation = eas_contract.getAttestation(uid).call().await?._0;
+        let attestation = eas_contract.getAttestation(uid).call().await?;
         let statement_data =
-            contracts::ERC721PaymentObligation::StatementData::abi_decode(&attestation.data, true)?;
+            contracts::ERC721PaymentObligation::StatementData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
@@ -700,7 +696,7 @@ mod tests {
             .await?;
 
         // Verify approval for payment obligation
-        let payment_approved = mock_erc721_a.getApproved(1.try_into()?).call().await?._0;
+        let payment_approved = mock_erc721_a.getApproved(1.try_into()?).call().await?;
 
         assert_eq!(
             payment_approved,
@@ -720,7 +716,7 @@ mod tests {
             .await?;
 
         // Verify approval for escrow obligation
-        let escrow_approved = mock_erc721_a.getApproved(1.try_into()?).call().await?._0;
+        let escrow_approved = mock_erc721_a.getApproved(1.try_into()?).call().await?;
 
         assert_eq!(
             escrow_approved,
@@ -773,8 +769,7 @@ mod tests {
                     .payment_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             payment_approved,
@@ -798,8 +793,7 @@ mod tests {
                     .escrow_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(
             escrow_approved,
@@ -847,8 +841,7 @@ mod tests {
                     .payment_obligation,
             )
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert!(!payment_approved, "Payment approval should be revoked");
 
@@ -898,7 +891,7 @@ mod tests {
             .await?;
 
         // Verify escrow happened
-        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         // token in escrow
         assert_eq!(
@@ -950,7 +943,7 @@ mod tests {
             .await?;
 
         // Verify payment happened
-        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         // token paid to bob
         assert_eq!(owner, test.bob.address(), "Token should be owned by Bob");
@@ -1000,7 +993,7 @@ mod tests {
             .await?;
 
         // verify escrow
-        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         assert_eq!(
             owner,
@@ -1078,8 +1071,8 @@ mod tests {
             .await?;
 
         // verify token transfers
-        let alice_token_b_owner = mock_erc721_b.ownerOf(1.try_into()?).call().await?._0;
-        let bob_token_a_owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let alice_token_b_owner = mock_erc721_b.ownerOf(1.try_into()?).call().await?;
+        let bob_token_a_owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         // both sides received the tokens
         assert_eq!(
@@ -1147,7 +1140,7 @@ mod tests {
             .await?;
 
         // verify token returned to alice
-        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         assert_eq!(
             owner,
@@ -1196,7 +1189,7 @@ mod tests {
             .await?;
 
         // Verify escrow happened
-        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         assert_eq!(
             owner,
@@ -1253,7 +1246,7 @@ mod tests {
             .await?;
 
         // Verify escrow happened
-        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         assert_eq!(
             owner,
@@ -1322,7 +1315,7 @@ mod tests {
             .await?;
 
         // Verify escrow happened
-        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         assert_eq!(
             owner,
@@ -1403,13 +1396,9 @@ mod tests {
             .await?;
 
         // verify token transfers
-        let alice_token_a_balance = mock_erc20_a
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
+        let alice_token_a_balance = mock_erc20_a.balanceOf(test.alice.address()).call().await?;
 
-        let bob_token_owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let bob_token_owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         // both sides received the tokens
         assert_eq!(
@@ -1493,10 +1482,9 @@ mod tests {
         let alice_erc1155_balance = mock_erc1155_a
             .balanceOf(test.alice.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
-        let bob_token_owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let bob_token_owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         // both sides received the tokens
         assert_eq!(
@@ -1557,16 +1545,12 @@ mod tests {
 
         // begin test
         // Check balances before the exchange
-        let initial_alice_erc20_balance = mock_erc20_b
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
+        let initial_alice_erc20_balance =
+            mock_erc20_b.balanceOf(test.alice.address()).call().await?;
         let initial_alice_erc1155_balance = mock_erc1155_a
             .balanceOf(test.alice.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Bob's bundle that he'll escrow
         let bundle = TokenBundleData {
@@ -1643,22 +1627,17 @@ mod tests {
 
         // verify token transfers
         // Check alice received all tokens from the bundle
-        let final_alice_erc20_balance = mock_erc20_b
-            .balanceOf(test.alice.address())
-            .call()
-            .await?
-            ._0;
+        let final_alice_erc20_balance = mock_erc20_b.balanceOf(test.alice.address()).call().await?;
 
-        let alice_erc721_owner = mock_erc721_b.ownerOf(1.try_into()?).call().await?._0;
+        let alice_erc721_owner = mock_erc721_b.ownerOf(1.try_into()?).call().await?;
 
         let final_alice_erc1155_balance = mock_erc1155_a
             .balanceOf(test.alice.address(), 1.try_into()?)
             .call()
-            .await?
-            ._0;
+            .await?;
 
         // Check bob received the ERC721 token
-        let bob_token_owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?._0;
+        let bob_token_owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         // Verify alice received the bundle
         assert_eq!(

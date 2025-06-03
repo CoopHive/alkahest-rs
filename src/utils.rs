@@ -1,7 +1,7 @@
 use alloy::{
     network::{EthereumWallet, TxSigner},
     node_bindings::AnvilInstance,
-    primitives::{Address, PrimitiveSignature},
+    primitives::{Address, Signature},
     providers::{ProviderBuilder, WsConnect},
     signers::local::PrivateKeySigner,
 };
@@ -29,14 +29,14 @@ use crate::{
     types::{PublicProvider, WalletProvider},
 };
 
-pub async fn get_wallet_provider<T: TxSigner<PrimitiveSignature> + Sync + Send + 'static>(
+pub async fn get_wallet_provider<T: TxSigner<Signature> + Sync + Send + 'static>(
     private_key: T,
     rpc_url: impl ToString,
 ) -> eyre::Result<WalletProvider> {
     let wallet = EthereumWallet::from(private_key);
     let ws = WsConnect::new(rpc_url.to_string());
 
-    let provider = ProviderBuilder::new().wallet(wallet).on_ws(ws).await?;
+    let provider = ProviderBuilder::new().wallet(wallet).connect_ws(ws).await?;
 
     Ok(provider)
 }
@@ -44,7 +44,7 @@ pub async fn get_wallet_provider<T: TxSigner<PrimitiveSignature> + Sync + Send +
 pub async fn get_public_provider(rpc_url: impl ToString) -> eyre::Result<PublicProvider> {
     let ws = WsConnect::new(rpc_url.to_string());
 
-    let provider = ProviderBuilder::new().on_ws(ws).await?;
+    let provider = ProviderBuilder::new().connect_ws(ws).await?;
 
     Ok(provider)
 }
@@ -56,7 +56,10 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let god_wallet = EthereumWallet::from(god.clone());
 
     let ws = WsConnect::new(anvil.ws_endpoint_url());
-    let god_provider = ProviderBuilder::new().wallet(god_wallet).on_ws(ws).await?;
+    let god_provider = ProviderBuilder::new()
+        .wallet(god_wallet)
+        .connect_ws(ws)
+        .await?;
     let god_provider_ = god_provider.clone();
 
     let schema_registry = SchemaRegistry::deploy(&god_provider).await?;
