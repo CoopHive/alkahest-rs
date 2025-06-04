@@ -391,6 +391,7 @@ impl OracleClient {
         let wallet_provider = self.wallet_provider.clone();
         let eas_address = self.addresses.eas;
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
+        let signer_address = self._signer.address();
         tokio::spawn(async move {
             let eas = IEAS::new(eas_address, &wallet_provider);
             let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
@@ -436,27 +437,41 @@ impl OracleClient {
                     continue;
                 };
 
-                let Ok(tx) = arbiter
-                    .arbitrate(attestation.uid, decision_value)
-                    .send()
-                    .await
-                else {
-                    continue;
-                };
+                let nonce_result = wallet_provider.get_transaction_count(signer_address).await;
+                let _nonce = match nonce_result {
+                    Ok(nonce) => match arbiter
+                        .arbitrate(attestation.uid, decision_value)
+                        .nonce(nonce)
+                        .send()
+                        .await
+                    {
+                        Ok(tx) => {
+                            let Ok(receipt) = tx.get_receipt().await else {
+                                continue;
+                            };
 
-                let Ok(receipt) = tx.get_receipt().await else {
-                    continue;
-                };
+                            let decision = Decision {
+                                attestation,
+                                statement,
+                                demand: None,
+                                decision: decision_value,
+                                receipt,
+                            };
 
-                let decision = Decision {
-                    attestation,
-                    statement,
-                    demand: None,
-                    decision: decision_value,
-                    receipt,
+                            tokio::spawn(on_after_arbitrate(&decision));
+                        }
+                        Err(err) => {
+                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                        }
+                    },
+                    Err(err) => {
+                        println!(
+                            "❌ Failed to get transaction count for {}: {}",
+                            signer_address, err
+                        );
+                        continue;
+                    }
                 };
-
-                tokio::spawn(on_after_arbitrate(&decision));
             }
         });
     }
@@ -479,7 +494,7 @@ impl OracleClient {
         let wallet_provider = self.wallet_provider.clone();
         let eas_address = self.addresses.eas;
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
-
+        let signer_address = self._signer.address();
         tokio::spawn(async move {
             let eas = IEAS::new(eas_address, &wallet_provider);
             let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
@@ -521,28 +536,45 @@ impl OracleClient {
                     continue;
                 };
 
-                if let Some(decision_value) = arbitrate(&statement).await {
-                    let Ok(tx) = arbiter
+                let Some(decision_value) = arbitrate(&statement).await else {
+                    continue;
+                };
+
+                let nonce_result = wallet_provider.get_transaction_count(signer_address).await;
+                let _nonce = match nonce_result {
+                    Ok(nonce) => match arbiter
                         .arbitrate(attestation.uid, decision_value)
+                        .nonce(nonce)
                         .send()
                         .await
-                    else {
-                        continue;
-                    };
-                    let Ok(receipt) = tx.get_receipt().await else {
-                        continue;
-                    };
+                    {
+                        Ok(tx) => {
+                            let Ok(receipt) = tx.get_receipt().await else {
+                                continue;
+                            };
 
-                    let decision = Decision {
-                        attestation,
-                        statement,
-                        demand: None,
-                        decision: decision_value,
-                        receipt,
-                    };
+                            let decision = Decision {
+                                attestation,
+                                statement,
+                                demand: None,
+                                decision: decision_value,
+                                receipt,
+                            };
 
-                    tokio::spawn(on_after_arbitrate(&decision));
-                }
+                            tokio::spawn(on_after_arbitrate(&decision));
+                        }
+                        Err(err) => {
+                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                        }
+                    },
+                    Err(err) => {
+                        println!(
+                            "❌ Failed to get transaction count for {}: {}",
+                            signer_address, err
+                        );
+                        continue;
+                    }
+                };
             }
         });
     }
@@ -1171,6 +1203,7 @@ impl OracleClient {
             let mut stream = sub.into_stream();
             let eas_address = eas_address.clone();
             let wallet_provider_fulfillment = Arc::new(wallet_provider.clone());
+            let signer_address = self._signer.address();
 
             tokio::spawn(async move {
                 let eas = IEAS::new(eas_address, &*wallet_provider_fulfillment);
@@ -1198,23 +1231,45 @@ impl OracleClient {
 
                             if let Ok(statement) = StatementData::abi_decode(&attestation.data) {
                                 if let Some(decision_value) = arbitrate(&statement, &demand) {
-                                    if let Ok(tx) = arbiter
-                                        .arbitrate(attestation.uid, decision_value)
-                                        .send()
-                                        .await
-                                    {
-                                        if let Ok(receipt) = tx.get_receipt().await {
-                                            let decision = Decision {
-                                                attestation,
-                                                statement,
-                                                demand: Some(demand.clone()),
-                                                decision: decision_value,
-                                                receipt,
-                                            };
+                                    let nonce_result =
+                                        wallet_provider.get_transaction_count(signer_address).await;
+                                    let _nonce = match nonce_result {
+                                        Ok(nonce) => match arbiter
+                                            .arbitrate(attestation.uid, decision_value)
+                                            .nonce(nonce)
+                                            .send()
+                                            .await
+                                        {
+                                            Ok(tx) => {
+                                                let Ok(receipt) = tx.get_receipt().await else {
+                                                    continue;
+                                                };
 
-                                            tokio::spawn(on_after_arbitrate(&decision));
+                                                let decision = Decision {
+                                                    attestation,
+                                                    statement,
+                                                    demand: None,
+                                                    decision: decision_value,
+                                                    receipt,
+                                                };
+
+                                                tokio::spawn(on_after_arbitrate(&decision));
+                                            }
+                                            Err(err) => {
+                                                println!(
+                                                    "❌ Arbitration failed for {}: {}",
+                                                    attestation.uid, err
+                                                );
+                                            }
+                                        },
+                                        Err(err) => {
+                                            println!(
+                                                "❌ Failed to get transaction count for {}: {}",
+                                                signer_address, err
+                                            );
+                                            continue;
                                         }
-                                    }
+                                    };
                                 }
                             }
                         }
@@ -1287,6 +1342,7 @@ impl OracleClient {
             let mut stream = sub.into_stream();
             let eas_address = eas_address.clone();
             let wallet_provider = wallet_provider.clone();
+            let signer_address = self._signer.address();
 
             tokio::spawn(async move {
                 let eas = IEAS::new(eas_address, &wallet_provider);
@@ -1325,6 +1381,7 @@ impl OracleClient {
             let mut stream = sub.into_stream();
             let eas_address = eas_address.clone();
             let wallet_provider_fulfillment = Arc::new(wallet_provider.clone());
+            let signer_address = self._signer.address();
 
             tokio::spawn(async move {
                 let eas = IEAS::new(eas_address, &*wallet_provider_fulfillment);
@@ -1352,23 +1409,45 @@ impl OracleClient {
 
                             if let Ok(statement) = StatementData::abi_decode(&attestation.data) {
                                 if let Some(decision_value) = arbitrate(&statement, &demand).await {
-                                    if let Ok(tx) = arbiter
-                                        .arbitrate(attestation.uid, decision_value)
-                                        .send()
-                                        .await
-                                    {
-                                        if let Ok(receipt) = tx.get_receipt().await {
-                                            let decision = Decision {
-                                                attestation,
-                                                statement,
-                                                demand: Some(demand.clone()),
-                                                decision: decision_value,
-                                                receipt,
-                                            };
+                                    let nonce_result =
+                                        wallet_provider.get_transaction_count(signer_address).await;
+                                    let _nonce = match nonce_result {
+                                        Ok(nonce) => match arbiter
+                                            .arbitrate(attestation.uid, decision_value)
+                                            .nonce(nonce)
+                                            .send()
+                                            .await
+                                        {
+                                            Ok(tx) => {
+                                                let Ok(receipt) = tx.get_receipt().await else {
+                                                    continue;
+                                                };
 
-                                            tokio::spawn(on_after_arbitrate(&decision));
+                                                let decision = Decision {
+                                                    attestation,
+                                                    statement,
+                                                    demand: None,
+                                                    decision: decision_value,
+                                                    receipt,
+                                                };
+
+                                                tokio::spawn(on_after_arbitrate(&decision));
+                                            }
+                                            Err(err) => {
+                                                println!(
+                                                    "❌ Arbitration failed for {}: {}",
+                                                    attestation.uid, err
+                                                );
+                                            }
+                                        },
+                                        Err(err) => {
+                                            println!(
+                                                "❌ Failed to get transaction count for {}: {}",
+                                                signer_address, err
+                                            );
+                                            continue;
                                         }
-                                    }
+                                    };
                                 }
                             }
                         }
