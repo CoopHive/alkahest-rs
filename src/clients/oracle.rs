@@ -1092,10 +1092,6 @@ impl OracleClient {
                 let nonce = base_nonce + i as u64;
                 if let Some(decision) = decision {
                     Some(async move {
-                        println!(
-                            "Arbitrating attestation {} with decision {} at nonce {}",
-                            attestation.uid, decision, nonce
-                        );
                         trusted_oracle_arbiter
                             .arbitrate(attestation.uid, *decision)
                             .nonce(nonce)
@@ -1285,10 +1281,6 @@ impl OracleClient {
                 let nonce = base_nonce + i as u64;
                 if let Some(decision) = decision {
                     Some(async move {
-                        println!(
-                            "Arbitrating attestation {} with decision {} at nonce {}",
-                            attestation.uid, decision, nonce
-                        );
                         trusted_oracle_arbiter
                             .arbitrate(attestation.uid, *decision)
                             .nonce(nonce)
