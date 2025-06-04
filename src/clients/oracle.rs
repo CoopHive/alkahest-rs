@@ -374,210 +374,6 @@ impl OracleClient {
         Ok(result)
     }
 
-    async fn spawn_fulfillment_listener<
-        StatementData: SolType + Clone + Send + 'static,
-        Arbitrate: Fn(&StatementData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
-        OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
-    >(
-        &self,
-        stream: SubscriptionStream<Log>,
-        fulfillment: FulfillmentParams<StatementData>,
-        arbitrate: Arbitrate,
-        on_after_arbitrate: OnAfterArbitrate,
-    ) where
-        <StatementData as SolType>::RustType: Send,
-    {
-        let wallet_provider = self.wallet_provider.clone();
-        let eas_address = self.addresses.eas;
-        let arbiter_address = self.addresses.trusted_oracle_arbiter;
-        let signer_address = self._signer.address();
-        tokio::spawn(async move {
-            let eas = IEAS::new(eas_address, &wallet_provider);
-            let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
-            let mut stream = stream;
-
-            while let Some(log) = stream.next().await {
-                let Ok(log) = log.log_decode::<IEAS::Attested>() else {
-                    continue;
-                };
-
-                let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
-                    continue;
-                };
-
-                match &fulfillment.filter.ref_uid {
-                    Some(ValueOrArray::Value(ref_uid)) if attestation.refUID != *ref_uid => {
-                        continue;
-                    }
-                    Some(ValueOrArray::Array(ref_uids))
-                        if !ref_uids.contains(&attestation.refUID) =>
-                    {
-                        continue;
-                    }
-                    _ => {}
-                }
-
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
-
-                if (attestation.expirationTime != 0 && attestation.expirationTime < now)
-                    || (attestation.revocationTime != 0 && attestation.revocationTime < now)
-                {
-                    continue;
-                }
-
-                let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
-                    continue;
-                };
-
-                let Some(decision_value) = arbitrate(&statement) else {
-                    continue;
-                };
-
-                let nonce_result = wallet_provider.get_transaction_count(signer_address).await;
-                let _nonce = match nonce_result {
-                    Ok(nonce) => match arbiter
-                        .arbitrate(attestation.uid, decision_value)
-                        .nonce(nonce)
-                        .send()
-                        .await
-                    {
-                        Ok(tx) => {
-                            let Ok(receipt) = tx.get_receipt().await else {
-                                continue;
-                            };
-
-                            let decision = Decision {
-                                attestation,
-                                statement,
-                                demand: None,
-                                decision: decision_value,
-                                receipt,
-                            };
-
-                            tokio::spawn(on_after_arbitrate(&decision));
-                        }
-                        Err(err) => {
-                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
-                        }
-                    },
-                    Err(err) => {
-                        println!(
-                            "❌ Failed to get transaction count for {}: {}",
-                            signer_address, err
-                        );
-                        continue;
-                    }
-                };
-            }
-        });
-    }
-
-    pub async fn spawn_fulfillment_listener_async<
-        StatementData: SolType + Clone + Send + 'static,
-        ArbitrateFut: Future<Output = Option<bool>> + Send,
-        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy + Send + Sync + 'static,
-        OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
-    >(
-        &self,
-        stream: SubscriptionStream<Log>,
-        fulfillment: FulfillmentParams<StatementData>,
-        arbitrate: Arbitrate,
-        on_after_arbitrate: OnAfterArbitrate,
-    ) where
-        <StatementData as SolType>::RustType: Send,
-    {
-        let wallet_provider = self.wallet_provider.clone();
-        let eas_address = self.addresses.eas;
-        let arbiter_address = self.addresses.trusted_oracle_arbiter;
-        let signer_address = self._signer.address();
-        tokio::spawn(async move {
-            let eas = IEAS::new(eas_address, &wallet_provider);
-            let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
-            let mut stream = stream;
-
-            while let Some(log) = stream.next().await {
-                let Ok(log) = log.log_decode::<IEAS::Attested>() else {
-                    continue;
-                };
-
-                let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
-                    continue;
-                };
-
-                match &fulfillment.filter.ref_uid {
-                    Some(ValueOrArray::Value(ref_uid)) if attestation.refUID != *ref_uid => {
-                        continue;
-                    }
-                    Some(ValueOrArray::Array(ref_uids))
-                        if !ref_uids.contains(&attestation.refUID) =>
-                    {
-                        continue;
-                    }
-                    _ => {}
-                }
-
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
-
-                if (attestation.expirationTime != 0 && attestation.expirationTime < now)
-                    || (attestation.revocationTime != 0 && attestation.revocationTime < now)
-                {
-                    continue;
-                }
-
-                let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
-                    continue;
-                };
-
-                let Some(decision_value) = arbitrate(&statement).await else {
-                    continue;
-                };
-
-                let nonce_result = wallet_provider.get_transaction_count(signer_address).await;
-                let _nonce = match nonce_result {
-                    Ok(nonce) => match arbiter
-                        .arbitrate(attestation.uid, decision_value)
-                        .nonce(nonce)
-                        .send()
-                        .await
-                    {
-                        Ok(tx) => {
-                            let Ok(receipt) = tx.get_receipt().await else {
-                                continue;
-                            };
-
-                            let decision = Decision {
-                                attestation,
-                                statement,
-                                demand: None,
-                                decision: decision_value,
-                                receipt,
-                            };
-
-                            tokio::spawn(on_after_arbitrate(&decision));
-                        }
-                        Err(err) => {
-                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
-                        }
-                    },
-                    Err(err) => {
-                        println!(
-                            "❌ Failed to get transaction count for {}: {}",
-                            signer_address, err
-                        );
-                        continue;
-                    }
-                };
-            }
-        });
-    }
     pub async fn arbitrate_past_async<
         StatementData: SolType,
         ArbitrateFut: Future<Output = Option<bool>>,
@@ -634,6 +430,192 @@ impl OracleClient {
             .collect::<Vec<Decision<StatementData, ()>>>();
 
         Ok(result)
+    }
+
+    async fn spawn_fulfillment_listener<
+        StatementData: SolType + Clone + Send + 'static,
+        Arbitrate: Fn(&StatementData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
+        OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
+    >(
+        &self,
+        stream: SubscriptionStream<Log>,
+        fulfillment: FulfillmentParams<StatementData>,
+        arbitrate: Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
+    ) where
+        <StatementData as SolType>::RustType: Send,
+    {
+        let wallet_provider = self.wallet_provider.clone();
+        let eas_address = self.addresses.eas;
+        let arbiter_address = self.addresses.trusted_oracle_arbiter;
+        let signer_address = self._signer.address();
+        tokio::spawn(async move {
+            let eas = IEAS::new(eas_address, &wallet_provider);
+            let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
+            let mut stream = stream;
+
+            while let Some(log) = stream.next().await {
+                let Ok(log) = log.log_decode::<IEAS::Attested>() else {
+                    continue;
+                };
+
+                let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
+                    continue;
+                };
+
+                match &fulfillment.filter.ref_uid {
+                    Some(ValueOrArray::Value(ref_uid)) if attestation.refUID != *ref_uid => {
+                        continue;
+                    }
+                    Some(ValueOrArray::Array(ref_uids))
+                        if !ref_uids.contains(&attestation.refUID) =>
+                    {
+                        continue;
+                    }
+                    _ => {}
+                }
+
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                if (attestation.expirationTime != 0 && attestation.expirationTime < now)
+                    || (attestation.revocationTime != 0 && attestation.revocationTime < now)
+                {
+                    continue;
+                }
+
+                let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
+                    continue;
+                };
+
+                let Some(decision_value) = arbitrate(&statement) else {
+                    continue;
+                };
+
+                let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await else {
+                    continue;
+                };
+
+                match arbiter
+                    .arbitrate(attestation.uid, decision_value)
+                    .nonce(nonce)
+                    .send()
+                    .await
+                {
+                    Ok(tx) => {
+                        if let Ok(receipt) = tx.get_receipt().await {
+                            let decision = Decision {
+                                attestation,
+                                statement,
+                                demand: None,
+                                decision: decision_value,
+                                receipt,
+                            };
+                            tokio::spawn(on_after_arbitrate(&decision));
+                        }
+                    }
+                    Err(err) => {
+                        println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                    }
+                }
+            }
+        });
+    }
+
+    pub async fn spawn_fulfillment_listener_async<
+        StatementData: SolType + Clone + Send + 'static,
+        ArbitrateFut: Future<Output = Option<bool>> + Send,
+        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy + Send + Sync + 'static,
+        OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
+    >(
+        &self,
+        stream: SubscriptionStream<Log>,
+        fulfillment: FulfillmentParams<StatementData>,
+        arbitrate: Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
+    ) where
+        <StatementData as SolType>::RustType: Send,
+    {
+        let wallet_provider = self.wallet_provider.clone();
+        let eas_address = self.addresses.eas;
+        let arbiter_address = self.addresses.trusted_oracle_arbiter;
+        let signer_address = self._signer.address();
+
+        tokio::spawn(async move {
+            let eas = IEAS::new(eas_address, &wallet_provider);
+            let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
+            let mut stream = stream;
+
+            while let Some(log) = stream.next().await {
+                let Ok(log) = log.log_decode::<IEAS::Attested>() else {
+                    continue;
+                };
+
+                let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
+                    continue;
+                };
+
+                match &fulfillment.filter.ref_uid {
+                    Some(ValueOrArray::Value(ref_uid)) if attestation.refUID != *ref_uid => {
+                        continue;
+                    }
+                    Some(ValueOrArray::Array(ref_uids))
+                        if !ref_uids.contains(&attestation.refUID) =>
+                    {
+                        continue;
+                    }
+                    _ => {}
+                }
+
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                if (attestation.expirationTime != 0 && attestation.expirationTime < now)
+                    || (attestation.revocationTime != 0 && attestation.revocationTime < now)
+                {
+                    continue;
+                }
+
+                let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
+                    continue;
+                };
+
+                let Some(decision_value) = arbitrate(&statement).await else {
+                    continue;
+                };
+
+                let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await else {
+                    continue;
+                };
+
+                match arbiter
+                    .arbitrate(attestation.uid, decision_value)
+                    .nonce(nonce)
+                    .send()
+                    .await
+                {
+                    Ok(tx) => {
+                        if let Ok(receipt) = tx.get_receipt().await {
+                            let decision = Decision {
+                                attestation,
+                                statement,
+                                demand: None,
+                                decision: decision_value,
+                                receipt,
+                            };
+                            tokio::spawn(on_after_arbitrate(&decision));
+                        }
+                    }
+                    Err(err) => {
+                        println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                    }
+                }
+            }
+        });
     }
 
     pub async fn listen_and_arbitrate<
@@ -1202,76 +1184,71 @@ impl OracleClient {
 
             let mut stream = sub.into_stream();
             let eas_address = eas_address.clone();
-            let wallet_provider_fulfillment = Arc::new(wallet_provider.clone());
+            let wallet_provider = Arc::new(wallet_provider.clone());
             let signer_address = self._signer.address();
 
             tokio::spawn(async move {
-                let eas = IEAS::new(eas_address, &*wallet_provider_fulfillment);
-                let arbiter =
-                    TrustedOracleArbiter::new(arbiter_address, &*wallet_provider_fulfillment);
+                let eas = IEAS::new(eas_address, &*wallet_provider);
+                let arbiter = TrustedOracleArbiter::new(arbiter_address, &*wallet_provider);
+
                 while let Some(log) = stream.next().await {
-                    if let Ok(log) = log.log_decode::<IEAS::Attested>() {
-                        if let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await {
-                            let now = SystemTime::now()
-                                .duration_since(UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs();
-                            if attestation.expirationTime != 0 && attestation.expirationTime < now {
-                                continue;
+                    let Ok(log) = log.log_decode::<IEAS::Attested>() else {
+                        continue;
+                    };
+                    let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
+                        continue;
+                    };
+
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
+                    if (attestation.expirationTime != 0 && attestation.expirationTime < now)
+                        || (attestation.revocationTime != 0 && attestation.revocationTime < now)
+                    {
+                        continue;
+                    }
+
+                    let Some(demand) = demands_map.read().await.get(&attestation.refUID).cloned()
+                    else {
+                        continue;
+                    };
+
+                    let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
+                        continue;
+                    };
+
+                    let Some(decision_value) = arbitrate(&statement, &demand) else {
+                        continue;
+                    };
+
+                    let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await
+                    else {
+                        println!("❌ Failed to get transaction count for {}", signer_address);
+                        continue;
+                    };
+
+                    match arbiter
+                        .arbitrate(attestation.uid, decision_value)
+                        .nonce(nonce)
+                        .send()
+                        .await
+                    {
+                        Ok(tx) => match tx.get_receipt().await {
+                            Ok(receipt) => {
+                                let decision = Decision {
+                                    attestation,
+                                    statement,
+                                    demand: None,
+                                    decision: decision_value,
+                                    receipt,
+                                };
+                                tokio::spawn(on_after_arbitrate(&decision));
                             }
-                            if attestation.revocationTime != 0 && attestation.revocationTime < now {
-                                continue;
-                            }
-
-                            let Some(demand) =
-                                demands_map.read().await.get(&attestation.refUID).cloned()
-                            else {
-                                continue;
-                            };
-
-                            if let Ok(statement) = StatementData::abi_decode(&attestation.data) {
-                                if let Some(decision_value) = arbitrate(&statement, &demand) {
-                                    let nonce_result =
-                                        wallet_provider.get_transaction_count(signer_address).await;
-                                    let _nonce = match nonce_result {
-                                        Ok(nonce) => match arbiter
-                                            .arbitrate(attestation.uid, decision_value)
-                                            .nonce(nonce)
-                                            .send()
-                                            .await
-                                        {
-                                            Ok(tx) => {
-                                                let Ok(receipt) = tx.get_receipt().await else {
-                                                    continue;
-                                                };
-
-                                                let decision = Decision {
-                                                    attestation,
-                                                    statement,
-                                                    demand: None,
-                                                    decision: decision_value,
-                                                    receipt,
-                                                };
-
-                                                tokio::spawn(on_after_arbitrate(&decision));
-                                            }
-                                            Err(err) => {
-                                                println!(
-                                                    "❌ Arbitration failed for {}: {}",
-                                                    attestation.uid, err
-                                                );
-                                            }
-                                        },
-                                        Err(err) => {
-                                            println!(
-                                                "❌ Failed to get transaction count for {}: {}",
-                                                signer_address, err
-                                            );
-                                            continue;
-                                        }
-                                    };
-                                }
-                            }
+                            Err(_) => continue,
+                        },
+                        Err(err) => {
+                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
                         }
                     }
                 }
@@ -1342,7 +1319,6 @@ impl OracleClient {
             let mut stream = sub.into_stream();
             let eas_address = eas_address.clone();
             let wallet_provider = wallet_provider.clone();
-            let signer_address = self._signer.address();
 
             tokio::spawn(async move {
                 let eas = IEAS::new(eas_address, &wallet_provider);
@@ -1380,76 +1356,71 @@ impl OracleClient {
 
             let mut stream = sub.into_stream();
             let eas_address = eas_address.clone();
-            let wallet_provider_fulfillment = Arc::new(wallet_provider.clone());
+            let wallet_provider = Arc::new(wallet_provider.clone());
             let signer_address = self._signer.address();
 
             tokio::spawn(async move {
-                let eas = IEAS::new(eas_address, &*wallet_provider_fulfillment);
-                let arbiter =
-                    TrustedOracleArbiter::new(arbiter_address, &*wallet_provider_fulfillment);
+                let eas = IEAS::new(eas_address, &*wallet_provider);
+                let arbiter = TrustedOracleArbiter::new(arbiter_address, &*wallet_provider);
+
                 while let Some(log) = stream.next().await {
-                    if let Ok(log) = log.log_decode::<IEAS::Attested>() {
-                        if let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await {
-                            let now = SystemTime::now()
-                                .duration_since(UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs();
-                            if attestation.expirationTime != 0 && attestation.expirationTime < now {
-                                continue;
+                    let Ok(log) = log.log_decode::<IEAS::Attested>() else {
+                        continue;
+                    };
+                    let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
+                        continue;
+                    };
+
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
+                    if (attestation.expirationTime != 0 && attestation.expirationTime < now)
+                        || (attestation.revocationTime != 0 && attestation.revocationTime < now)
+                    {
+                        continue;
+                    }
+
+                    let Some(demand) = demands_map.read().await.get(&attestation.refUID).cloned()
+                    else {
+                        continue;
+                    };
+
+                    let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
+                        continue;
+                    };
+
+                    let Some(decision_value) = arbitrate(&statement, &demand).await else {
+                        continue;
+                    };
+
+                    let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await
+                    else {
+                        println!("❌ Failed to get transaction count for {}", signer_address);
+                        continue;
+                    };
+
+                    match arbiter
+                        .arbitrate(attestation.uid, decision_value)
+                        .nonce(nonce)
+                        .send()
+                        .await
+                    {
+                        Ok(tx) => match tx.get_receipt().await {
+                            Ok(receipt) => {
+                                let decision = Decision {
+                                    attestation,
+                                    statement,
+                                    demand: None,
+                                    decision: decision_value,
+                                    receipt,
+                                };
+                                tokio::spawn(on_after_arbitrate(&decision));
                             }
-                            if attestation.revocationTime != 0 && attestation.revocationTime < now {
-                                continue;
-                            }
-
-                            let Some(demand) =
-                                demands_map.read().await.get(&attestation.refUID).cloned()
-                            else {
-                                continue;
-                            };
-
-                            if let Ok(statement) = StatementData::abi_decode(&attestation.data) {
-                                if let Some(decision_value) = arbitrate(&statement, &demand).await {
-                                    let nonce_result =
-                                        wallet_provider.get_transaction_count(signer_address).await;
-                                    let _nonce = match nonce_result {
-                                        Ok(nonce) => match arbiter
-                                            .arbitrate(attestation.uid, decision_value)
-                                            .nonce(nonce)
-                                            .send()
-                                            .await
-                                        {
-                                            Ok(tx) => {
-                                                let Ok(receipt) = tx.get_receipt().await else {
-                                                    continue;
-                                                };
-
-                                                let decision = Decision {
-                                                    attestation,
-                                                    statement,
-                                                    demand: None,
-                                                    decision: decision_value,
-                                                    receipt,
-                                                };
-
-                                                tokio::spawn(on_after_arbitrate(&decision));
-                                            }
-                                            Err(err) => {
-                                                println!(
-                                                    "❌ Arbitration failed for {}: {}",
-                                                    attestation.uid, err
-                                                );
-                                            }
-                                        },
-                                        Err(err) => {
-                                            println!(
-                                                "❌ Failed to get transaction count for {}: {}",
-                                                signer_address, err
-                                            );
-                                            continue;
-                                        }
-                                    };
-                                }
-                            }
+                            Err(_) => continue,
+                        },
+                        Err(err) => {
+                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
                         }
                     }
                 }
