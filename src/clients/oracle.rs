@@ -267,8 +267,10 @@ impl OracleClient {
     async fn get_attestations_and_statements<StatementData: SolType>(
         &self,
         fulfillment: &FulfillmentParams<StatementData>,
+        require_oracle: Option<bool>,
     ) -> eyre::Result<(Vec<Attestation>, Vec<StatementData::RustType>)> {
         let filter = self.make_filter(&fulfillment.filter);
+
         let logs = self
             .public_provider
             .get_logs(&filter)
@@ -277,38 +279,51 @@ impl OracleClient {
             .map(|log| log.log_decode::<IEAS::Attested>())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let attestation_futs = logs.into_iter().map(|log| {
+        let attestation_futures = logs.into_iter().map(|log| {
             let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
             async move { eas.getAttestation(log.inner.uid).call().await }
         });
-
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        let attestations: Vec<Attestation> = try_join_all(attestation_futs)
+
+        let attestations: Vec<Attestation> = try_join_all(attestation_futures)
             .await?
             .into_iter()
             .filter(|a| {
-                if let Some(ValueOrArray::Value(ref_uid)) = &fulfillment.filter.ref_uid {
-                    if a.refUID != *ref_uid {
+                match &fulfillment.filter.ref_uid {
+                    Some(ValueOrArray::Value(ref_uid)) if a.refUID != *ref_uid => return false,
+                    Some(ValueOrArray::Array(ref_uids)) if !ref_uids.contains(&a.refUID) => {
                         return false;
-                    };
+                    }
+                    _ => {}
                 }
-                if let Some(ValueOrArray::Array(ref_uids)) = &fulfillment.filter.ref_uid {
-                    if ref_uids.contains(&a.refUID) {
-                        return false;
-                    };
-                }
-
-                if a.expirationTime != 0 && a.expirationTime < now {
+                if (a.expirationTime != 0 && a.expirationTime < now)
+                    || (a.revocationTime != 0 && a.revocationTime < now)
+                {
                     return false;
                 }
-
-                if a.revocationTime != 0 && a.revocationTime < now {
-                    return false;
-                }
-
-                return true;
+                true
             })
-            .collect::<Vec<_>>();
+            .collect();
+
+        let attestations = if require_oracle.unwrap_or(false) {
+            let oracle_addr = self.addresses.trusted_oracle_arbiter;
+            let futs = attestations.into_iter().map(|a| {
+                let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
+                async move {
+                    let escrow_att = eas.getAttestation(a.refUID).call().await?;
+                    let demand = ArbiterDemand::abi_decode(&escrow_att.data)?;
+                    Ok::<_, eyre::Error>((a, demand.oracle == oracle_addr))
+                }
+            });
+
+            try_join_all(futs)
+                .await?
+                .into_iter()
+                .filter_map(|(a, is_match)| if is_match { Some(a) } else { None })
+                .collect()
+        } else {
+            attestations
+        };
 
         let statements = attestations
             .iter()
@@ -325,8 +340,11 @@ impl OracleClient {
         &self,
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
+        require_oracle: Option<bool>,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
-        let (attestations, statements) = self.get_attestations_and_statements(fulfillment).await?;
+        let (attestations, statements) = self
+            .get_attestations_and_statements(fulfillment, require_oracle)
+            .await?;
 
         let decisions = statements.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
 
@@ -382,8 +400,11 @@ impl OracleClient {
         &self,
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
+        require_oracle: Option<bool>,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
-        let (attestations, statements) = self.get_attestations_and_statements(fulfillment).await?;
+        let (attestations, statements) = self
+            .get_attestations_and_statements(fulfillment, require_oracle)
+            .await?;
 
         let decision_futs = statements.iter().map(|s| async move { arbitrate(s).await });
         let decisions = join_all(decision_futs).await;
@@ -443,6 +464,7 @@ impl OracleClient {
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        require_oracle: Option<bool>,
     ) where
         <StatementData as SolType>::RustType: Send,
     {
@@ -463,6 +485,22 @@ impl OracleClient {
                 let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
                     continue;
                 };
+
+                if require_oracle.unwrap_or(false) {
+                    let escrow_att = match eas.getAttestation(attestation.refUID).call().await {
+                        Ok(a) => a,
+                        Err(_) => continue,
+                    };
+
+                    let demand = match ArbiterDemand::abi_decode(&escrow_att.data) {
+                        Ok(d) => d,
+                        Err(_) => continue,
+                    };
+
+                    if demand.oracle != arbiter_address {
+                        continue;
+                    }
+                }
 
                 match &fulfillment.filter.ref_uid {
                     Some(ValueOrArray::Value(ref_uid)) if attestation.refUID != *ref_uid => {
@@ -536,6 +574,7 @@ impl OracleClient {
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        require_oracle: Option<bool>,
     ) where
         <StatementData as SolType>::RustType: Send,
     {
@@ -557,6 +596,22 @@ impl OracleClient {
                 let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
                     continue;
                 };
+
+                if require_oracle.unwrap_or(false) {
+                    let escrow_att = match eas.getAttestation(attestation.refUID).call().await {
+                        Ok(a) => a,
+                        Err(_) => continue,
+                    };
+
+                    let demand = match ArbiterDemand::abi_decode(&escrow_att.data) {
+                        Ok(d) => d,
+                        Err(_) => continue,
+                    };
+
+                    if demand.oracle != arbiter_address {
+                        continue;
+                    }
+                }
 
                 match &fulfillment.filter.ref_uid {
                     Some(ValueOrArray::Value(ref_uid)) if attestation.refUID != *ref_uid => {
@@ -628,19 +683,28 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        require_oracle: Option<bool>,
     ) -> eyre::Result<ListenAndArbitrateResult<StatementData>>
     where
         <StatementData as SolType>::RustType: Send,
     {
-        let decisions = self.arbitrate_past(&fulfillment, arbitrate).await?;
+        let decisions = self
+            .arbitrate_past(&fulfillment, arbitrate, require_oracle)
+            .await?;
         let filter = self.make_filter(&fulfillment.filter);
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
         let stream: SubscriptionStream<Log> = sub.into_stream();
 
-        self.spawn_fulfillment_listener(stream, fulfillment.clone(), arbitrate, on_after_arbitrate)
-            .await;
+        self.spawn_fulfillment_listener(
+            stream,
+            fulfillment.clone(),
+            arbitrate,
+            on_after_arbitrate,
+            require_oracle,
+        )
+        .await;
 
         Ok(ListenAndArbitrateResult {
             decisions,
@@ -659,11 +723,14 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        require_oracle: Option<bool>,
     ) -> eyre::Result<ListenAndArbitrateResult<StatementData>>
     where
         <StatementData as SolType>::RustType: Send,
     {
-        let decisions = self.arbitrate_past_async(&fulfillment, arbitrate).await?;
+        let decisions = self
+            .arbitrate_past_async(&fulfillment, arbitrate, require_oracle)
+            .await?;
         let filter = self.make_filter(&fulfillment.filter);
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
@@ -675,6 +742,7 @@ impl OracleClient {
             fulfillment.clone(),
             arbitrate,
             on_after_arbitrate,
+            require_oracle,
         )
         .await;
 
@@ -694,6 +762,7 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        require_oracle: Option<bool>,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
     where
         <StatementData as SolType>::RustType: Send,
@@ -704,8 +773,14 @@ impl OracleClient {
         let local_id = *sub.local_id();
         let stream = sub.into_stream();
 
-        self.spawn_fulfillment_listener(stream, fulfillment.clone(), arbitrate, on_after_arbitrate)
-            .await;
+        self.spawn_fulfillment_listener(
+            stream,
+            fulfillment.clone(),
+            arbitrate,
+            on_after_arbitrate,
+            require_oracle,
+        )
+        .await;
 
         Ok(ListenAndArbitrateNewFulfillmentsResult {
             subscription_id: local_id,
@@ -723,6 +798,7 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        require_oracle: Option<bool>,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
     where
         <StatementData as SolType>::RustType: Send,
@@ -738,6 +814,7 @@ impl OracleClient {
             fulfillment.clone(),
             arbitrate,
             on_after_arbitrate,
+            require_oracle,
         )
         .await;
 
@@ -812,7 +889,7 @@ impl OracleClient {
                     };
                 }
                 if let Some(ValueOrArray::Array(ref_uids)) = &escrow.filter.ref_uid {
-                    if ref_uids.contains(&a.refUID) {
+                    if !ref_uids.contains(&a.refUID) {
                         return false;
                     };
                 }
@@ -984,7 +1061,7 @@ impl OracleClient {
                     };
                 }
                 if let Some(ValueOrArray::Array(ref_uids)) = &escrow.filter.ref_uid {
-                    if ref_uids.contains(&a.refUID) {
+                    if !ref_uids.contains(&a.refUID) {
                         return false;
                     };
                 }

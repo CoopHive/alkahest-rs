@@ -190,7 +190,7 @@ mod tests {
         let decisions = test
             .bob_client
             .oracle
-            .arbitrate_past(&fulfillment, |s| Some(s.item == "good"))
+            .arbitrate_past(&fulfillment, |s| Some(s.item == "good"), Some(true))
             .await?;
 
         assert_eq!(decisions.len(), 1);
@@ -221,7 +221,7 @@ mod tests {
         let decisions = test
             .bob_client
             .oracle
-            .arbitrate_past(&fulfillment, |s| Some(s.item == "good"))
+            .arbitrate_past(&fulfillment, |s| Some(s.item == "good"), Some(true))
             .await?;
 
         for decision in &decisions {
@@ -278,6 +278,7 @@ mod tests {
                         assert!(decision_value);
                     }
                 },
+                Some(true),
             )
             .await?;
 
@@ -327,6 +328,7 @@ mod tests {
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
                     }
                 },
+                Some(true),
             )
             .await?;
 
@@ -395,6 +397,7 @@ mod tests {
                         );
                     }
                 },
+                Some(true),
             )
             .await?;
 
@@ -459,6 +462,7 @@ mod tests {
                         assert!(decision_value);
                     }
                 },
+                Some(true),
             )
             .await?;
 
@@ -514,6 +518,7 @@ mod tests {
                         );
                     }
                 },
+                Some(true),
             )
             .await?;
 
@@ -581,6 +586,7 @@ mod tests {
                         );
                     }
                 },
+                Some(true),
             )
             .await?;
 
