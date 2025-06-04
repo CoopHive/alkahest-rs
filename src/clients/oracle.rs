@@ -241,11 +241,6 @@ impl OracleClient {
         attestations: Vec<Attestation>,
         skip_arbitrated: bool,
     ) -> eyre::Result<Vec<Attestation>> {
-        println!(
-            "Filtering {} attestations for arbitration",
-            attestations.len()
-        );
-        println!("Skip arbitrated: {}", skip_arbitrated);
         if !skip_arbitrated {
             return Ok(attestations);
         }
@@ -258,11 +253,6 @@ impl OracleClient {
             );
             async move {
                 let logs = self.public_provider.get_logs(&filter).await?;
-                println!(
-                    "Found {} arbitration logs for attestation {}",
-                    logs.len(),
-                    a.uid
-                );
                 Ok::<_, eyre::Error>((a, !logs.is_empty()))
             }
         });
@@ -426,10 +416,6 @@ impl OracleClient {
                 let nonce = base_nonce + i as u64;
                 if let Some(decision) = decision {
                     Some(async move {
-                        println!(
-                            "Arbitrating attestation {} with decision {} at nonce {}",
-                            attestation.uid, decision, nonce
-                        );
                         trusted_oracle_arbiter
                             .arbitrate(attestation.uid, *decision)
                             .nonce(nonce)
@@ -498,10 +484,6 @@ impl OracleClient {
                 let nonce = base_nonce + i as u64;
                 if let Some(decision) = decision {
                     Some(async move {
-                        println!(
-                            "Arbitrating attestation {} with decision {} at nonce {}",
-                            attestation.uid, decision, nonce
-                        );
                         trusted_oracle_arbiter
                             .arbitrate(attestation.uid, *decision)
                             .nonce(nonce)
