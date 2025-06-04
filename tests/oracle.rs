@@ -190,7 +190,7 @@ mod tests {
         let decisions = test
             .bob_client
             .oracle
-            .arbitrate_past(&fulfillment, |s| Some(s.item == "good"), Some(true))
+            .arbitrate_past(&fulfillment, |s| Some(s.item == "good"), Some(true), None)
             .await?;
 
         assert_eq!(decisions.len(), 1);
@@ -221,12 +221,148 @@ mod tests {
         let decisions = test
             .bob_client
             .oracle
-            .arbitrate_past(&fulfillment, |s| Some(s.item == "good"), Some(true))
+            .arbitrate_past(&fulfillment, |s| Some(s.item == "good"), None, None)
             .await?;
 
         for decision in &decisions {
             assert_eq!(decision.decision, decision.statement.item == "good");
         }
+
+        let good_collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .await?;
+
+        println!(
+            "✅ Expected good_collection to succeed, got receipt: {:?}",
+            good_collection
+        );
+
+        let bad_collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .await;
+
+        assert!(
+            bad_collection.is_err(),
+            "❌ Expected bad_collection to fail due to failed arbitration, but it succeeded"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_skip_arbitrated_arbitrate_past() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, _, escrow_uid) = setup_escrow(&test).await?;
+
+        let bad_fulfillment_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
+
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
+
+        let decisions = test
+            .bob_client
+            .oracle
+            .arbitrate_past(
+                &fulfillment,
+                |s| {
+                    println!("Arbitrating for item: {}", s.item);
+                    Some(s.item == "good")
+                },
+                Some(true),
+                Some(true),
+            )
+            .await?;
+        assert_eq!(decisions.len(), 1);
+
+        let good_fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+
+        let decisions = test
+            .bob_client
+            .oracle
+            .arbitrate_past(
+                &fulfillment,
+                |s| {
+                    println!("Arbitrating for item: {}", s.item);
+                    Some(s.item == "good")
+                },
+                Some(true),
+                Some(true),
+            )
+            .await?;
+        assert_eq!(decisions.len(), 1);
+
+        let good_collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .await?;
+
+        println!(
+            "✅ Expected good_collection to succeed, got receipt: {:?}",
+            good_collection
+        );
+
+        let bad_collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .await;
+
+        assert!(
+            bad_collection.is_err(),
+            "❌ Expected bad_collection to fail due to failed arbitration, but it succeeded"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_skip_arbitrated_arbitrate_past_async() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, _, escrow_uid) = setup_escrow(&test).await?;
+
+        let bad_fulfillment_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
+
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
+
+        let decisions = test
+            .bob_client
+            .oracle
+            .arbitrate_past_async(
+                &fulfillment,
+                |s| {
+                    println!("Arbitrating for item: {}", s.item);
+                    let result = s.item == "good";
+                    async move { Some(result) }
+                },
+                Some(true),
+                Some(true),
+            )
+            .await?;
+        assert_eq!(decisions.len(), 1);
+
+        let good_fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+
+        let decisions = test
+            .bob_client
+            .oracle
+            .arbitrate_past_async(
+                &fulfillment,
+                |s| {
+                    println!("Arbitrating for item: {}", s.item);
+                    let result = s.item == "good";
+                    async move { Some(result) }
+                },
+                Some(true),
+                Some(true),
+            )
+            .await?;
+        assert_eq!(decisions.len(), 1);
 
         let good_collection = test
             .bob_client
@@ -279,6 +415,7 @@ mod tests {
                     }
                 },
                 Some(true),
+                None,
             )
             .await?;
 
@@ -329,6 +466,7 @@ mod tests {
                     }
                 },
                 Some(true),
+                None,
             )
             .await?;
 
@@ -398,6 +536,7 @@ mod tests {
                     }
                 },
                 Some(true),
+                None,
             )
             .await?;
 
@@ -463,6 +602,7 @@ mod tests {
                     }
                 },
                 Some(true),
+                None,
             )
             .await?;
 
@@ -519,6 +659,7 @@ mod tests {
                     }
                 },
                 Some(true),
+                None,
             )
             .await?;
 
@@ -587,6 +728,7 @@ mod tests {
                     }
                 },
                 Some(true),
+                None,
             )
             .await?;
 
@@ -640,16 +782,21 @@ mod tests {
         let (decisions, _, _) = test
             .bob_client
             .oracle
-            .arbitrate_past_for_escrow(&escrow, &fulfillment, |_statement, _demand| {
-                println!(
-                    "🔍 Checking item: '{}', demand: {:?}",
-                    _statement.item, _demand.oracle
-                );
-                let item = _statement.item.clone();
-                let oracle_addr = _demand.oracle;
-                println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
-                Some(item == "good")
-            })
+            .arbitrate_past_for_escrow(
+                &escrow,
+                &fulfillment,
+                |_statement, _demand| {
+                    println!(
+                        "🔍 Checking item: '{}', demand: {:?}",
+                        _statement.item, _demand.oracle
+                    );
+                    let item = _statement.item.clone();
+                    let oracle_addr = _demand.oracle;
+                    println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
+                    Some(item == "good")
+                },
+                None,
+            )
             .await?;
 
         let collection = test
@@ -682,16 +829,21 @@ mod tests {
         let (decisions, _, _) = test
             .bob_client
             .oracle
-            .arbitrate_past_for_escrow(&escrow, &fulfillment, |_statement, _demand| {
-                println!(
-                    "🔍 Checking item: '{}', demand: {:?}",
-                    _statement.item, _demand.oracle
-                );
-                let item = _statement.item.clone();
-                let oracle_addr = _demand.oracle;
-                println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
-                Some(item == "good")
-            })
+            .arbitrate_past_for_escrow(
+                &escrow,
+                &fulfillment,
+                |_statement, _demand| {
+                    println!(
+                        "🔍 Checking item: '{}', demand: {:?}",
+                        _statement.item, _demand.oracle
+                    );
+                    let item = _statement.item.clone();
+                    let oracle_addr = _demand.oracle;
+                    println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
+                    Some(item == "good")
+                },
+                None,
+            )
             .await?;
 
         let good_collection = test
@@ -718,6 +870,92 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_skip_arbitrated_arbitrate_past_for_escrow() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, item, escrow_uid) = setup_escrow(&test).await?;
+
+        let bad_fulfillment_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
+
+        let filter = make_filter_without_refuid(&test);
+        let fulfillment = make_fulfillment_params_without_refuid(filter);
+
+        let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
+        let escrow = EscrowParams {
+            filter: make_filter_for_escrow(&test, None),
+            demand_abi: demand_data.clone(),
+        };
+        let (decisions, _, _) = test
+            .bob_client
+            .oracle
+            .arbitrate_past_for_escrow(
+                &escrow,
+                &fulfillment,
+                |_statement, _demand| {
+                    println!(
+                        "🔍 Checking item: '{}', demand: {:?}",
+                        _statement.item, _demand.oracle
+                    );
+                    let item = _statement.item.clone();
+                    let oracle_addr = _demand.oracle;
+                    println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
+                    Some(item == "good")
+                },
+                None,
+            )
+            .await?;
+        assert_eq!(decisions.len(), 1);
+
+        let good_fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+
+        let (decisions, _, _) = test
+            .bob_client
+            .oracle
+            .arbitrate_past_for_escrow(
+                &escrow,
+                &fulfillment,
+                |_statement, _demand| {
+                    println!(
+                        "🔍 Checking item: '{}', demand: {:?}",
+                        _statement.item, _demand.oracle
+                    );
+                    let item = _statement.item.clone();
+                    let oracle_addr = _demand.oracle;
+                    println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
+                    Some(item == "good")
+                },
+                Some(true),
+            )
+            .await?;
+
+        assert_eq!(decisions.len(), 1);
+
+        let good_collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .await?;
+
+        println!(
+            "✅ Expected good_collection to succeed, got receipt: {:?}",
+            good_collection
+        );
+
+        let bad_collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .await;
+
+        assert!(
+            bad_collection.is_err(),
+            "❌ Expected bad_collection to fail due to failed arbitration, but it succeeded"
+        );
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_conditional_arbitrate_past_for_escrow_async() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
@@ -737,16 +975,21 @@ mod tests {
         let (decisions, _, _) = test
             .bob_client
             .oracle
-            .arbitrate_past_for_escrow_async(&escrow, &fulfillment, |_statement, _demand| {
-                println!(
-                    "🔍 Checking item: '{}', demand: {:?}",
-                    _statement.item, _demand.oracle
-                );
-                let item = _statement.item.clone();
-                let oracle_addr = _demand.oracle;
-                println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
-                async move { Some(item == "good") }
-            })
+            .arbitrate_past_for_escrow_async(
+                &escrow,
+                &fulfillment,
+                |_statement, _demand| {
+                    println!(
+                        "🔍 Checking item: '{}', demand: {:?}",
+                        _statement.item, _demand.oracle
+                    );
+                    let item = _statement.item.clone();
+                    let oracle_addr = _demand.oracle;
+                    println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
+                    async move { Some(item == "good") }
+                },
+                None,
+            )
             .await?;
 
         let good_collection = test
@@ -773,6 +1016,92 @@ mod tests {
 
         Ok(())
     }
+
+        #[tokio::test]
+    async fn test_skip_arbitrated_arbitrate_past_for_escrow_async() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, item, escrow_uid) = setup_escrow(&test).await?;
+
+        let bad_fulfillment_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
+
+        let filter = make_filter_without_refuid(&test);
+        let fulfillment = make_fulfillment_params_without_refuid(filter);
+
+        let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
+        let escrow = EscrowParams {
+            filter: make_filter_for_escrow(&test, None),
+            demand_abi: demand_data.clone(),
+        };
+        let (decisions, _, _) = test
+            .bob_client
+            .oracle
+            .arbitrate_past_for_escrow_async(
+                &escrow,
+                &fulfillment,
+                 |_statement, _demand| {
+                    println!(
+                        "🔍 Checking item: '{}', demand: {:?}",
+                        _statement.item, _demand.oracle
+                    );
+                    let item = _statement.item.clone();
+                    let oracle_addr = _demand.oracle;
+                    println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
+                    async move { Some(item == "good") }
+                },
+                None,
+            )
+            .await?;
+        assert_eq!(decisions.len(), 1);
+
+        let good_fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+
+        let (decisions, _, _) = test
+            .bob_client
+            .oracle
+            .arbitrate_past_for_escrow_async(
+                &escrow,
+                &fulfillment,
+                 |_statement, _demand| {
+                    println!(
+                        "🔍 Checking item: '{}', demand: {:?}",
+                        _statement.item, _demand.oracle
+                    );
+                    let item = _statement.item.clone();
+                    let oracle_addr = _demand.oracle;
+                    println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
+                    async move { Some(item == "good") }
+                },
+                Some(true),
+            )
+            .await?;
+
+        assert_eq!(decisions.len(), 1);
+
+        let good_collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .await?;
+
+        println!(
+            "✅ Expected good_collection to succeed, got receipt: {:?}",
+            good_collection
+        );
+
+        let bad_collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .await;
+
+        assert!(
+            bad_collection.is_err(),
+            "❌ Expected bad_collection to fail due to failed arbitration, but it succeeded"
+        );
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_trivial_listen_and_arbitrate_for_escrow() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
@@ -810,6 +1139,7 @@ mod tests {
                         assert!(decision_value);
                     }
                 },
+                None,
             )
             .await?;
 
@@ -873,6 +1203,7 @@ mod tests {
                         assert!(decision_value);
                     }
                 },
+                None,
             )
             .await?;
 
@@ -940,6 +1271,7 @@ mod tests {
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
                     }
                 },
+                None,
             )
             .await?;
 
@@ -1031,6 +1363,7 @@ mod tests {
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
                     }
                 },
+                None,
             )
             .await?;
 

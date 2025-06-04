@@ -218,6 +218,62 @@ impl OracleClient {
         filter
     }
 
+    pub fn make_arbitration_filter(
+        address: Address,
+        statement: FixedBytes<32>,
+        oracle: Address,
+    ) -> Filter {
+        let mut filter = Filter::new()
+            .address(address)
+            .event_signature(TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH)
+            .from_block(BlockNumberOrTag::Earliest)
+            .to_block(BlockNumberOrTag::Latest);
+
+        filter = filter.topic1(statement);
+
+        filter = filter.topic2(oracle);
+
+        filter
+    }
+
+    async fn filter_unarbitrated_attestations(
+        &self,
+        attestations: Vec<Attestation>,
+        skip_arbitrated: bool,
+    ) -> eyre::Result<Vec<Attestation>> {
+        println!(
+            "Filtering {} attestations for arbitration",
+            attestations.len()
+        );
+        println!("Skip arbitrated: {}", skip_arbitrated);
+        if !skip_arbitrated {
+            return Ok(attestations);
+        }
+
+        let futs = attestations.into_iter().map(|a| {
+            let filter = Self::make_arbitration_filter(
+                self.addresses.trusted_oracle_arbiter,
+                a.uid,
+                self._signer.address(),
+            );
+            async move {
+                let logs = self.public_provider.get_logs(&filter).await?;
+                println!(
+                    "Found {} arbitration logs for attestation {}",
+                    logs.len(),
+                    a.uid
+                );
+                Ok::<_, eyre::Error>((a, !logs.is_empty()))
+            }
+        });
+
+        let results = try_join_all(futs).await?;
+        Ok(results
+            .into_iter()
+            .filter_map(|(a, is_arbitrated)| if is_arbitrated { None } else { Some(a) })
+            .collect())
+    }
+
     fn make_filter_without_refuid(&self, p: &AttestationFilterWithoutRefUid) -> Filter {
         let mut filter = Filter::new()
             .address(self.addresses.eas)
@@ -268,6 +324,7 @@ impl OracleClient {
         &self,
         fulfillment: &FulfillmentParams<StatementData>,
         require_oracle: Option<bool>,
+        skip_arbitrated: Option<bool>,
     ) -> eyre::Result<(Vec<Attestation>, Vec<StatementData::RustType>)> {
         let filter = self.make_filter(&fulfillment.filter);
 
@@ -325,6 +382,10 @@ impl OracleClient {
             attestations
         };
 
+        let attestations = self
+            .filter_unarbitrated_attestations(attestations, skip_arbitrated.unwrap_or(false))
+            .await?;
+
         let statements = attestations
             .iter()
             .map(|a| StatementData::abi_decode(&a.data))
@@ -341,26 +402,37 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         require_oracle: Option<bool>,
+        skip_arbitrated: Option<bool>,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
         let (attestations, statements) = self
-            .get_attestations_and_statements(fulfillment, require_oracle)
+            .get_attestations_and_statements(fulfillment, require_oracle, skip_arbitrated)
             .await?;
 
         let decisions = statements.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
+        let base_nonce = self
+            .wallet_provider
+            .get_transaction_count(self._signer.address())
+            .await?;
 
         let arbitration_futs = attestations
             .iter()
             .zip(decisions.iter())
-            .map(|(attestation, decision)| {
+            .enumerate()
+            .filter_map(|(i, (attestation, decision))| {
                 let trusted_oracle_arbiter = TrustedOracleArbiter::new(
                     self.addresses.trusted_oracle_arbiter,
                     &self.wallet_provider,
                 );
-
+                let nonce = base_nonce + i as u64;
                 if let Some(decision) = decision {
                     Some(async move {
+                        println!(
+                            "Arbitrating attestation {} with decision {} at nonce {}",
+                            attestation.uid, decision, nonce
+                        );
                         trusted_oracle_arbiter
                             .arbitrate(attestation.uid, *decision)
+                            .nonce(nonce)
                             .send()
                             .await
                     })
@@ -368,7 +440,6 @@ impl OracleClient {
                     None
                 }
             })
-            .flatten()
             .collect::<Vec<_>>();
 
         let pending_txs = try_join_all(arbitration_futs).await?;
@@ -401,27 +472,39 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         require_oracle: Option<bool>,
+        skip_arbitrated: Option<bool>,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
         let (attestations, statements) = self
-            .get_attestations_and_statements(fulfillment, require_oracle)
+            .get_attestations_and_statements(fulfillment, require_oracle, skip_arbitrated)
             .await?;
 
         let decision_futs = statements.iter().map(|s| async move { arbitrate(s).await });
         let decisions = join_all(decision_futs).await;
 
+        let base_nonce = self
+            .wallet_provider
+            .get_transaction_count(self._signer.address())
+            .await?;
+
         let arbitration_futs = attestations
             .iter()
             .zip(decisions.iter())
-            .map(|(attestation, decision)| {
+            .enumerate()
+            .filter_map(|(i, (attestation, decision))| {
                 let trusted_oracle_arbiter = TrustedOracleArbiter::new(
                     self.addresses.trusted_oracle_arbiter,
                     &self.wallet_provider,
                 );
-
+                let nonce = base_nonce + i as u64;
                 if let Some(decision) = decision {
                     Some(async move {
+                        println!(
+                            "Arbitrating attestation {} with decision {} at nonce {}",
+                            attestation.uid, decision, nonce
+                        );
                         trusted_oracle_arbiter
                             .arbitrate(attestation.uid, *decision)
+                            .nonce(nonce)
                             .send()
                             .await
                     })
@@ -429,7 +512,6 @@ impl OracleClient {
                     None
                 }
             })
-            .flatten()
             .collect::<Vec<_>>();
 
         let pending_txs = try_join_all(arbitration_futs).await?;
@@ -465,6 +547,7 @@ impl OracleClient {
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         require_oracle: Option<bool>,
+        skip_arbitrated: Option<bool>,
     ) where
         <StatementData as SolType>::RustType: Send,
     {
@@ -472,6 +555,8 @@ impl OracleClient {
         let eas_address = self.addresses.eas;
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
         let signer_address = self._signer.address();
+        let public_provider = self.public_provider.clone();
+
         tokio::spawn(async move {
             let eas = IEAS::new(eas_address, &wallet_provider);
             let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
@@ -499,6 +584,21 @@ impl OracleClient {
 
                     if demand.oracle != arbiter_address {
                         continue;
+                    }
+                }
+
+                if skip_arbitrated.unwrap_or(false) {
+                    let filter = Self::make_arbitration_filter(
+                        arbiter_address,
+                        attestation.uid,
+                        signer_address,
+                    );
+                    let logs_result = public_provider.get_logs(&filter).await;
+
+                    if let Ok(logs) = logs_result {
+                        if logs.len() > 0 {
+                            continue;
+                        }
                     }
                 }
 
@@ -575,6 +675,7 @@ impl OracleClient {
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         require_oracle: Option<bool>,
+        skip_arbitrated: Option<bool>,
     ) where
         <StatementData as SolType>::RustType: Send,
     {
@@ -582,6 +683,7 @@ impl OracleClient {
         let eas_address = self.addresses.eas;
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
         let signer_address = self._signer.address();
+        let public_provider = self.public_provider.clone();
 
         tokio::spawn(async move {
             let eas = IEAS::new(eas_address, &wallet_provider);
@@ -610,6 +712,21 @@ impl OracleClient {
 
                     if demand.oracle != arbiter_address {
                         continue;
+                    }
+                }
+
+                if skip_arbitrated.unwrap_or(false) {
+                    let filter = Self::make_arbitration_filter(
+                        arbiter_address,
+                        attestation.uid,
+                        signer_address,
+                    );
+                    let logs_result = public_provider.get_logs(&filter).await;
+
+                    if let Ok(logs) = logs_result {
+                        if logs.len() > 0 {
+                            continue;
+                        }
                     }
                 }
 
@@ -684,12 +801,13 @@ impl OracleClient {
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         require_oracle: Option<bool>,
+        skip_arbitrated: Option<bool>,
     ) -> eyre::Result<ListenAndArbitrateResult<StatementData>>
     where
         <StatementData as SolType>::RustType: Send,
     {
         let decisions = self
-            .arbitrate_past(&fulfillment, arbitrate, require_oracle)
+            .arbitrate_past(&fulfillment, arbitrate, require_oracle, skip_arbitrated)
             .await?;
         let filter = self.make_filter(&fulfillment.filter);
 
@@ -703,6 +821,7 @@ impl OracleClient {
             arbitrate,
             on_after_arbitrate,
             require_oracle,
+            skip_arbitrated,
         )
         .await;
 
@@ -724,12 +843,13 @@ impl OracleClient {
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         require_oracle: Option<bool>,
+        skip_arbitrated: Option<bool>,
     ) -> eyre::Result<ListenAndArbitrateResult<StatementData>>
     where
         <StatementData as SolType>::RustType: Send,
     {
         let decisions = self
-            .arbitrate_past_async(&fulfillment, arbitrate, require_oracle)
+            .arbitrate_past_async(&fulfillment, arbitrate, require_oracle, skip_arbitrated)
             .await?;
         let filter = self.make_filter(&fulfillment.filter);
 
@@ -743,6 +863,7 @@ impl OracleClient {
             arbitrate,
             on_after_arbitrate,
             require_oracle,
+            skip_arbitrated,
         )
         .await;
 
@@ -763,6 +884,7 @@ impl OracleClient {
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         require_oracle: Option<bool>,
+        skip_arbitrated: Option<bool>,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
     where
         <StatementData as SolType>::RustType: Send,
@@ -779,6 +901,7 @@ impl OracleClient {
             arbitrate,
             on_after_arbitrate,
             require_oracle,
+            skip_arbitrated,
         )
         .await;
 
@@ -799,6 +922,7 @@ impl OracleClient {
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         require_oracle: Option<bool>,
+        skip_arbitrated: Option<bool>,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
     where
         <StatementData as SolType>::RustType: Send,
@@ -815,6 +939,7 @@ impl OracleClient {
             arbitrate,
             on_after_arbitrate,
             require_oracle,
+            skip_arbitrated,
         )
         .await;
 
@@ -832,6 +957,7 @@ impl OracleClient {
         escrow: &EscrowParams<DemandData>,
         fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
+        skip_arbitrated: Option<bool>,
     ) -> eyre::Result<(
         Vec<Decision<StatementData, DemandData>>,
         Vec<IEAS::Attestation>,
@@ -928,6 +1054,13 @@ impl OracleClient {
             .filter(|a| demands_map.contains_key(&a.refUID))
             .collect::<Vec<_>>();
 
+        let fulfillment_attestations = self
+            .filter_unarbitrated_attestations(
+                fulfillment_attestations,
+                skip_arbitrated.unwrap_or(false),
+            )
+            .await?;
+
         let fulfillment_statements = fulfillment_attestations
             .iter()
             .map(|a| StatementData::abi_decode(&a.data))
@@ -942,19 +1075,30 @@ impl OracleClient {
             })
             .collect::<Vec<_>>();
 
+        let base_nonce = self
+            .wallet_provider
+            .get_transaction_count(self._signer.address())
+            .await?;
+
         let arbitration_futs = fulfillment_attestations
             .iter()
             .zip(decisions.iter())
-            .map(|(attestation, decision)| {
+            .enumerate()
+            .filter_map(|(i, (attestation, decision))| {
                 let trusted_oracle_arbiter = TrustedOracleArbiter::new(
                     self.addresses.trusted_oracle_arbiter,
                     &self.wallet_provider,
                 );
-
+                let nonce = base_nonce + i as u64;
                 if let Some(decision) = decision {
                     Some(async move {
+                        println!(
+                            "Arbitrating attestation {} with decision {} at nonce {}",
+                            attestation.uid, decision, nonce
+                        );
                         trusted_oracle_arbiter
                             .arbitrate(attestation.uid, *decision)
+                            .nonce(nonce)
                             .send()
                             .await
                     })
@@ -962,7 +1106,6 @@ impl OracleClient {
                     None
                 }
             })
-            .flatten()
             .collect::<Vec<_>>();
 
         let pending_txs = try_join_all(arbitration_futs).await?;
@@ -1004,6 +1147,7 @@ impl OracleClient {
         escrow: &EscrowParams<DemandData>,
         fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
+        skip_arbitrated: Option<bool>,
     ) -> eyre::Result<(
         Vec<Decision<StatementData, DemandData>>,
         Vec<IEAS::Attestation>,
@@ -1100,6 +1244,13 @@ impl OracleClient {
             .filter(|a| demands_map.contains_key(&a.refUID))
             .collect::<Vec<_>>();
 
+        let fulfillment_attestations = self
+            .filter_unarbitrated_attestations(
+                fulfillment_attestations,
+                skip_arbitrated.unwrap_or(false),
+            )
+            .await?;
+
         let fulfillment_statements = fulfillment_attestations
             .iter()
             .map(|a| StatementData::abi_decode(&a.data))
@@ -1117,19 +1268,30 @@ impl OracleClient {
 
         let decisions = join_all(decisions_fut).await;
 
+        let base_nonce = self
+            .wallet_provider
+            .get_transaction_count(self._signer.address())
+            .await?;
+
         let arbitration_futs = fulfillment_attestations
             .iter()
             .zip(decisions.iter())
-            .map(|(attestation, decision)| {
+            .enumerate()
+            .filter_map(|(i, (attestation, decision))| {
                 let trusted_oracle_arbiter = TrustedOracleArbiter::new(
                     self.addresses.trusted_oracle_arbiter,
                     &self.wallet_provider,
                 );
-
+                let nonce = base_nonce + i as u64;
                 if let Some(decision) = decision {
                     Some(async move {
+                        println!(
+                            "Arbitrating attestation {} with decision {} at nonce {}",
+                            attestation.uid, decision, nonce
+                        );
                         trusted_oracle_arbiter
                             .arbitrate(attestation.uid, *decision)
+                            .nonce(nonce)
                             .send()
                             .await
                     })
@@ -1137,7 +1299,6 @@ impl OracleClient {
                     None
                 }
             })
-            .flatten()
             .collect::<Vec<_>>();
 
         let pending_txs = try_join_all(arbitration_futs).await?;
@@ -1189,13 +1350,14 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        skip_arbitrated: Option<bool>,
     ) -> eyre::Result<ListenAndArbitrateForEscrowResult<StatementData, DemandData>>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
         <StatementData as SolType>::RustType: Send + 'static,
     {
         let (decisions, escrow_attestations, escrow_demands) = self
-            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate)
+            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, skip_arbitrated)
             .await?;
 
         let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
@@ -1361,13 +1523,14 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        skip_arbitrated: Option<bool>,
     ) -> eyre::Result<ListenAndArbitrateForEscrowResult<StatementData, DemandData>>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
         <StatementData as SolType>::RustType: Send + 'static,
     {
         let (decisions, escrow_attestations, escrow_demands) = self
-            .arbitrate_past_for_escrow_async(&escrow, &fulfillment, arbitrate)
+            .arbitrate_past_for_escrow_async(&escrow, &fulfillment, arbitrate, skip_arbitrated)
             .await?;
 
         let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
