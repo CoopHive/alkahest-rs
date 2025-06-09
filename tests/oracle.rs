@@ -23,7 +23,7 @@ mod tests {
 
     use {
         alkahest_rs::clients::arbiters::{
-            ArbitersClient, IntrinsicsArbiter2, MultiArbiter, RecipientArbiterNoncomposing,
+            ArbitersClient, IntrinsicsArbiter2, MultiArbiter, RecipientArbiterNonComposing,
             SpecificAttestationArbiter, TrustedOracleArbiter, TrustedPartyArbiter,
             UidArbiterComposing,
         },
@@ -1017,7 +1017,7 @@ mod tests {
         Ok(())
     }
 
-        #[tokio::test]
+    #[tokio::test]
     async fn test_skip_arbitrated_arbitrate_past_for_escrow_async() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, item, escrow_uid) = setup_escrow(&test).await?;
@@ -1038,7 +1038,7 @@ mod tests {
             .arbitrate_past_for_escrow_async(
                 &escrow,
                 &fulfillment,
-                 |_statement, _demand| {
+                |_statement, _demand| {
                     println!(
                         "🔍 Checking item: '{}', demand: {:?}",
                         _statement.item, _demand.oracle
@@ -1061,7 +1061,7 @@ mod tests {
             .arbitrate_past_for_escrow_async(
                 &escrow,
                 &fulfillment,
-                 |_statement, _demand| {
+                |_statement, _demand| {
                     println!(
                         "🔍 Checking item: '{}', demand: {:?}",
                         _statement.item, _demand.oracle
