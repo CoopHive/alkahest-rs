@@ -23,7 +23,7 @@ mod tests {
 
     use {
         alkahest_rs::clients::arbiters::{
-            ArbitersClient, IntrinsicsArbiter2, MultiArbiter, RecipientArbiterNoncomposing,
+            ArbitersClient, IntrinsicsArbiter2, MultiArbiter, RecipientArbiterNonComposing,
             SpecificAttestationArbiter, TrustedOracleArbiter, TrustedPartyArbiter,
             UidArbiterComposing,
         },
