@@ -103,6 +103,21 @@ impl
         }
     }
 }
+#[derive(Debug, Clone)]
+pub struct ArbitrateOptions {
+    pub require_oracle: bool,
+    pub skip_arbitrated: bool,
+}
+
+impl Default for ArbitrateOptions {
+    fn default() -> Self {
+        ArbitrateOptions {
+            require_oracle: false,
+            skip_arbitrated: false,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct FulfillmentParams<T: SolType> {
     pub statement_abi: T,
@@ -313,8 +328,7 @@ impl OracleClient {
     async fn get_attestations_and_statements<StatementData: SolType>(
         &self,
         fulfillment: &FulfillmentParams<StatementData>,
-        require_oracle: Option<bool>,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<(Vec<Attestation>, Vec<StatementData::RustType>)> {
         let filter = self.make_filter(&fulfillment.filter);
 
@@ -352,7 +366,7 @@ impl OracleClient {
             })
             .collect();
 
-        let attestations = if require_oracle.unwrap_or(false) {
+        let attestations = if options.require_oracle {
             let oracle_addr = self.addresses.trusted_oracle_arbiter;
             let futs = attestations.into_iter().map(|a| {
                 let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
@@ -373,7 +387,7 @@ impl OracleClient {
         };
 
         let attestations = self
-            .filter_unarbitrated_attestations(attestations, skip_arbitrated.unwrap_or(false))
+            .filter_unarbitrated_attestations(attestations, options.skip_arbitrated)
             .await?;
 
         let statements = attestations
@@ -391,11 +405,10 @@ impl OracleClient {
         &self,
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
-        require_oracle: Option<bool>,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
         let (attestations, statements) = self
-            .get_attestations_and_statements(fulfillment, require_oracle, skip_arbitrated)
+            .get_attestations_and_statements(fulfillment, options)
             .await?;
 
         let decisions = statements.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
@@ -457,11 +470,10 @@ impl OracleClient {
         &self,
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
-        require_oracle: Option<bool>,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
         let (attestations, statements) = self
-            .get_attestations_and_statements(fulfillment, require_oracle, skip_arbitrated)
+            .get_attestations_and_statements(fulfillment, options)
             .await?;
 
         let decision_futs = statements.iter().map(|s| async move { arbitrate(s).await });
@@ -528,8 +540,7 @@ impl OracleClient {
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        require_oracle: Option<bool>,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) where
         <StatementData as SolType>::RustType: Send,
     {
@@ -538,7 +549,7 @@ impl OracleClient {
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
         let signer_address = self._signer.address();
         let public_provider = self.public_provider.clone();
-
+        let options = options.clone();
         tokio::spawn(async move {
             let eas = IEAS::new(eas_address, &wallet_provider);
             let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
@@ -553,7 +564,7 @@ impl OracleClient {
                     continue;
                 };
 
-                if require_oracle.unwrap_or(false) {
+                if options.require_oracle {
                     let escrow_att = match eas.getAttestation(attestation.refUID).call().await {
                         Ok(a) => a,
                         Err(_) => continue,
@@ -569,7 +580,7 @@ impl OracleClient {
                     }
                 }
 
-                if skip_arbitrated.unwrap_or(false) {
+                if options.skip_arbitrated {
                     let filter = Self::make_arbitration_filter(
                         arbiter_address,
                         attestation.uid,
@@ -656,8 +667,7 @@ impl OracleClient {
         fulfillment: FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        require_oracle: Option<bool>,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) where
         <StatementData as SolType>::RustType: Send,
     {
@@ -666,7 +676,7 @@ impl OracleClient {
         let arbiter_address = self.addresses.trusted_oracle_arbiter;
         let signer_address = self._signer.address();
         let public_provider = self.public_provider.clone();
-
+        let options = options.clone();
         tokio::spawn(async move {
             let eas = IEAS::new(eas_address, &wallet_provider);
             let arbiter = TrustedOracleArbiter::new(arbiter_address, &wallet_provider);
@@ -681,7 +691,7 @@ impl OracleClient {
                     continue;
                 };
 
-                if require_oracle.unwrap_or(false) {
+                if options.require_oracle {
                     let escrow_att = match eas.getAttestation(attestation.refUID).call().await {
                         Ok(a) => a,
                         Err(_) => continue,
@@ -697,7 +707,7 @@ impl OracleClient {
                     }
                 }
 
-                if skip_arbitrated.unwrap_or(false) {
+                if options.skip_arbitrated {
                     let filter = Self::make_arbitration_filter(
                         arbiter_address,
                         attestation.uid,
@@ -782,14 +792,13 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        require_oracle: Option<bool>,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateResult<StatementData>>
     where
         <StatementData as SolType>::RustType: Send,
     {
         let decisions = self
-            .arbitrate_past(&fulfillment, arbitrate, require_oracle, skip_arbitrated)
+            .arbitrate_past(&fulfillment, arbitrate, options)
             .await?;
         let filter = self.make_filter(&fulfillment.filter);
 
@@ -802,8 +811,7 @@ impl OracleClient {
             fulfillment.clone(),
             arbitrate,
             on_after_arbitrate,
-            require_oracle,
-            skip_arbitrated,
+            options,
         )
         .await;
 
@@ -824,14 +832,13 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        require_oracle: Option<bool>,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateResult<StatementData>>
     where
         <StatementData as SolType>::RustType: Send,
     {
         let decisions = self
-            .arbitrate_past_async(&fulfillment, arbitrate, require_oracle, skip_arbitrated)
+            .arbitrate_past_async(&fulfillment, arbitrate, options)
             .await?;
         let filter = self.make_filter(&fulfillment.filter);
 
@@ -844,8 +851,7 @@ impl OracleClient {
             fulfillment.clone(),
             arbitrate,
             on_after_arbitrate,
-            require_oracle,
-            skip_arbitrated,
+            options,
         )
         .await;
 
@@ -865,8 +871,7 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        require_oracle: Option<bool>,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
     where
         <StatementData as SolType>::RustType: Send,
@@ -882,8 +887,7 @@ impl OracleClient {
             fulfillment.clone(),
             arbitrate,
             on_after_arbitrate,
-            require_oracle,
-            skip_arbitrated,
+            options,
         )
         .await;
 
@@ -903,8 +907,7 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<StatementData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        require_oracle: Option<bool>,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
     where
         <StatementData as SolType>::RustType: Send,
@@ -920,8 +923,7 @@ impl OracleClient {
             fulfillment.clone(),
             arbitrate,
             on_after_arbitrate,
-            require_oracle,
-            skip_arbitrated,
+            options,
         )
         .await;
 

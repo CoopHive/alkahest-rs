@@ -3,8 +3,8 @@ mod tests {
     use alkahest_rs::{
         AlkahestClient,
         clients::oracle::{
-            AttestationFilter, AttestationFilterWithoutRefUid, EscrowParams, FulfillmentParams,
-            FulfillmentParamsWithoutRefUid,
+            ArbitrateOptions, AttestationFilter, AttestationFilterWithoutRefUid, EscrowParams,
+            FulfillmentParams, FulfillmentParamsWithoutRefUid,
         },
         contracts::StringObligation,
         fixtures::MockERC20Permit,
@@ -190,7 +190,14 @@ mod tests {
         let decisions = test
             .bob_client
             .oracle
-            .arbitrate_past(&fulfillment, |s| Some(s.item == "good"), Some(true), None)
+            .arbitrate_past(
+                &fulfillment,
+                |s| Some(s.item == "good"),
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                },
+            )
             .await?;
 
         assert_eq!(decisions.len(), 1);
@@ -221,7 +228,11 @@ mod tests {
         let decisions = test
             .bob_client
             .oracle
-            .arbitrate_past(&fulfillment, |s| Some(s.item == "good"), None, None)
+            .arbitrate_past(
+                &fulfillment,
+                |s| Some(s.item == "good"),
+                &ArbitrateOptions::default(),
+            )
             .await?;
 
         for decision in &decisions {
@@ -272,8 +283,10 @@ mod tests {
                     println!("Arbitrating for item: {}", s.item);
                     Some(s.item == "good")
                 },
-                Some(true),
-                Some(true),
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: true,
+                },
             )
             .await?;
         assert_eq!(decisions.len(), 1);
@@ -289,8 +302,10 @@ mod tests {
                     println!("Arbitrating for item: {}", s.item);
                     Some(s.item == "good")
                 },
-                Some(true),
-                Some(true),
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: true,
+                },
             )
             .await?;
         assert_eq!(decisions.len(), 1);
@@ -340,8 +355,10 @@ mod tests {
                     let result = s.item == "good";
                     async move { Some(result) }
                 },
-                Some(true),
-                Some(true),
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: true,
+                },
             )
             .await?;
         assert_eq!(decisions.len(), 1);
@@ -358,8 +375,10 @@ mod tests {
                     let result = s.item == "good";
                     async move { Some(result) }
                 },
-                Some(true),
-                Some(true),
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: true,
+                },
             )
             .await?;
         assert_eq!(decisions.len(), 1);
@@ -414,8 +433,10 @@ mod tests {
                         assert!(decision_value);
                     }
                 },
-                Some(true),
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                },
             )
             .await?;
 
@@ -465,8 +486,10 @@ mod tests {
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
                     }
                 },
-                Some(true),
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                },
             )
             .await?;
 
@@ -535,8 +558,10 @@ mod tests {
                         );
                     }
                 },
-                Some(true),
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                },
             )
             .await?;
 
@@ -601,8 +626,10 @@ mod tests {
                         assert!(decision_value);
                     }
                 },
-                Some(true),
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                },
             )
             .await?;
 
@@ -658,8 +685,10 @@ mod tests {
                         );
                     }
                 },
-                Some(true),
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                },
             )
             .await?;
 
@@ -727,8 +756,10 @@ mod tests {
                         );
                     }
                 },
-                Some(true),
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                },
             )
             .await?;
 
@@ -1017,7 +1048,7 @@ mod tests {
         Ok(())
     }
 
-        #[tokio::test]
+    #[tokio::test]
     async fn test_skip_arbitrated_arbitrate_past_for_escrow_async() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, item, escrow_uid) = setup_escrow(&test).await?;
@@ -1038,7 +1069,7 @@ mod tests {
             .arbitrate_past_for_escrow_async(
                 &escrow,
                 &fulfillment,
-                 |_statement, _demand| {
+                |_statement, _demand| {
                     println!(
                         "🔍 Checking item: '{}', demand: {:?}",
                         _statement.item, _demand.oracle
@@ -1061,7 +1092,7 @@ mod tests {
             .arbitrate_past_for_escrow_async(
                 &escrow,
                 &fulfillment,
-                 |_statement, _demand| {
+                |_statement, _demand| {
                     println!(
                         "🔍 Checking item: '{}', demand: {:?}",
                         _statement.item, _demand.oracle
