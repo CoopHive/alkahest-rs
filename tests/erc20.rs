@@ -107,7 +107,7 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
     // if using a custom Arbiter not supported by the SDK, you can use the sol! macro and abi_encode
     // directly, like we did for the base_demand
 
-    let demand = ArbitersClient::encode_trusted_party_demand(&TrustedPartyArbiter::DemandData {
+    let demand = ArbitersClient::encode_trusted_party_arbiter_demand(&TrustedPartyArbiter::DemandData {
         creator: client_seller.address,
         baseArbiter: client_seller.arbiters.addresses.trivial_arbiter,
         baseDemand: base_demand.into(),
@@ -145,7 +145,7 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
         .await?;
     let buy_statement = Erc20Client::decode_escrow_statement(&buy_statement.data)?;
 
-    let decoded_demand = ArbitersClient::decode_trusted_party_demand(&buy_statement.demand)?;
+    let decoded_demand = ArbitersClient::decode_trusted_party_arbiter_demand(&buy_statement.demand)?;
     let decoded_base_demand = ResultDemandData::abi_decode(decoded_demand.baseDemand.as_ref());
 
     // uppercase string for the example;

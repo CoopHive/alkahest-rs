@@ -60,7 +60,7 @@ mod tests {
             data: bytes!(""),
         };
 
-        let demand = ArbitersClient::encode_trusted_oracle_demand(&demand_data);
+        let demand = ArbitersClient::encode_trusted_oracle_arbiter_demand(&demand_data);
         let item = ArbiterData { arbiter, demand };
         let expiration = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
 
