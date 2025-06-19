@@ -238,7 +238,7 @@ impl OracleClient {
         filter
     }
 
-    pub fn make_arbitration_filter(
+    fn make_arbitration_filter(
         address: Address,
         statement: FixedBytes<32>,
         oracle: Address,
