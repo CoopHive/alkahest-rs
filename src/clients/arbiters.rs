@@ -618,7 +618,34 @@ mod tests {
         utils::setup_test_environment,
     };
 
-    // Helper to create a test attestation for arbiter tests
+    // Helper to convert IEAS::Attestation to tuple format expected by contracts
+    fn attestation_to_tuple(
+        attestation: &contracts::IEAS::Attestation,
+    ) -> (
+        FixedBytes<32>, // uid
+        FixedBytes<32>, // schema
+        u64,            // time
+        u64,            // expirationTime
+        u64,            // revocationTime
+        FixedBytes<32>, // refUID
+        Address,        // recipient
+        Address,        // attester
+        bool,           // revocable
+        Bytes,          // data
+    ) {
+        (
+            attestation.uid,
+            attestation.schema,
+            attestation.time,
+            attestation.expirationTime,
+            attestation.revocationTime,
+            attestation.refUID,
+            attestation.recipient,
+            attestation.attester,
+            attestation.revocable,
+            attestation.data.clone(),
+        )
+    }
     fn create_test_attestation(
         uid: Option<FixedBytes<32>>,
         recipient: Option<Address>,
