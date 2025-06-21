@@ -28,6 +28,43 @@ pub struct ArbitersAddresses {
     pub all_arbiter: Address,
     pub uid_arbiter: Address,
     pub recipient_arbiter: Address,
+    pub not_arbiter: Address,
+    pub attester_arbiter_composing: Address,
+    pub attester_arbiter_non_composing: Address,
+    pub expiration_time_after_arbiter_composing: Address,
+    pub expiration_time_before_arbiter_composing: Address,
+    pub expiration_time_equal_arbiter_composing: Address,
+    pub recipient_arbiter_composing: Address,
+    pub ref_uid_arbiter_composing: Address,
+    pub revocable_arbiter_composing: Address,
+    pub schema_arbiter_composing: Address,
+    pub time_after_arbiter_composing: Address,
+    pub time_before_arbiter_composing: Address,
+    pub time_equal_arbiter_composing: Address,
+    pub uid_arbiter_composing: Address,
+    // Payment fulfillment arbiters
+    pub erc20_payment_fulfillment_arbiter: Address,
+    pub erc721_payment_fulfillment_arbiter: Address,
+    pub erc1155_payment_fulfillment_arbiter: Address,
+    pub token_bundle_payment_fulfillment_arbiter: Address,
+    // Non-composing arbiters
+    pub expiration_time_after_arbiter_non_composing: Address,
+    pub expiration_time_before_arbiter_non_composing: Address,
+    pub expiration_time_equal_arbiter_non_composing: Address,
+    pub recipient_arbiter_non_composing: Address,
+    pub ref_uid_arbiter_non_composing: Address,
+    pub revocable_arbiter_non_composing: Address,
+    pub schema_arbiter_non_composing: Address,
+    pub time_after_arbiter_non_composing: Address,
+    pub time_before_arbiter_non_composing: Address,
+    pub time_equal_arbiter_non_composing: Address,
+    pub uid_arbiter_non_composing: Address,
+    // Confirmation arbiters
+    pub confirmation_arbiter: Address,
+    pub confirmation_arbiter_composing: Address,
+    pub revocable_confirmation_arbiter: Address,
+    pub revocable_confirmation_arbiter_composing: Address,
+    pub unrevocable_confirmation_arbiter: Address,
 }
 
 #[derive(Clone)]
@@ -618,7 +655,6 @@ mod tests {
         utils::setup_test_environment,
     };
 
-    // Helper to create a test attestation for arbiter tests
     fn create_test_attestation(
         uid: Option<FixedBytes<32>>,
         recipient: Option<Address>,
