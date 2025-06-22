@@ -19,7 +19,10 @@ mod tests {
         sol,
         sol_types::SolValue,
     };
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::{
+        marker::PhantomData,
+        time::{Duration, SystemTime, UNIX_EPOCH},
+    };
 
     use {
         alkahest_rs::clients::arbiters::{
@@ -140,10 +143,8 @@ mod tests {
         filter: AttestationFilter,
     ) -> FulfillmentParams<StringObligation::StatementData> {
         FulfillmentParams {
-            statement_abi: StringObligation::StatementData {
-                item: "".to_string(),
-            },
             filter,
+            _statement_data: PhantomData::<StringObligation::StatementData>,
         }
     }
 
@@ -170,10 +171,8 @@ mod tests {
         filter: AttestationFilterWithoutRefUid,
     ) -> FulfillmentParamsWithoutRefUid<StringObligation::StatementData> {
         FulfillmentParamsWithoutRefUid {
-            statement_abi: StringObligation::StatementData {
-                item: "".to_string(),
-            },
             filter,
+            _statement_data: std::marker::PhantomData,
         }
     }
 
@@ -181,7 +180,7 @@ mod tests {
     async fn test_trivial_arbitrate_past() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
-
+        
         let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
 
         let filter = make_filter(&test, Some(escrow_uid));
@@ -808,7 +807,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let (decisions, _, _) = test
             .bob_client
@@ -855,7 +854,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let (decisions, _, _) = test
             .bob_client
@@ -915,7 +914,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let (decisions, _, _) = test
             .bob_client
@@ -1001,7 +1000,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let (decisions, _, _) = test
             .bob_client
@@ -1061,7 +1060,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let (decisions, _, _) = test
             .bob_client
@@ -1144,7 +1143,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 
@@ -1208,7 +1207,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 
@@ -1275,7 +1274,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 
@@ -1369,7 +1368,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 
@@ -1461,7 +1460,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 
@@ -1555,7 +1554,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 

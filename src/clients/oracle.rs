@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    marker::PhantomData,
     pin::Pin,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
@@ -120,17 +121,17 @@ impl Default for ArbitrateOptions {
 
 #[derive(Clone)]
 pub struct FulfillmentParams<T: SolType> {
-    pub statement_abi: T,
     pub filter: AttestationFilter,
+    pub _statement_data: PhantomData<T>,
 }
 
 pub struct FulfillmentParamsWithoutRefUid<T: SolType> {
-    pub statement_abi: T,
     pub filter: AttestationFilterWithoutRefUid,
+    pub _statement_data: PhantomData<T>,
 }
 
 pub struct EscrowParams<T: SolType> {
-    pub demand_abi: T,
+    pub _demand_data: PhantomData<T>,
     pub filter: AttestationFilter,
 }
 
