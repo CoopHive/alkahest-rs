@@ -180,7 +180,7 @@ mod tests {
     async fn test_trivial_arbitrate_past() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
-        
+
         let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
 
         let filter = make_filter(&test, Some(escrow_uid));
@@ -455,6 +455,63 @@ mod tests {
 
         // Cleanup
         oracle.unsubscribe(listen_result.subscription_id).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_trivial_listen_and_arbitrate_no_spawn() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, _, escrow_uid) = setup_escrow(&test).await?;
+
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
+
+        println!("Listening for decisions no spawn ...");
+
+        let oracle = test.bob_client.oracle.clone();
+
+        // ⬇️ Spawn the listen_and_arbitrate_no_spawn as a background task
+        let listen_handle = tokio::spawn(async move {
+            oracle
+                .listen_and_arbitrate_no_spawn(
+                    &fulfillment,
+                    |_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
+                    |decision| {
+                        let statement_item = decision.statement.item.clone();
+                        let decision_value = decision.decision;
+                        async move {
+                            assert_eq!(statement_item, "good");
+                            assert!(decision_value);
+                        }
+                    },
+                    &ArbitrateOptions {
+                        require_oracle: true,
+                        skip_arbitrated: false,
+                    },
+                    Some(Duration::from_secs(10)),
+                )
+                .await
+        });
+
+        // Allow time for the listener to start
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Trigger fulfillment
+        let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+
+        // Allow time for listener to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        let collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment_uid)
+            .await?;
+
+        println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
+
+        // Get the result from the spawned task and cleanup
 
         Ok(())
     }
