@@ -480,6 +480,7 @@ mod tests {
                     |decision| {
                         let statement_item = decision.statement.item.clone();
                         let decision_value = decision.decision;
+                        println!("📣 Decision for '{}': {}", statement_item, decision_value);
                         async move {
                             assert_eq!(statement_item, "good");
                             assert!(decision_value);
