@@ -191,7 +191,7 @@ mod tests {
             .oracle
             .arbitrate_past(
                 &fulfillment,
-                |s| Some(s.item == "good"),
+                &|s| Some(s.item == "good"),
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: false,
@@ -229,7 +229,7 @@ mod tests {
             .oracle
             .arbitrate_past(
                 &fulfillment,
-                |s| Some(s.item == "good"),
+                &|s| Some(s.item == "good"),
                 &ArbitrateOptions::default(),
             )
             .await?;
@@ -278,7 +278,7 @@ mod tests {
             .oracle
             .arbitrate_past(
                 &fulfillment,
-                |s| {
+                &|s| {
                     println!("Arbitrating for item: {}", s.item);
                     Some(s.item == "good")
                 },
@@ -297,7 +297,7 @@ mod tests {
             .oracle
             .arbitrate_past(
                 &fulfillment,
-                |s| {
+                &|s| {
                     println!("Arbitrating for item: {}", s.item);
                     Some(s.item == "good")
                 },
@@ -423,7 +423,7 @@ mod tests {
         let listen_result = oracle
             .listen_and_arbitrate(
                 &fulfillment,
-                |_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
+                &|_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
                 |decision| {
                     let statement_item = decision.statement.item.clone();
                     let decision_value = decision.decision;
@@ -476,7 +476,7 @@ mod tests {
             oracle
                 .listen_and_arbitrate_no_spawn(
                     &fulfillment,
-                    |_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
+                    &|_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
                     |decision| {
                         let statement_item = decision.statement.item.clone();
                         let decision_value = decision.decision;
@@ -532,7 +532,7 @@ mod tests {
             .oracle
             .listen_and_arbitrate(
                 &fulfillment,
-                |_statement: &StringObligation::StatementData| -> Option<bool> {
+                &|_statement: &StringObligation::StatementData| -> Option<bool> {
                     Some(_statement.item == "good")
                 },
                 |decision| {
@@ -598,7 +598,7 @@ mod tests {
         let listen_result = oracle
             .listen_and_arbitrate_new_fulfillments(
                 &fulfillment,
-                |_statement: &StringObligation::StatementData| -> Option<bool> {
+                &|_statement: &StringObligation::StatementData| -> Option<bool> {
                     Some(_statement.item == "good")
                 },
                 |decision| {
