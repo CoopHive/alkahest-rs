@@ -1046,6 +1046,43 @@ impl OracleClient {
         })
     }
 
+    pub async fn listen_and_arbitrate_new_fulfillments_no_spawn<
+        StatementData: SolType,
+        Arbitrate: Fn(&StatementData::RustType) -> Option<bool>,
+        OnAfterArbitrateFut: Future<Output = ()>,
+        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut,
+    >(
+        &self,
+        fulfillment: &FulfillmentParams<StatementData>,
+        arbitrate: &Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
+        options: &ArbitrateOptions,
+        timeout: Option<Duration>,
+    ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
+    where
+        <StatementData as SolType>::RustType: Send,
+    {
+        let filter = self.make_filter(&fulfillment.filter);
+
+        let sub = self.public_provider.subscribe_logs(&filter).await?;
+        let local_id = *sub.local_id();
+        let stream: SubscriptionStream<Log> = sub.into_stream();
+
+        self.handle_fulfillment_stream_no_spawn(
+            stream,
+            fulfillment,
+            arbitrate,
+            on_after_arbitrate,
+            options,
+            timeout,
+        )
+        .await;
+
+        Ok(ListenAndArbitrateNewFulfillmentsResult {
+            subscription_id: local_id,
+        })
+    }
+
     pub async fn listen_and_arbitrate_new_fulfillments<
         StatementData: SolType + Clone + Send + 'static,
         Arbitrate: Fn(&StatementData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
