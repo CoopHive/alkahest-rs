@@ -19,7 +19,10 @@ mod tests {
         sol,
         sol_types::SolValue,
     };
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::{
+        marker::PhantomData,
+        time::{Duration, SystemTime, UNIX_EPOCH},
+    };
 
     use {
         alkahest_rs::clients::arbiters::{
@@ -140,10 +143,8 @@ mod tests {
         filter: AttestationFilter,
     ) -> FulfillmentParams<StringObligation::StatementData> {
         FulfillmentParams {
-            statement_abi: StringObligation::StatementData {
-                item: "".to_string(),
-            },
             filter,
+            _statement_data: PhantomData::<StringObligation::StatementData>,
         }
     }
 
@@ -170,10 +171,8 @@ mod tests {
         filter: AttestationFilterWithoutRefUid,
     ) -> FulfillmentParamsWithoutRefUid<StringObligation::StatementData> {
         FulfillmentParamsWithoutRefUid {
-            statement_abi: StringObligation::StatementData {
-                item: "".to_string(),
-            },
             filter,
+            _statement_data: std::marker::PhantomData,
         }
     }
 
@@ -192,7 +191,7 @@ mod tests {
             .oracle
             .arbitrate_past(
                 &fulfillment,
-                |s| Some(s.item == "good"),
+                &|s| Some(s.item == "good"),
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: false,
@@ -230,7 +229,7 @@ mod tests {
             .oracle
             .arbitrate_past(
                 &fulfillment,
-                |s| Some(s.item == "good"),
+                &|s| Some(s.item == "good"),
                 &ArbitrateOptions::default(),
             )
             .await?;
@@ -279,7 +278,7 @@ mod tests {
             .oracle
             .arbitrate_past(
                 &fulfillment,
-                |s| {
+                &|s| {
                     println!("Arbitrating for item: {}", s.item);
                     Some(s.item == "good")
                 },
@@ -298,7 +297,7 @@ mod tests {
             .oracle
             .arbitrate_past(
                 &fulfillment,
-                |s| {
+                &|s| {
                     println!("Arbitrating for item: {}", s.item);
                     Some(s.item == "good")
                 },
@@ -424,7 +423,7 @@ mod tests {
         let listen_result = oracle
             .listen_and_arbitrate(
                 &fulfillment,
-                |_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
+                &|_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
                 |decision| {
                     let statement_item = decision.statement.item.clone();
                     let decision_value = decision.decision;
@@ -461,6 +460,122 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_trivial_listen_and_arbitrate_no_spawn() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, _, escrow_uid) = setup_escrow(&test).await?;
+
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
+
+        println!("Listening for decisions no spawn ...");
+
+        let oracle = test.bob_client.oracle.clone();
+
+        // ⬇️ Spawn the listen_and_arbitrate_no_spawn as a background task
+        let listen_handle = tokio::spawn(async move {
+            oracle
+                .listen_and_arbitrate_no_spawn(
+                    &fulfillment,
+                    &|_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
+                    |decision| {
+                        let statement_item = decision.statement.item.clone();
+                        let decision_value = decision.decision;
+                        println!("📣 Decision for '{}': {}", statement_item, decision_value);
+                        async move {
+                            assert_eq!(statement_item, "good");
+                            assert!(decision_value);
+                        }
+                    },
+                    &ArbitrateOptions {
+                        require_oracle: true,
+                        skip_arbitrated: false,
+                    },
+                    Some(Duration::from_secs(10)),
+                )
+                .await
+        });
+
+        // Allow time for the listener to start
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Trigger fulfillment
+        let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+
+        // Allow time for listener to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        let collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment_uid)
+            .await?;
+
+        println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
+
+        // Get the result from the spawned task and cleanup
+
+        Ok(())
+    }
+
+        #[tokio::test]
+    async fn test_trivial_listen_and_arbitrate_new_fulfillments_no_spawn() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, _, escrow_uid) = setup_escrow(&test).await?;
+
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
+
+        println!("Listening for decisions no spawn ...");
+
+        let oracle = test.bob_client.oracle.clone();
+
+        // ⬇️ Spawn the listen_and_arbitrate_no_spawn as a background task
+        let listen_handle = tokio::spawn(async move {
+            oracle
+                .listen_and_arbitrate_new_fulfillments_no_spawn(
+                    &fulfillment,
+                    &|_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
+                    |decision| {
+                        let statement_item = decision.statement.item.clone();
+                        let decision_value = decision.decision;
+                        println!("📣 Decision for '{}': {}", statement_item, decision_value);
+                        async move {
+                            assert_eq!(statement_item, "good");
+                            assert!(decision_value);
+                        }
+                    },
+                    &ArbitrateOptions {
+                        require_oracle: true,
+                        skip_arbitrated: false,
+                    },
+                    Some(Duration::from_secs(10)),
+                )
+                .await
+        });
+
+        // Allow time for the listener to start
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Trigger fulfillment
+        let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+
+        // Allow time for listener to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        let collection = test
+            .bob_client
+            .erc20
+            .collect_payment(escrow_uid, fulfillment_uid)
+            .await?;
+
+        println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
+
+        // Get the result from the spawned task and cleanup
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_conditional_listen_and_arbitrate() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
@@ -476,7 +591,7 @@ mod tests {
             .oracle
             .listen_and_arbitrate(
                 &fulfillment,
-                |_statement: &StringObligation::StatementData| -> Option<bool> {
+                &|_statement: &StringObligation::StatementData| -> Option<bool> {
                     Some(_statement.item == "good")
                 },
                 |decision| {
@@ -542,7 +657,7 @@ mod tests {
         let listen_result = oracle
             .listen_and_arbitrate_new_fulfillments(
                 &fulfillment,
-                |_statement: &StringObligation::StatementData| -> Option<bool> {
+                &|_statement: &StringObligation::StatementData| -> Option<bool> {
                     Some(_statement.item == "good")
                 },
                 |decision| {
@@ -808,7 +923,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let (decisions, _, _) = test
             .bob_client
@@ -855,7 +970,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let (decisions, _, _) = test
             .bob_client
@@ -915,7 +1030,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let (decisions, _, _) = test
             .bob_client
@@ -1001,7 +1116,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let (decisions, _, _) = test
             .bob_client
@@ -1061,7 +1176,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let (decisions, _, _) = test
             .bob_client
@@ -1144,7 +1259,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 
@@ -1208,7 +1323,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 
@@ -1275,7 +1390,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 
@@ -1369,7 +1484,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 
@@ -1461,7 +1576,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 
@@ -1555,7 +1670,7 @@ mod tests {
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
-            demand_abi: demand_data.clone(),
+            _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
         let oracle = test.bob_client.oracle.clone();
 
