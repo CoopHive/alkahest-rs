@@ -1769,6 +1769,132 @@ impl OracleClient {
         })
     }
 
+    pub async fn listen_and_arbitrate_for_escrow_no_spawn<
+        StatementData: SolType,
+        DemandData: SolType,
+        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> Option<bool>,
+        OnAfterArbitrateFut: Future<Output = ()>,
+        OnAfterArbitrate: Fn(&Decision<StatementData, DemandData>) -> OnAfterArbitrateFut,
+    >(
+        &self,
+        escrow: &EscrowParams<DemandData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
+        arbitrate: &Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
+        skip_arbitrated: Option<bool>,
+        timeout: Option<Duration>,
+    ) -> eyre::Result<ListenAndArbitrateForEscrowResult<StatementData, DemandData>>
+    where
+        <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
+        <StatementData as SolType>::RustType: Send + 'static,
+    {
+        let (decisions, escrow_attestations, escrow_demands) = self
+            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, skip_arbitrated)
+            .await?;
+
+        let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
+            Arc::new(RwLock::new(
+                escrow_attestations
+                    .iter()
+                    .zip(escrow_demands.iter())
+                    .map(|(a, d)| (a.uid, d.clone()))
+                    .collect(),
+            ));
+
+        let escrow_filter = self.make_filter(&escrow.filter);
+        let fulfillment_filter = self.make_filter_without_refuid(&fulfillment.filter);
+
+        let escrow_sub = self.public_provider.subscribe_logs(&escrow_filter).await?;
+        let fulfillment_sub = self
+            .public_provider
+            .subscribe_logs(&fulfillment_filter)
+            .await?;
+
+        let escrow_subscription_id = *escrow_sub.local_id();
+        let fulfillment_subscription_id = *fulfillment_sub.local_id();
+
+        let mut escrow_stream = escrow_sub.into_stream();
+        let mut fulfillment_stream = fulfillment_sub.into_stream();
+
+        let wallet_provider = Arc::new(self.wallet_provider.clone());
+        let eas_address = self.addresses.eas;
+        let arbiter_address = self.addresses.trusted_oracle_arbiter;
+        let eas = IEAS::new(eas_address, &*wallet_provider);
+        let arbiter = TrustedOracleArbiter::new(arbiter_address, &*wallet_provider);
+        let signer_address = self._signer.address();
+
+        loop {
+            tokio::select! {
+                maybe_log = escrow_stream.next() => {
+                    let Some(log) = maybe_log else { break };
+                    let Ok(log) = log.log_decode::<IEAS::Attested>() else { continue };
+
+                    if let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await {
+                        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                        if attestation.expirationTime != 0 && attestation.expirationTime < now { continue; }
+                        if attestation.revocationTime != 0 && attestation.revocationTime < now { continue; }
+
+                        if let Ok(statement) = ArbiterDemand::abi_decode(&attestation.data) {
+                            if let Ok(demand) = DemandData::abi_decode(&statement.demand) {
+                                demands_map.write().await.insert(attestation.uid, demand);
+                            }
+                        }
+                    }
+                }
+
+                maybe_log = fulfillment_stream.next() => {
+                    let Some(log) = maybe_log else { break };
+                    let Ok(log) = log.log_decode::<IEAS::Attested>() else { continue };
+                    let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else { continue };
+
+                    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                    if attestation.expirationTime != 0 && attestation.expirationTime < now { continue; }
+                    if attestation.revocationTime != 0 && attestation.revocationTime < now { continue; }
+
+                    let Some(demand) = demands_map.read().await.get(&attestation.refUID).cloned() else { continue; };
+                    let Ok(statement) = StatementData::abi_decode(&attestation.data) else { continue; };
+                    let Some(decision_value) = arbitrate(&statement, &demand) else { continue; };
+
+                    let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await else {
+                        println!("❌ Failed to get transaction count for {}", signer_address);
+                        continue;
+                    };
+
+                    match arbiter.arbitrate(attestation.uid, decision_value).nonce(nonce).send().await {
+                        Ok(tx) => match tx.get_receipt().await {
+                            Ok(receipt) => {
+                                let decision = Decision {
+                                    attestation,
+                                    statement,
+                                    demand: None,
+                                    decision: decision_value,
+                                    receipt,
+                                };
+                                on_after_arbitrate(&decision).await;
+                            },
+                            Err(_) => continue,
+                        },
+                        Err(err) => {
+                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                        }
+                    }
+                }
+
+                _ = tokio::time::sleep(timeout.unwrap_or(Duration::from_secs(300))) => {
+                    println!("⏰ Timeout reached, exiting arbitration loop.");
+                    break;
+                }
+            }
+        }
+
+        Ok(ListenAndArbitrateForEscrowResult {
+            decisions,
+            escrow_attestations,
+            escrow_subscription_id,
+            fulfillment_subscription_id,
+        })
+    }
+
     pub async fn listen_and_arbitrate_for_escrow_async<
         StatementData: SolType,
         DemandData: SolType,
@@ -2101,6 +2227,129 @@ impl OracleClient {
                     }
                 }
             });
+        }
+
+        Ok(ListenAndArbitrateNewFulfillmentsForEscrowResult {
+            escrow_attestations,
+            escrow_subscription_id,
+            fulfillment_subscription_id,
+        })
+    }
+
+    pub async fn listen_and_arbitrate_new_fulfillments_for_escrow_no_spawn<
+        StatementData: SolType,
+        DemandData: SolType,
+        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> Option<bool>,
+        OnAfterArbitrateFut: Future<Output = ()>,
+        OnAfterArbitrate: Fn(&Decision<StatementData, DemandData>) -> OnAfterArbitrateFut,
+    >(
+        &self,
+        escrow: &EscrowParams<DemandData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
+        arbitrate: &Arbitrate,
+        on_after_arbitrate: OnAfterArbitrate,
+        skip_arbitrated: Option<bool>,
+        timeout: Option<Duration>,
+    ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsForEscrowResult>
+    where
+        <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
+        <StatementData as SolType>::RustType: Send + 'static,
+    {
+        let (escrow_attestations, escrow_demands) = self.get_escrows(&escrow).await?;
+
+        let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
+            Arc::new(RwLock::new(
+                escrow_attestations
+                    .iter()
+                    .zip(escrow_demands.iter())
+                    .map(|(a, d)| (a.uid, d.clone()))
+                    .collect(),
+            ));
+
+        let escrow_filter = self.make_filter(&escrow.filter);
+        let fulfillment_filter = self.make_filter_without_refuid(&fulfillment.filter);
+
+        let escrow_sub = self.public_provider.subscribe_logs(&escrow_filter).await?;
+        let fulfillment_sub = self
+            .public_provider
+            .subscribe_logs(&fulfillment_filter)
+            .await?;
+
+        let escrow_subscription_id = *escrow_sub.local_id();
+        let fulfillment_subscription_id = *fulfillment_sub.local_id();
+
+        let mut escrow_stream = escrow_sub.into_stream();
+        let mut fulfillment_stream = fulfillment_sub.into_stream();
+
+        let wallet_provider = Arc::new(self.wallet_provider.clone());
+        let eas_address = self.addresses.eas;
+        let arbiter_address = self.addresses.trusted_oracle_arbiter;
+        let eas = IEAS::new(eas_address, &*wallet_provider);
+        let arbiter = TrustedOracleArbiter::new(arbiter_address, &*wallet_provider);
+        let signer_address = self._signer.address();
+
+        loop {
+            tokio::select! {
+                maybe_log = escrow_stream.next() => {
+                    let Some(log) = maybe_log else { break };
+                    let Ok(log) = log.log_decode::<IEAS::Attested>() else { continue };
+
+                    if let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await {
+                        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                        if attestation.expirationTime != 0 && attestation.expirationTime < now { continue; }
+                        if attestation.revocationTime != 0 && attestation.revocationTime < now { continue; }
+
+                        if let Ok(statement) = ArbiterDemand::abi_decode(&attestation.data) {
+                            if let Ok(demand) = DemandData::abi_decode(&statement.demand) {
+                                demands_map.write().await.insert(attestation.uid, demand);
+                            }
+                        }
+                    }
+                }
+
+                maybe_log = fulfillment_stream.next() => {
+                    let Some(log) = maybe_log else { break };
+                    let Ok(log) = log.log_decode::<IEAS::Attested>() else { continue };
+                    let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else { continue };
+
+                    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                    if attestation.expirationTime != 0 && attestation.expirationTime < now { continue; }
+                    if attestation.revocationTime != 0 && attestation.revocationTime < now { continue; }
+
+                    let Some(demand) = demands_map.read().await.get(&attestation.refUID).cloned() else { continue; };
+                    let Ok(statement) = StatementData::abi_decode(&attestation.data) else { continue; };
+                    let Some(decision_value) = arbitrate(&statement, &demand) else { continue; };
+
+                    let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await else {
+                        println!("❌ Failed to get transaction count for {}", signer_address);
+                        continue;
+                    };
+
+                    match arbiter.arbitrate(attestation.uid, decision_value).nonce(nonce).send().await {
+                        Ok(tx) => match tx.get_receipt().await {
+                            Ok(receipt) => {
+                                let decision = Decision {
+                                    attestation,
+                                    statement,
+                                    demand: None,
+                                    decision: decision_value,
+                                    receipt,
+                                };
+                                on_after_arbitrate(&decision).await;
+                            },
+                            Err(_) => continue,
+                        },
+                        Err(err) => {
+                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                        }
+                    }
+                }
+
+                _ = tokio::time::sleep(timeout.unwrap_or(Duration::from_secs(300))) => {
+                    println!("⏰ Timeout reached, exiting arbitration loop.");
+                    break;
+                }
+            }
         }
 
         Ok(ListenAndArbitrateNewFulfillmentsForEscrowResult {
