@@ -22,6 +22,7 @@ use futures::{
 };
 use itertools::izip;
 use tokio::{sync::RwLock, time::Duration};
+use tracing;
 
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
@@ -654,7 +655,7 @@ impl OracleClient {
                         }
                     }
                     Err(err) => {
-                        println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                        tracing::error!("Arbitration failed for {}: {}", attestation.uid, err);
                     }
                 }
             }
@@ -781,7 +782,7 @@ impl OracleClient {
                         }
                     }
                     Err(err) => {
-                        println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                        tracing::error!("Arbitration failed for {}: {}", attestation.uid, err);
                     }
                 }
             }
@@ -893,7 +894,7 @@ impl OracleClient {
                     Ok(Some(log)) => Some(log),
                     Ok(None) => None, // Stream ended
                     Err(_) => {
-                        println!("⏰ Stream timeout reached after {:?}", timeout_duration);
+                        tracing::info!("Stream timeout reached after {:?}", timeout_duration);
                         break;
                     }
                 }
@@ -999,7 +1000,7 @@ impl OracleClient {
                     }
                 }
                 Err(err) => {
-                    println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                    tracing::error!("Arbitration failed for {}: {}", attestation.uid, err);
                 }
             }
         }
@@ -1730,7 +1731,7 @@ impl OracleClient {
 
                     let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await
                     else {
-                        println!("❌ Failed to get transaction count for {}", signer_address);
+                        tracing::error!("Failed to get transaction count for {}", signer_address);
                         continue;
                     };
 
@@ -1754,7 +1755,7 @@ impl OracleClient {
                             Err(_) => continue,
                         },
                         Err(err) => {
-                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                            tracing::error!("Arbitration failed for {}: {}", attestation.uid, err);
                         }
                     }
                 }
@@ -1856,7 +1857,7 @@ impl OracleClient {
                     let Some(decision_value) = arbitrate(&statement, &demand) else { continue; };
 
                     let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await else {
-                        println!("❌ Failed to get transaction count for {}", signer_address);
+                        tracing::error!("Failed to get transaction count for {}", signer_address);
                         continue;
                     };
 
@@ -1875,13 +1876,13 @@ impl OracleClient {
                             Err(_) => continue,
                         },
                         Err(err) => {
-                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                            tracing::error!("Arbitration failed for {}: {}", attestation.uid, err);
                         }
                     }
                 }
 
                 _ = tokio::time::sleep(timeout.unwrap_or(Duration::from_secs(300))) => {
-                    println!("⏰ Timeout reached, exiting arbitration loop.");
+                    tracing::info!("Timeout reached, exiting arbitration loop.");
                     break;
                 }
             }
@@ -2029,7 +2030,7 @@ impl OracleClient {
 
                     let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await
                     else {
-                        println!("❌ Failed to get transaction count for {}", signer_address);
+                        tracing::error!("Failed to get transaction count for {}", signer_address);
                         continue;
                     };
 
@@ -2053,7 +2054,7 @@ impl OracleClient {
                             Err(_) => continue,
                         },
                         Err(err) => {
-                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                            tracing::error!("Arbitration failed for {}: {}", attestation.uid, err);
                         }
                     }
                 }
@@ -2198,7 +2199,7 @@ impl OracleClient {
 
                     let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await
                     else {
-                        println!("❌ Failed to get transaction count for {}", signer_address);
+                        tracing::error!("Failed to get transaction count for {}", signer_address);
                         continue;
                     };
 
@@ -2222,7 +2223,7 @@ impl OracleClient {
                             Err(_) => continue,
                         },
                         Err(err) => {
-                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                            tracing::error!("Arbitration failed for {}: {}", attestation.uid, err);
                         }
                     }
                 }
@@ -2321,7 +2322,7 @@ impl OracleClient {
                     let Some(decision_value) = arbitrate(&statement, &demand) else { continue; };
 
                     let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await else {
-                        println!("❌ Failed to get transaction count for {}", signer_address);
+                        tracing::error!("Failed to get transaction count for {}", signer_address);
                         continue;
                     };
 
@@ -2340,13 +2341,13 @@ impl OracleClient {
                             Err(_) => continue,
                         },
                         Err(err) => {
-                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                            tracing::error!("Arbitration failed for {}: {}", attestation.uid, err);
                         }
                     }
                 }
 
                 _ = tokio::time::sleep(timeout.unwrap_or(Duration::from_secs(300))) => {
-                    println!("⏰ Timeout reached, exiting arbitration loop.");
+                    tracing::info!("Timeout reached, exiting arbitration loop.");
                     break;
                 }
             }
@@ -2490,7 +2491,7 @@ impl OracleClient {
 
                     let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await
                     else {
-                        println!("❌ Failed to get transaction count for {}", signer_address);
+                        tracing::error!("Failed to get transaction count for {}", signer_address);
                         continue;
                     };
 
@@ -2514,7 +2515,7 @@ impl OracleClient {
                             Err(_) => continue,
                         },
                         Err(err) => {
-                            println!("❌ Arbitration failed for {}: {}", attestation.uid, err);
+                            tracing::error!("Arbitration failed for {}: {}", attestation.uid, err);
                         }
                     }
                 }
