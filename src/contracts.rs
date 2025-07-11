@@ -49,7 +49,6 @@ sol!(
     "src/contracts/ERC20Permit.json"
 );
 
-// Statements
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]

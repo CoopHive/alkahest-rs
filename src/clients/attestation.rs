@@ -55,37 +55,37 @@ impl AttestationClient {
         })
     }
 
-    /// Decodes AttestationEscrowObligation.StatementData from bytes.
+    /// Decodes AttestationEscrowObligation.ObligationData from bytes.
     ///
     /// # Arguments
-    /// * `statement_data` - The statement data
+    /// * `obligation_data` - The obligation data
     ///
     /// # Returns
-    /// * `Result<contracts::AttestationEscrowObligation::ObligationData>` - The decoded statement data
-    pub fn decode_escrow_statement(
-        statement_data: &Bytes,
+    /// * `Result<contracts::AttestationEscrowObligation::ObligationData>` - The decoded obligation data
+    pub fn decode_escrow_obligation(
+        obligation_data: &Bytes,
     ) -> eyre::Result<contracts::AttestationEscrowObligation::ObligationData> {
-        let statement_data =
-            contracts::AttestationEscrowObligation::ObligationData::abi_decode(statement_data)?;
-        return Ok(statement_data);
+        let obligation_data =
+            contracts::AttestationEscrowObligation::ObligationData::abi_decode(obligation_data)?;
+        return Ok(obligation_data);
     }
 
-    /// Decodes AttestationEscrowObligation2.StatementData from bytes.
+    /// Decodes AttestationEscrowObligation2.ObligationData from bytes.
     ///
     /// # Arguments
-    /// * `statement_data` - The statement data
+    /// * `obligation_data` - The obligation data
     ///
     /// # Returns
-    /// * `Result<contracts::AttestationEscrowObligation2::ObligationData>` - The decoded statement data
-    pub fn decode_escrow_statement_2(
-        statement_data: &Bytes,
+    /// * `Result<contracts::AttestationEscrowObligation2::ObligationData>` - The decoded obligation data
+    pub fn decode_escrow_obligation_2(
+        obligation_data: &Bytes,
     ) -> eyre::Result<contracts::AttestationEscrowObligation2::ObligationData> {
-        let statement_data =
-            contracts::AttestationEscrowObligation2::ObligationData::abi_decode(statement_data)?;
-        return Ok(statement_data);
+        let obligation_data =
+            contracts::AttestationEscrowObligation2::ObligationData::abi_decode(obligation_data)?;
+        return Ok(obligation_data);
     }
 
-    pub async fn get_escrow_statement(
+    pub async fn get_escrow_obligation(
         &self,
         uid: FixedBytes<32>,
     ) -> eyre::Result<DecodedAttestation<contracts::AttestationEscrowObligation::ObligationData>>
@@ -93,16 +93,16 @@ impl AttestationClient {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
         let attestation = eas_contract.getAttestation(uid).call().await?;
-        let statement_data =
+        let obligation_data =
             contracts::AttestationEscrowObligation::ObligationData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
-            data: statement_data,
+            data: obligation_data,
         })
     }
 
-    pub async fn get_escrow_statement_2(
+    pub async fn get_escrow_obligation_2(
         &self,
         uid: FixedBytes<32>,
     ) -> eyre::Result<DecodedAttestation<contracts::AttestationEscrowObligation2::ObligationData>>
@@ -110,12 +110,12 @@ impl AttestationClient {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
         let attestation = eas_contract.getAttestation(uid).call().await?;
-        let statement_data =
+        let obligation_data =
             contracts::AttestationEscrowObligation2::ObligationData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
-            data: statement_data,
+            data: obligation_data,
         })
     }
 
@@ -232,7 +232,7 @@ impl AttestationClient {
 
     /// Creates an escrow using an attestation as the escrowed item.
     /// This function uses the original AttestationEscrowObligation contract where the full attestation
-    /// data is stored in the escrow statement. When collecting payment, this contract creates a new
+    /// data is stored in the escrow obligation. When collecting payment, this contract creates a new
     /// attestation as the collection event, requiring the contract to have attestation rights.
     ///
     /// # Arguments
@@ -447,11 +447,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_decode_escrow_statement() -> eyre::Result<()> {
+    async fn test_decode_escrow_obligation() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
 
-        // Create sample statement data
+        // Create sample obligation data
         let attestation_request = IEAS::AttestationRequest {
             schema: FixedBytes::<32>::default(),
             data: IEAS::AttestationRequestData {
@@ -481,7 +481,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = AttestationClient::decode_escrow_statement(&encoded.into())?;
+        let decoded = AttestationClient::decode_escrow_obligation(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.arbiter, arbiter, "Arbiter should match");
@@ -499,11 +499,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_decode_escrow_statement_2() -> eyre::Result<()> {
+    async fn test_decode_escrow_obligation_2() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
 
-        // Create sample statement data
+        // Create sample obligation data
         let attestation_uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
         let arbiter = test
             .addresses
@@ -522,7 +522,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = AttestationClient::decode_escrow_statement_2(&encoded.into())?;
+        let decoded = AttestationClient::decode_escrow_obligation_2(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(
@@ -945,7 +945,7 @@ mod tests {
         let fulfillment_receipt = test
             .bob_client
             .string_obligation
-            .make_statement(
+            .do_obligation(
                 StringObligation::ObligationData {
                     item: "fulfillment data".to_string(),
                 },

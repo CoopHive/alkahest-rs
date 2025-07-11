@@ -582,7 +582,7 @@ impl ArbitersClient {
 
     pub async fn arbitrate_as_trusted_oracle(
         &self,
-        statement: FixedBytes<32>,
+        obligation: FixedBytes<32>,
         decision: bool,
     ) -> eyre::Result<TransactionReceipt> {
         let trusted_oracle_arbiter = contracts::TrustedOracleArbiter::new(
@@ -591,7 +591,7 @@ impl ArbitersClient {
         );
 
         let receipt = trusted_oracle_arbiter
-            .arbitrate(statement, decision)
+            .arbitrate(obligation, decision)
             .send()
             .await?
             .get_receipt()
@@ -603,14 +603,14 @@ impl ArbitersClient {
     pub async fn wait_for_trusted_oracle_arbitration(
         &self,
         oracle: Address,
-        statement: FixedBytes<32>,
+        obligation: FixedBytes<32>,
         from_block: Option<u64>,
     ) -> eyre::Result<Log<contracts::TrustedOracleArbiter::ArbitrationMade>> {
         let filter = Filter::new()
             .from_block(from_block.unwrap_or(0))
             .address(self.addresses.trusted_oracle_arbiter)
             .event_signature(contracts::TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH)
-            .topic1(statement)
+            .topic1(obligation)
             .topic2(oracle.into_word());
 
         let logs = self.public_provider.get_logs(&filter).await?;
@@ -759,7 +759,7 @@ mod tests {
         let demand = ArbitersClient::encode_trusted_party_arbiter_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
-        // Check statement should revert with NotTrustedParty
+        // Check obligation should revert with NotTrustedParty
         let trusted_party_arbiter = contracts::TrustedPartyArbiter::new(
             test.addresses
                 .arbiters_addresses
@@ -815,7 +815,7 @@ mod tests {
             &test.alice_client.public_provider,
         );
 
-        // Call check_statement - should revert with RecipientMismatched
+        // Call check_obligation - should revert with RecipientMismatched
         let result = recipient_arbiter
             .checkObligation(attestation.clone().into(), demand, counteroffer)
             .call()
@@ -855,13 +855,13 @@ mod tests {
         let demand = ArbitersClient::encode_recipient_arbiter_composing_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
-        // Check statement should return true
+        // Check obligation should return true
         let recipient_arbiter = contracts::RecipientArbiter::new(
             test.addresses.arbiters_addresses.unwrap().recipient_arbiter,
             &test.alice_client.public_provider,
         );
 
-        // Call check_statement
+        // Call check_obligation
         let result = recipient_arbiter
             .checkObligation(attestation.clone().into(), demand, counteroffer)
             .call()
@@ -903,7 +903,7 @@ mod tests {
         let demand = ArbitersClient::encode_trusted_party_arbiter_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
-        // Check statement should revert with NotTrustedParty
+        // Check obligation should revert with NotTrustedParty
         let trusted_party_arbiter = contracts::TrustedPartyArbiter::new(
             test.addresses
                 .arbiters_addresses
@@ -928,10 +928,10 @@ mod tests {
         // Setup test environment
         let test = setup_test_environment().await?;
 
-        let statement_uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
+        let obligation_uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
 
-        // Create an attestation with the statement UID
-        let attestation = create_test_attestation(Some(statement_uid), None);
+        // Create an attestation with the obligation UID
+        let attestation = create_test_attestation(Some(obligation_uid), None);
 
         // Create demand data with oracle as bob
         let demand_data = TrustedOracleArbiter::DemandData {
@@ -943,7 +943,7 @@ mod tests {
         let demand = ArbitersClient::encode_trusted_oracle_arbiter_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
-        // Check statement - should be false initially since no decision has been made
+        // Check obligation - should be false initially since no decision has been made
         let trusted_oracle_arbiter = contracts::TrustedOracleArbiter::new(
             test.addresses
                 .arbiters_addresses
@@ -971,10 +971,10 @@ mod tests {
         // Setup test environment
         let test = setup_test_environment().await?;
 
-        let statement_uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
+        let obligation_uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
 
-        // Create an attestation with the statement UID
-        let attestation = create_test_attestation(Some(statement_uid), None);
+        // Create an attestation with the obligation UID
+        let attestation = create_test_attestation(Some(obligation_uid), None);
 
         // Create demand data with oracle as bob
         let demand_data = TrustedOracleArbiter::DemandData {
@@ -1007,7 +1007,7 @@ mod tests {
         let arbitrate_hash = test
             .bob_client
             .arbiters
-            .arbitrate_as_trusted_oracle(statement_uid, true)
+            .arbitrate_as_trusted_oracle(obligation_uid, true)
             .await?
             .transaction_hash;
 
@@ -1037,7 +1037,7 @@ mod tests {
         // Setup test environment
         let test = setup_test_environment().await?;
 
-        let statement_uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
+        let obligation_uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
 
         // Set up two different oracles
         let oracle1 = test.bob.address();
@@ -1047,7 +1047,7 @@ mod tests {
         let arbitrate_hash1 = test
             .bob_client
             .arbiters
-            .arbitrate_as_trusted_oracle(statement_uid, true)
+            .arbitrate_as_trusted_oracle(obligation_uid, true)
             .await?
             .transaction_hash;
 
@@ -1062,7 +1062,7 @@ mod tests {
         let arbitrate_hash2 = test
             .alice_client
             .arbiters
-            .arbitrate_as_trusted_oracle(statement_uid, false)
+            .arbitrate_as_trusted_oracle(obligation_uid, false)
             .await?
             .transaction_hash;
 
@@ -1074,7 +1074,7 @@ mod tests {
             .await?;
 
         // Create the attestation
-        let attestation = create_test_attestation(Some(statement_uid), None);
+        let attestation = create_test_attestation(Some(obligation_uid), None);
         let trusted_oracle_arbiter = contracts::TrustedOracleArbiter::new(
             test.addresses
                 .arbiters_addresses
@@ -1122,10 +1122,10 @@ mod tests {
 
         // Create a new oracle address that hasn't made a decision
         let new_oracle = Address::from_slice(&[0x42; 20]);
-        let statement_uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
+        let obligation_uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
 
         // Create the attestation
-        let attestation = create_test_attestation(Some(statement_uid), None);
+        let attestation = create_test_attestation(Some(obligation_uid), None);
 
         // Create demand data with the new oracle
         let demand_data = TrustedOracleArbiter::DemandData {
@@ -1175,7 +1175,7 @@ mod tests {
         // Encode the demand data
         let encoded = ArbitersClient::encode_specific_attestation_arbiter_demand(&demand_data);
 
-        // Check statement should revert with NotDemandedAttestation
+        // Check obligation should revert with NotDemandedAttestation
         let specific_attestation_arbiter = contracts::SpecificAttestationArbiter::new(
             test.addresses
                 .arbiters_addresses
@@ -1223,7 +1223,7 @@ mod tests {
         // Encode the demand data
         let encoded = ArbitersClient::encode_uid_arbiter_composing_demand(&demand_data);
 
-        // Check statement should revert with UidMismatched
+        // Check obligation should revert with UidMismatched
         let uid_arbiter_address = test
             .addresses
             .arbiters_addresses
@@ -1271,7 +1271,7 @@ mod tests {
         // Encode the demand data
         let encoded = ArbitersClient::encode_uid_arbiter_composing_demand(&demand_data);
 
-        // Check statement - should return true
+        // Check obligation - should return true
         let uid_arbiter_address = test
             .addresses
             .arbiters_addresses
@@ -1309,7 +1309,7 @@ mod tests {
         let demand = ArbitersClient::encode_specific_attestation_arbiter_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
-        // Check statement should revert with NotDemandedAttestation
+        // Check obligation should revert with NotDemandedAttestation
         let specific_attestation_arbiter = contracts::SpecificAttestationArbiter::new(
             test.addresses
                 .arbiters_addresses
@@ -1488,17 +1488,17 @@ mod tests {
         // Setup test environment
         let test = setup_test_environment().await?;
 
-        let statement_uid = FixedBytes::<32>::from_slice(&[42u8; 32]);
+        let obligation_uid = FixedBytes::<32>::from_slice(&[42u8; 32]);
         let oracle = test.bob.address();
 
         // Start listening for arbitration events in the background
         let listener_task = tokio::spawn({
             let alice_client = test.alice_client.clone();
-            let statement_uid = statement_uid.clone();
+            let obligation_uid = obligation_uid.clone();
             async move {
                 alice_client
                     .arbiters
-                    .wait_for_trusted_oracle_arbitration(oracle, statement_uid, None)
+                    .wait_for_trusted_oracle_arbitration(oracle, obligation_uid, None)
                     .await
             }
         });
@@ -1510,7 +1510,7 @@ mod tests {
         let arbitrate_hash = test
             .bob_client
             .arbiters
-            .arbitrate_as_trusted_oracle(statement_uid, true)
+            .arbitrate_as_trusted_oracle(obligation_uid, true)
             .await?
             .transaction_hash;
 
@@ -1528,8 +1528,8 @@ mod tests {
         // Verify the event data
         assert_eq!(log_result.oracle, oracle, "Oracle in event should match");
         assert_eq!(
-            log_result.obligation, statement_uid,
-            "Statement UID in event should match"
+            log_result.obligation, obligation_uid,
+            "Obligation UID in event should match"
         );
         assert!(log_result.decision, "Decision in event should be true");
 

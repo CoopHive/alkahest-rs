@@ -86,7 +86,7 @@ mod tests {
         let receipt = test
             .bob_client
             .string_obligation
-            .make_statement(
+            .do_obligation(
                 StringObligation::ObligationData {
                     item: statement.to_string(),
                 },
@@ -144,7 +144,7 @@ mod tests {
     ) -> FulfillmentParams<StringObligation::ObligationData> {
         FulfillmentParams {
             filter,
-            _statement_data: PhantomData::<StringObligation::ObligationData>,
+            _obligation_data: PhantomData::<StringObligation::ObligationData>,
         }
     }
 
@@ -172,7 +172,7 @@ mod tests {
     ) -> FulfillmentParamsWithoutRefUid<StringObligation::ObligationData> {
         FulfillmentParamsWithoutRefUid {
             filter,
-            _statement_data: std::marker::PhantomData,
+            _obligation_data: std::marker::PhantomData,
         }
     }
 
@@ -235,7 +235,7 @@ mod tests {
             .await?;
 
         for decision in &decisions {
-            assert_eq!(decision.decision, decision.statement.item == "good");
+            assert_eq!(decision.decision, decision.obligation.item == "good");
         }
 
         let good_collection = test
@@ -425,7 +425,7 @@ mod tests {
                 &fulfillment,
                 &|_statement: &StringObligation::ObligationData| -> Option<bool> { Some(true) },
                 |decision| {
-                    let statement_item = decision.statement.item.clone();
+                    let statement_item = decision.obligation.item.clone();
                     let decision_value = decision.decision;
                     async move {
                         assert_eq!(statement_item, "good");
@@ -476,9 +476,12 @@ mod tests {
             oracle
                 .listen_and_arbitrate_no_spawn(
                     &fulfillment,
-                    &|_statement: &StringObligation::ObligationData| -> Option<bool> { Some(true) },
+                    &|_statement: &StringObligation::ObligationData| -> Option<bool> {
+                        println!("Arbitrating for item: {}", _statement.item);
+                        Some(true)
+                    },
                     |decision| {
-                        let statement_item = decision.statement.item.clone();
+                        let statement_item = decision.obligation.item.clone();
                         let decision_value = decision.decision;
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
                         async move {
@@ -502,6 +505,7 @@ mod tests {
         let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
 
         // Allow time for listener to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         let collection = test
             .bob_client
@@ -535,7 +539,7 @@ mod tests {
                     &fulfillment,
                     &|_statement: &StringObligation::ObligationData| -> Option<bool> { Some(true) },
                     |decision| {
-                        let statement_item = decision.statement.item.clone();
+                        let statement_item = decision.obligation.item.clone();
                         let decision_value = decision.decision;
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
                         async move {
@@ -594,7 +598,7 @@ mod tests {
                     Some(_statement.item == "good")
                 },
                 |decision| {
-                    let statement_item = decision.statement.item.clone();
+                    let statement_item = decision.obligation.item.clone();
                     let decision_value = decision.decision;
                     async move {
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
@@ -660,7 +664,7 @@ mod tests {
                     Some(_statement.item == "good")
                 },
                 |decision| {
-                    let statement_item = decision.statement.item.clone();
+                    let statement_item = decision.obligation.item.clone();
                     let decision_value = decision.decision;
                     async move {
                         assert_eq!(
@@ -729,7 +733,7 @@ mod tests {
                     async move { Some(item == "async good") }
                 },
                 |decision| {
-                    let statement_item = decision.statement.item.clone();
+                    let statement_item = decision.obligation.item.clone();
                     let decision_value = decision.decision;
                     println!(
                         "Decision made for item '{}': {}",
@@ -786,7 +790,7 @@ mod tests {
                     }
                 },
                 |decision| {
-                    let statement_item = decision.statement.item.clone();
+                    let statement_item = decision.obligation.item.clone();
                     let decision_value = decision.decision;
                     async move {
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
@@ -858,7 +862,7 @@ mod tests {
                     async move { Some(result) }
                 },
                 |decision| {
-                    let statement_item = decision.statement.item.clone();
+                    let statement_item = decision.obligation.item.clone();
                     let decision_value = decision.decision;
                     async move {
                         assert_eq!(
@@ -1277,7 +1281,7 @@ mod tests {
                     Some(item == "good")
                 },
                 |_decision| {
-                    let statement_item = _decision.statement.item.clone();
+                    let statement_item = _decision.obligation.item.clone();
                     let decision_value = _decision.decision;
                     async move {
                         assert_eq!(statement_item, "good");
@@ -1341,7 +1345,7 @@ mod tests {
                     async move { Some(item == "good") }
                 },
                 |_decision| {
-                    let statement_item = _decision.statement.item.clone();
+                    let statement_item = _decision.obligation.item.clone();
                     let decision_value = _decision.decision;
                     async move {
                         assert_eq!(statement_item, "good");
@@ -1409,7 +1413,7 @@ mod tests {
                     Some(item == "good")
                 },
                 |_decision| {
-                    let statement_item = _decision.statement.item.clone();
+                    let statement_item = _decision.obligation.item.clone();
                     let decision_value = _decision.decision;
 
                     async move {
@@ -1504,7 +1508,7 @@ mod tests {
                         Some(item == "good")
                     },
                     |_decision| {
-                        let statement_item = _decision.statement.item.clone();
+                        let statement_item = _decision.obligation.item.clone();
                         let decision_value = _decision.decision;
 
                         async move {
@@ -1594,7 +1598,7 @@ mod tests {
                     async move { Some(item == "good") }
                 },
                 |_decision| {
-                    let statement_item = _decision.statement.item.clone();
+                    let statement_item = _decision.obligation.item.clone();
                     let decision_value = _decision.decision;
                     async move {
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
@@ -1687,7 +1691,7 @@ mod tests {
                     Some(item == "good")
                 },
                 |_decision| {
-                    let statement_item = _decision.statement.item.clone();
+                    let statement_item = _decision.obligation.item.clone();
                     let decision_value = _decision.decision;
 
                     async move {
@@ -1780,7 +1784,7 @@ mod tests {
                     async move { Some(item == "good") }
                 },
                 |_decision| {
-                    let statement_item = _decision.statement.item.clone();
+                    let statement_item = _decision.obligation.item.clone();
                     let decision_value = _decision.decision;
                     async move {
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
@@ -1873,7 +1877,7 @@ mod tests {
                         Some(item == "good")
                     },
                     |_decision| {
-                        let statement_item = _decision.statement.item.clone();
+                        let statement_item = _decision.obligation.item.clone();
                         let decision_value = _decision.decision;
 
                         async move {

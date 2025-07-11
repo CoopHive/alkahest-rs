@@ -68,64 +68,64 @@ impl Erc1155Client {
     /// Decodes ERC1155EscrowObligation.ObligationData from bytes.
     ///
     /// # Arguments
-    /// * `statement_data` - The statement data
+    /// * `obligation_data` - The obligation data
     ///
     /// # Returns
-    /// * `Result<contracts::ERC1155EscrowObligation::ObligationData>` - The decoded statement data
-    pub fn decode_escrow_statement(
-        statement_data: &Bytes,
+    /// * `Result<contracts::ERC1155EscrowObligation::ObligationData>` - The decoded obligation data
+    pub fn decode_escrow_obligation(
+        obligation_data: &Bytes,
     ) -> eyre::Result<contracts::ERC1155EscrowObligation::ObligationData> {
-        let statement_data =
-            contracts::ERC1155EscrowObligation::ObligationData::abi_decode(statement_data)?;
-        return Ok(statement_data);
+        let obligation_data =
+            contracts::ERC1155EscrowObligation::ObligationData::abi_decode(obligation_data)?;
+        return Ok(obligation_data);
     }
 
     /// Decodes ERC1155PaymentObligation.ObligationData from bytes.
     ///
     /// # Arguments
     ///
-    /// * `statement_data` - The statement data
+    /// * `obligation_data` - The obligation data
     ///
     /// # Returns
     ///
-    /// * `eyre::Result<contracts::ERC1155PaymentObligation::ObligationData>` - The decoded statement data
-    pub fn decode_payment_statement(
-        statement_data: &Bytes,
+    /// * `eyre::Result<contracts::ERC1155PaymentObligation::ObligationData>` - The decoded obligation data
+    pub fn decode_payment_obligation(
+        obligation_data: &Bytes,
     ) -> eyre::Result<contracts::ERC1155PaymentObligation::ObligationData> {
-        let statement_data =
-            contracts::ERC1155PaymentObligation::ObligationData::abi_decode(statement_data)?;
-        return Ok(statement_data);
+        let obligation_data =
+            contracts::ERC1155PaymentObligation::ObligationData::abi_decode(obligation_data)?;
+        return Ok(obligation_data);
     }
 
-    pub async fn get_escrow_statement(
+    pub async fn get_escrow_obligation(
         &self,
         uid: FixedBytes<32>,
     ) -> eyre::Result<DecodedAttestation<contracts::ERC1155EscrowObligation::ObligationData>> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
         let attestation = eas_contract.getAttestation(uid).call().await?;
-        let statement_data =
+        let obligation_data =
             contracts::ERC1155EscrowObligation::ObligationData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
-            data: statement_data,
+            data: obligation_data,
         })
     }
 
-    pub async fn get_payment_statement(
+    pub async fn get_payment_obligation(
         &self,
         uid: FixedBytes<32>,
     ) -> eyre::Result<DecodedAttestation<contracts::ERC1155PaymentObligation::ObligationData>> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
         let attestation = eas_contract.getAttestation(uid).call().await?;
-        let statement_data =
+        let obligation_data =
             contracts::ERC1155PaymentObligation::ObligationData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
-            data: statement_data,
+            data: obligation_data,
         })
     }
 
@@ -591,11 +591,11 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn test_decode_escrow_statement() -> eyre::Result<()> {
+    async fn test_decode_escrow_obligation() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
 
-        // Create sample statement data
+        // Create sample obligation data
         let token_address = test.mock_addresses.erc1155_a;
         let id: U256 = 1.try_into()?;
         let amount: U256 = 10.try_into()?;
@@ -618,7 +618,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = Erc1155Client::decode_escrow_statement(&encoded.into())?;
+        let decoded = Erc1155Client::decode_escrow_obligation(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.token, token_address, "Token address should match");
@@ -631,11 +631,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_decode_payment_statement() -> eyre::Result<()> {
+    async fn test_decode_payment_obligation() -> eyre::Result<()> {
         // test setup
         let test = setup_test_environment().await?;
 
-        // Create sample statement data
+        // Create sample obligation data
         let token_address = test.mock_addresses.erc1155_a;
         let id: U256 = 1.try_into()?;
         let amount: U256 = 10.try_into()?;
@@ -652,7 +652,7 @@ mod tests {
         let encoded = payment_data.abi_encode();
 
         // Decode the data
-        let decoded = Erc1155Client::decode_payment_statement(&encoded.into())?;
+        let decoded = Erc1155Client::decode_payment_obligation(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.token, token_address, "Token address should match");
@@ -843,7 +843,7 @@ mod tests {
         );
         assert_eq!(escrow_balance, 5.try_into()?, "Escrow should have 5 tokens");
 
-        // escrow statement made
+        // escrow obligation made
         let attested_event = AlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
@@ -902,7 +902,7 @@ mod tests {
             "Bob should have received 5 tokens"
         );
 
-        // payment statement made
+        // payment obligation made
         let attested_event = AlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
@@ -966,7 +966,7 @@ mod tests {
             "5 tokens should be in escrow"
         );
 
-        // escrow statement made
+        // escrow obligation made
         let attested_event = AlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
@@ -1197,7 +1197,7 @@ mod tests {
             "5 tokens should be in escrow"
         );
 
-        // escrow statement made
+        // escrow obligation made
         let attested_event = AlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
@@ -1260,7 +1260,7 @@ mod tests {
             "5 tokens should be in escrow"
         );
 
-        // escrow statement made
+        // escrow obligation made
         let attested_event = AlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
@@ -1336,7 +1336,7 @@ mod tests {
             "5 tokens should be in escrow"
         );
 
-        // escrow statement made
+        // escrow obligation made
         let attested_event = AlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
@@ -1601,8 +1601,8 @@ mod tests {
             }],
         };
 
-        // Create the ERC1155 payment statement data as the demand
-        let payment_statement_data = crate::contracts::ERC1155PaymentObligation::ObligationData {
+        // Create the ERC1155 payment obligation data as the demand
+        let payment_obligation_data = crate::contracts::ERC1155PaymentObligation::ObligationData {
             token: test.mock_addresses.erc1155_a,
             tokenId: 1.try_into()?,
             amount: 5.try_into()?,
@@ -1627,7 +1627,7 @@ mod tests {
                         .erc1155_addresses
                         .ok_or(eyre::eyre!("no erc1155-related addresses"))?
                         .payment_obligation,
-                    demand: payment_statement_data.abi_encode().into(),
+                    demand: payment_obligation_data.abi_encode().into(),
                 },
                 0,
             )
