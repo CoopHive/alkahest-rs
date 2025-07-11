@@ -121,7 +121,7 @@ impl StringObligationClient {
         Ok(receipt)
     }
 
-    pub async fn make_obligation_json<T: serde::Serialize>(
+    pub async fn do_obligation_json<T: serde::Serialize>(
         &self,
         obligation_data: T,
         ref_uid: Option<FixedBytes<32>>,
