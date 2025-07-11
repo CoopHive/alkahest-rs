@@ -14,7 +14,7 @@ mod tests {
     use alloy::{
         eips::BlockNumberOrTag,
         primitives::{Address, Bytes, FixedBytes, bytes},
-        providers::Provider as _,
+        providers::{Provider as _, ext::AnvilApi},
         rpc::types::{FilterBlockOption, ValueOrArray},
         sol,
         sol_types::SolValue,
@@ -87,7 +87,7 @@ mod tests {
             .bob_client
             .string_obligation
             .make_statement(
-                StringObligation::StatementData {
+                StringObligation::ObligationData {
                     item: statement.to_string(),
                 },
                 Some(ref_uid),
@@ -141,10 +141,10 @@ mod tests {
 
     fn make_fulfillment_params(
         filter: AttestationFilter,
-    ) -> FulfillmentParams<StringObligation::StatementData> {
+    ) -> FulfillmentParams<StringObligation::ObligationData> {
         FulfillmentParams {
             filter,
-            _statement_data: PhantomData::<StringObligation::StatementData>,
+            _statement_data: PhantomData::<StringObligation::ObligationData>,
         }
     }
 
@@ -169,7 +169,7 @@ mod tests {
 
     fn make_fulfillment_params_without_refuid(
         filter: AttestationFilterWithoutRefUid,
-    ) -> FulfillmentParamsWithoutRefUid<StringObligation::StatementData> {
+    ) -> FulfillmentParamsWithoutRefUid<StringObligation::ObligationData> {
         FulfillmentParamsWithoutRefUid {
             filter,
             _statement_data: std::marker::PhantomData,
@@ -205,7 +205,7 @@ mod tests {
         let collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, fulfillment_uid)
+            .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
         println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
@@ -241,7 +241,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -252,7 +252,7 @@ mod tests {
         let bad_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
         assert!(
@@ -312,7 +312,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -323,7 +323,7 @@ mod tests {
         let bad_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
         assert!(
@@ -385,7 +385,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -396,7 +396,7 @@ mod tests {
         let bad_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
         assert!(
@@ -423,7 +423,7 @@ mod tests {
         let listen_result = oracle
             .listen_and_arbitrate(
                 &fulfillment,
-                &|_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
+                &|_statement: &StringObligation::ObligationData| -> Option<bool> { Some(true) },
                 |decision| {
                     let statement_item = decision.statement.item.clone();
                     let decision_value = decision.decision;
@@ -448,7 +448,7 @@ mod tests {
         let collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, fulfillment_uid)
+            .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
         println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
@@ -476,7 +476,7 @@ mod tests {
             oracle
                 .listen_and_arbitrate_no_spawn(
                     &fulfillment,
-                    &|_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
+                    &|_statement: &StringObligation::ObligationData| -> Option<bool> { Some(true) },
                     |decision| {
                         let statement_item = decision.statement.item.clone();
                         let decision_value = decision.decision;
@@ -502,12 +502,11 @@ mod tests {
         let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
 
         // Allow time for listener to process
-        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
         let collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, fulfillment_uid)
+            .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
         println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
@@ -534,7 +533,7 @@ mod tests {
             oracle
                 .listen_and_arbitrate_new_fulfillments_no_spawn(
                     &fulfillment,
-                    &|_statement: &StringObligation::StatementData| -> Option<bool> { Some(true) },
+                    &|_statement: &StringObligation::ObligationData| -> Option<bool> { Some(true) },
                     |decision| {
                         let statement_item = decision.statement.item.clone();
                         let decision_value = decision.decision;
@@ -565,7 +564,7 @@ mod tests {
         let collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, fulfillment_uid)
+            .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
         println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
@@ -591,7 +590,7 @@ mod tests {
             .oracle
             .listen_and_arbitrate(
                 &fulfillment,
-                &|_statement: &StringObligation::StatementData| -> Option<bool> {
+                &|_statement: &StringObligation::ObligationData| -> Option<bool> {
                     Some(_statement.item == "good")
                 },
                 |decision| {
@@ -619,7 +618,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -630,7 +629,7 @@ mod tests {
         let bad_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
         assert!(
@@ -657,7 +656,7 @@ mod tests {
         let listen_result = oracle
             .listen_and_arbitrate_new_fulfillments(
                 &fulfillment,
-                &|_statement: &StringObligation::StatementData| -> Option<bool> {
+                &|_statement: &StringObligation::ObligationData| -> Option<bool> {
                     Some(_statement.item == "good")
                 },
                 |decision| {
@@ -688,7 +687,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -699,7 +698,7 @@ mod tests {
         let bad_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
         assert!(
@@ -724,7 +723,7 @@ mod tests {
         let listen_result = oracle
             .listen_and_arbitrate_async(
                 &fulfillment,
-                |_stmt: &StringObligation::StatementData| {
+                |_stmt: &StringObligation::ObligationData| {
                     let item = _stmt.item.clone();
                     println!("Arbitrating for item: {}", item);
                     async move { Some(item == "async good") }
@@ -758,7 +757,7 @@ mod tests {
         let _collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, fulfillment_uid)
+            .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
         oracle.unsubscribe(listen_result.subscription_id).await?;
@@ -779,7 +778,7 @@ mod tests {
         let listen_result = oracle
             .listen_and_arbitrate_async(
                 &fulfillment,
-                |_stmt: &StringObligation::StatementData| {
+                |_stmt: &StringObligation::ObligationData| {
                     let item = _stmt.item.clone();
                     async move {
                         println!("🧠 Arbitrating for item: {}", item);
@@ -821,7 +820,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!("✅ Collection 1 succeeded: {:?}", good_collection);
@@ -829,7 +828,7 @@ mod tests {
         let bad_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
         assert!(
@@ -854,7 +853,7 @@ mod tests {
         let listen_result = oracle
             .listen_and_arbitrate_new_fulfillments_async(
                 &fulfillment,
-                |_statement: &StringObligation::StatementData| {
+                |_statement: &StringObligation::ObligationData| {
                     let result = _statement.item == "good";
                     async move { Some(result) }
                 },
@@ -886,7 +885,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -897,7 +896,7 @@ mod tests {
         let bad_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
         assert!(
@@ -948,7 +947,7 @@ mod tests {
         let collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, fulfillment_uid)
+            .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
         println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
@@ -995,7 +994,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -1006,7 +1005,7 @@ mod tests {
         let bad_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
         assert!(
@@ -1080,7 +1079,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -1091,7 +1090,7 @@ mod tests {
         let bad_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
         assert!(
@@ -1141,7 +1140,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -1152,7 +1151,7 @@ mod tests {
         let bad_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
         assert!(
@@ -1226,7 +1225,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -1237,7 +1236,7 @@ mod tests {
         let bad_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
         assert!(
@@ -1299,7 +1298,7 @@ mod tests {
         let _collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, fulfillment_uid)
+            .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
         oracle
@@ -1363,7 +1362,7 @@ mod tests {
         let _collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, fulfillment_uid)
+            .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
         oracle
@@ -1430,7 +1429,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -1441,7 +1440,7 @@ mod tests {
         let bad_collection1 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid1)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
         assert!(
@@ -1452,7 +1451,7 @@ mod tests {
         let bad_collection2 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid2)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
 
         assert!(
@@ -1529,7 +1528,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -1540,7 +1539,7 @@ mod tests {
         let bad_collection1 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid1)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
         assert!(
@@ -1551,7 +1550,7 @@ mod tests {
         let bad_collection2 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid2)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
 
         assert!(
@@ -1614,7 +1613,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -1625,7 +1624,7 @@ mod tests {
         let bad_collection1 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid1)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
         assert!(
@@ -1636,7 +1635,7 @@ mod tests {
         let bad_collection2 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid2)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
         assert!(
             bad_collection2.is_err(),
@@ -1707,7 +1706,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -1718,7 +1717,7 @@ mod tests {
         let bad_collection1 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid1)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
         assert!(
@@ -1729,7 +1728,7 @@ mod tests {
         let bad_collection2 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid2)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
 
         assert!(
@@ -1799,7 +1798,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -1810,7 +1809,7 @@ mod tests {
         let bad_collection1 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid1)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
         assert!(
@@ -1821,7 +1820,7 @@ mod tests {
         let bad_collection2 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid2)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
         assert!(
             bad_collection2.is_err(),
@@ -1839,7 +1838,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_conditional_listen_and_arbitrate_new_fulfillments_for_escrow_no_spawn() -> eyre::Result<()> {
+    async fn test_conditional_listen_and_arbitrate_new_fulfillments_for_escrow_no_spawn()
+    -> eyre::Result<()> {
         let test = setup_test_environment().await?;
         let (_, item, escrow_uid) = setup_escrow(&test).await?;
 
@@ -1897,7 +1897,7 @@ mod tests {
         let good_collection = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, good_fulfillment_uid)
+            .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
         println!(
@@ -1908,7 +1908,7 @@ mod tests {
         let bad_collection1 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid1)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
         assert!(
@@ -1919,7 +1919,7 @@ mod tests {
         let bad_collection2 = test
             .bob_client
             .erc20
-            .collect_payment(escrow_uid, bad_fulfillment_uid2)
+            .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
 
         assert!(

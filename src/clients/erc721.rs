@@ -65,22 +65,22 @@ impl Erc721Client {
         })
     }
 
-    /// Decodes ERC721EscrowObligation.StatementData from bytes.
+    /// Decodes ERC721EscrowObligation.ObligationData from bytes.
     ///
     /// # Arguments
     /// * `statement_data` - The statement data
     ///
     /// # Returns
-    /// * `Result<contracts::ERC721EscrowObligation::StatementData>` - The decoded statement data
+    /// * `Result<contracts::ERC721EscrowObligation::ObligationData>` - The decoded statement data
     pub fn decode_escrow_statement(
         statement_data: &Bytes,
-    ) -> eyre::Result<contracts::ERC721EscrowObligation::StatementData> {
+    ) -> eyre::Result<contracts::ERC721EscrowObligation::ObligationData> {
         let statement_data =
-            contracts::ERC721EscrowObligation::StatementData::abi_decode(statement_data.as_ref())?;
+            contracts::ERC721EscrowObligation::ObligationData::abi_decode(statement_data.as_ref())?;
         return Ok(statement_data);
     }
 
-    /// Decodes ERC721PaymentObligation.StatementData from bytes.
+    /// Decodes ERC721PaymentObligation.ObligationData from bytes.
     ///
     /// # Arguments
     ///
@@ -88,24 +88,24 @@ impl Erc721Client {
     ///
     /// # Returns
     ///
-    /// * `eyre::Result<contracts::ERC721PaymentObligation::StatementData>` - The decoded statement data
+    /// * `eyre::Result<contracts::ERC721PaymentObligation::ObligationData>` - The decoded statement data
     pub fn decode_payment_statement(
         statement_data: &Bytes,
-    ) -> eyre::Result<contracts::ERC721PaymentObligation::StatementData> {
+    ) -> eyre::Result<contracts::ERC721PaymentObligation::ObligationData> {
         let statement_data =
-            contracts::ERC721PaymentObligation::StatementData::abi_decode(statement_data.as_ref())?;
+            contracts::ERC721PaymentObligation::ObligationData::abi_decode(statement_data.as_ref())?;
         return Ok(statement_data);
     }
 
     pub async fn get_escrow_statement(
         &self,
         uid: FixedBytes<32>,
-    ) -> eyre::Result<DecodedAttestation<contracts::ERC721EscrowObligation::StatementData>> {
+    ) -> eyre::Result<DecodedAttestation<contracts::ERC721EscrowObligation::ObligationData>> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
         let attestation = eas_contract.getAttestation(uid).call().await?;
         let statement_data =
-            contracts::ERC721EscrowObligation::StatementData::abi_decode(&attestation.data)?;
+            contracts::ERC721EscrowObligation::ObligationData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
@@ -116,12 +116,12 @@ impl Erc721Client {
     pub async fn get_payment_statement(
         &self,
         uid: FixedBytes<32>,
-    ) -> eyre::Result<DecodedAttestation<contracts::ERC721PaymentObligation::StatementData>> {
+    ) -> eyre::Result<DecodedAttestation<contracts::ERC721PaymentObligation::ObligationData>> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
         let attestation = eas_contract.getAttestation(uid).call().await?;
         let statement_data =
-            contracts::ERC721PaymentObligation::StatementData::abi_decode(&attestation.data)?;
+            contracts::ERC721PaymentObligation::ObligationData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
@@ -227,7 +227,7 @@ impl Erc721Client {
     ///
     /// # Returns
     /// * `Result<TransactionReceipt>` - The transaction receipt
-    pub async fn collect_payment(
+    pub async fn collect_escrow(
         &self,
         buy_attestation: FixedBytes<32>,
         fulfillment: FixedBytes<32>,
@@ -238,7 +238,7 @@ impl Erc721Client {
         );
 
         let receipt = escrow_contract
-            .collectPayment(buy_attestation, fulfillment)
+            .collectEscrow(buy_attestation, fulfillment)
             .send()
             .await?
             .get_receipt()
@@ -254,7 +254,7 @@ impl Erc721Client {
     ///
     /// # Returns
     /// * `Result<TransactionReceipt>` - The transaction receipt
-    pub async fn collect_expired(
+    pub async fn reclaim_expired(
         &self,
         buy_attestation: FixedBytes<32>,
     ) -> eyre::Result<TransactionReceipt> {
@@ -264,7 +264,7 @@ impl Erc721Client {
         );
 
         let receipt = escrow_contract
-            .collectExpired(buy_attestation)
+            .reclaimExpired(buy_attestation)
             .send()
             .await?
             .get_receipt()
@@ -294,8 +294,8 @@ impl Erc721Client {
         );
 
         let receipt = escrow_obligation_contract
-            .makeStatement(
-                contracts::ERC721EscrowObligation::StatementData {
+            .doObligation(
+                contracts::ERC721EscrowObligation::ObligationData {
                     token: price.address,
                     tokenId: price.id,
                     arbiter: item.arbiter,
@@ -330,7 +330,7 @@ impl Erc721Client {
         );
 
         let receipt = payment_obligation_contract
-            .makeStatement(contracts::ERC721PaymentObligation::StatementData {
+            .doObligation(contracts::ERC721PaymentObligation::ObligationData {
                 token: price.address,
                 tokenId: price.id,
                 payee,
@@ -617,7 +617,7 @@ mod tests {
             .payment_obligation;
         let demand = Bytes::from(vec![1, 2, 3, 4]); // sample demand data
 
-        let escrow_data = crate::contracts::ERC721EscrowObligation::StatementData {
+        let escrow_data = crate::contracts::ERC721EscrowObligation::ObligationData {
             token: token_address,
             tokenId: id,
             arbiter,
@@ -649,7 +649,7 @@ mod tests {
         let id: U256 = 1.try_into()?;
         let payee = test.alice.address();
 
-        let payment_data = crate::contracts::ERC721PaymentObligation::StatementData {
+        let payment_data = crate::contracts::ERC721PaymentObligation::ObligationData {
             token: token_address,
             tokenId: id,
             payee,
@@ -1136,7 +1136,7 @@ mod tests {
         let _collect_receipt = test
             .alice_client
             .erc721
-            .collect_expired(buy_attestation)
+            .reclaim_expired(buy_attestation)
             .await?;
 
         // verify token returned to alice
@@ -1570,7 +1570,7 @@ mod tests {
         };
 
         // Create the ERC721 payment statement data as the demand
-        let payment_statement_data = crate::contracts::ERC721PaymentObligation::StatementData {
+        let payment_statement_data = crate::contracts::ERC721PaymentObligation::ObligationData {
             token: test.mock_addresses.erc721_a,
             tokenId: 1.try_into()?,
             payee: test.bob.address(),

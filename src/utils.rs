@@ -35,7 +35,6 @@ use crate::{
         TrivialArbiter,
         TrustedOracleArbiter,
         TrustedPartyArbiter,
-        UidArbiter,
         // New arbiters
         attester_arbiters::{
             composing::AttesterArbiterComposing, non_composing::AttesterArbiterNonComposing,
@@ -144,7 +143,7 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let mock_erc1155_a = MockERC1155::deploy(&god_provider).await?;
     let mock_erc1155_b = MockERC1155::deploy(&god_provider).await?;
 
-    let uid_arbiter = UidArbiter::deploy(&god_provider).await?;
+    let uid_arbiter = UidArbiterComposing::deploy(&god_provider).await?;
     let recipient_arbiter = RecipientArbiter::deploy(&god_provider).await?;
     let specific_attestation_arbiter = SpecificAttestationArbiter::deploy(&god_provider).await?;
     let trivial_arbiter = TrivialArbiter::deploy(&god_provider).await?;

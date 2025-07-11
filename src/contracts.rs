@@ -224,7 +224,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug)]
     TrivialArbiter,
-    "src/contracts/TrivialArbiter.json"
+    "src/contracts/arbiters/TrivialArbiter.json"
 );
 
 sol!(
@@ -232,15 +232,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug)]
     TrustedPartyArbiter,
-    "src/contracts/TrustedPartyArbiter.json"
-);
-
-sol!(
-    #[allow(missing_docs)]
-    #[sol(rpc)]
-    #[derive(Debug)]
-    UidArbiter,
-    "src/contracts/UidArbiter.json"
+    "src/contracts/arbiters/TrustedPartyArbiter.json"
 );
 
 sol!(
@@ -248,7 +240,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug)]
     RecipientArbiter,
-    "src/contracts/RecipientArbiter.json"
+    "src/contracts/arbiters/RecipientArbiter.json"
 );
 
 sol!(
@@ -256,7 +248,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug)]
     SpecificAttestationArbiter,
-    "src/contracts/SpecificAttestationArbiter.json"
+    "src/contracts/arbiters/SpecificAttestationArbiter.json"
 );
 
 sol!(
@@ -264,7 +256,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug)]
     TrustedOracleArbiter,
-    "src/contracts/TrustedOracleArbiter.json"
+    "src/contracts/arbiters/TrustedOracleArbiter.json"
 );
 
 sol!(
@@ -272,7 +264,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug)]
     IntrinsicsArbiter,
-    "src/contracts/IntrinsicsArbiter.json"
+    "src/contracts/arbiters/IntrinsicsArbiter.json"
 );
 
 sol!(
@@ -280,7 +272,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug)]
     IntrinsicsArbiter2,
-    "src/contracts/IntrinsicsArbiter2.json"
+    "src/contracts/arbiters/IntrinsicsArbiter2.json"
 );
 
 sol!(
@@ -288,7 +280,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug)]
     AnyArbiter,
-    "src/contracts/AnyArbiter.json"
+    "src/contracts/arbiters/AnyArbiter.json"
 );
 
 pub mod attester_arbiters {
@@ -302,7 +294,7 @@ pub mod attester_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             AttesterArbiterComposing,
-            "src/contracts/AttesterArbiterComposing.json"
+            "src/contracts/arbiters/attestation-properties/composing/AttesterArbiter.json"
         );
     }
 
@@ -314,7 +306,7 @@ pub mod attester_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             AttesterArbiterNonComposing,
-            "src/contracts/AttesterArbiterNonComposing.json"
+            "src/contracts/arbiters/attestation-properties/non-composing/AttesterArbiter.json"
         );
     }
 }
@@ -327,7 +319,7 @@ pub mod confirmation_arbiters {
         #[sol(rpc)]
         #[derive(Debug)]
         ConfirmationArbiter,
-        "src/contracts/ConfirmationArbiter.json"
+        "src/contracts/arbiters/ConfirmationArbiter.json"
     );
 
     pub mod composing {
@@ -338,7 +330,7 @@ pub mod confirmation_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             ConfirmationArbiterComposing,
-            "src/contracts/ConfirmationArbiterComposing.json"
+            "src/contracts/arbiters/ConfirmationArbiterComposing.json"
         );
     }
 
@@ -350,7 +342,7 @@ pub mod confirmation_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             RevocableConfirmationArbiter,
-            "src/contracts/RevocableConfirmationArbiter.json"
+            "src/contracts/arbiters/RevocableConfirmationArbiter.json"
         );
     }
 
@@ -362,7 +354,7 @@ pub mod confirmation_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             RevocableConfirmationArbiterComposing,
-            "src/contracts/RevocableConfirmationArbiterComposing.json"
+            "src/contracts/arbiters/RevocableConfirmationArbiterComposing.json"
         );
     }
 
@@ -374,7 +366,7 @@ pub mod confirmation_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             UnrevocableConfirmationArbiter,
-            "src/contracts/UnrevocableConfirmationArbiter.json"
+            "src/contracts/arbiters/UnrevocableConfirmationArbiter.json"
         );
     }
 }
@@ -387,7 +379,7 @@ pub mod payment_fulfillment_arbiters {
         #[sol(rpc)]
         #[derive(Debug)]
         ERC1155PaymentFulfillmentArbiter,
-        "src/contracts/ERC1155PaymentFulfillmentArbiter.json"
+        "src/contracts/arbiters/ERC1155PaymentFulfillmentArbiter.json"
     );
 
     sol!(
@@ -395,7 +387,7 @@ pub mod payment_fulfillment_arbiters {
         #[sol(rpc)]
         #[derive(Debug)]
         ERC20PaymentFulfillmentArbiter,
-        "src/contracts/ERC20PaymentFulfillmentArbiter.json"
+        "src/contracts/arbiters/ERC20PaymentFulfillmentArbiter.json"
     );
 
     sol!(
@@ -403,7 +395,7 @@ pub mod payment_fulfillment_arbiters {
         #[sol(rpc)]
         #[derive(Debug)]
         ERC721PaymentFulfillmentArbiter,
-        "src/contracts/ERC721PaymentFulfillmentArbiter.json"
+        "src/contracts/arbiters/ERC721PaymentFulfillmentArbiter.json"
     );
 
     sol!(
@@ -429,7 +421,7 @@ pub mod expiration_time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 ExpirationTimeAfterArbiterComposing,
-                "src/contracts/ExpirationTimeAfterArbiterComposing.json"
+                "src/contracts/arbiters/attestation-properties/composing/ExpirationTimeAfterArbiter.json"
             );
         }
 
@@ -441,7 +433,7 @@ pub mod expiration_time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 ExpirationTimeAfterArbiterNonComposing,
-                "src/contracts/ExpirationTimeAfterArbiterNonComposing.json"
+                "src/contracts/arbiters/attestation-properties/non-composing/ExpirationTimeAfterArbiter.json"
             );
         }
     }
@@ -457,7 +449,7 @@ pub mod expiration_time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 ExpirationTimeBeforeArbiterComposing,
-                "src/contracts/ExpirationTimeBeforeArbiterComposing.json"
+                "src/contracts/arbiters/attestation-properties/composing/ExpirationTimeBeforeArbiter.json"
             );
         }
 
@@ -469,7 +461,7 @@ pub mod expiration_time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 ExpirationTimeBeforeArbiterNonComposing,
-                "src/contracts/ExpirationTimeBeforeArbiterNonComposing.json"
+                "src/contracts/arbiters/attestation-properties/non-composing/ExpirationTimeBeforeArbiter.json"
             );
         }
     }
@@ -485,7 +477,7 @@ pub mod expiration_time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 ExpirationTimeEqualArbiterComposing,
-                "src/contracts/ExpirationTimeEqualArbiterComposing.json"
+                "src/contracts/arbiters/attestation-properties/composing/ExpirationTimeEqualArbiter.json"
             );
         }
 
@@ -497,7 +489,7 @@ pub mod expiration_time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 ExpirationTimeEqualArbiterNonComposing,
-                "src/contracts/ExpirationTimeEqualArbiterNonComposing.json"
+                "src/contracts/arbiters/attestation-properties/non-composing/ExpirationTimeEqualArbiter.json"
             );
         }
     }
@@ -514,7 +506,7 @@ pub mod extended_recipient_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             RecipientArbiterComposing,
-            "src/contracts/RecipientArbiterComposing.json"
+            "src/contracts/arbiters/attestation-properties/composing/RecipientArbiter.json"
         );
     }
 
@@ -526,7 +518,7 @@ pub mod extended_recipient_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             RecipientArbiterNonComposing,
-            "src/contracts/RecipientArbiterNonComposing.json"
+            "src/contracts/arbiters/attestation-properties/non-composing/RecipientArbiter.json"
         );
     }
 }
@@ -542,7 +534,7 @@ pub mod ref_uid_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             RefUidArbiterComposing,
-            "src/contracts/RefUidArbiterComposing.json"
+            "src/contracts/arbiters/attestation-properties/composing/RefUidArbiter.json"
         );
     }
 
@@ -554,7 +546,7 @@ pub mod ref_uid_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             RefUidArbiterNonComposing,
-            "src/contracts/RefUidArbiterNonComposing.json"
+            "src/contracts/arbiters/attestation-properties/non-composing/RefUidArbiter.json"
         );
     }
 }
@@ -570,7 +562,7 @@ pub mod revocable_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             RevocableArbiterComposing,
-            "src/contracts/RevocableArbiterComposing.json"
+            "src/contracts/arbiters/attestation-properties/composing/RevocableArbiter.json"
         );
     }
 
@@ -582,7 +574,7 @@ pub mod revocable_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             RevocableArbiterNonComposing,
-            "src/contracts/RevocableArbiterNonComposing.json"
+            "src/contracts/arbiters/attestation-properties/non-composing/RevocableArbiter.json"
         );
     }
 }
@@ -598,7 +590,7 @@ pub mod schema_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             SchemaArbiterComposing,
-            "src/contracts/SchemaArbiterComposing.json"
+            "src/contracts/arbiters/attestation-properties/composing/SchemaArbiter.json"
         );
     }
 
@@ -610,7 +602,7 @@ pub mod schema_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             SchemaArbiterNonComposing,
-            "src/contracts/SchemaArbiterNonComposing.json"
+            "src/contracts/arbiters/attestation-properties/non-composing/SchemaArbiter.json"
         );
     }
 }
@@ -629,7 +621,7 @@ pub mod time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 TimeAfterArbiterComposing,
-                "src/contracts/TimeAfterArbiterComposing.json"
+                "src/contracts/arbiters/attestation-properties/composing/TimeAfterArbiter.json"
             );
         }
 
@@ -641,7 +633,7 @@ pub mod time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 TimeAfterArbiterNonComposing,
-                "src/contracts/TimeAfterArbiterNonComposing.json"
+                "src/contracts/arbiters/attestation-properties/non-composing/TimeAfterArbiter.json"
             );
         }
     }
@@ -657,7 +649,7 @@ pub mod time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 TimeBeforeArbiterComposing,
-                "src/contracts/TimeBeforeArbiterComposing.json"
+                "src/contracts/arbiters/attestation-properties/composing/TimeBeforeArbiter.json"
             );
         }
 
@@ -669,7 +661,7 @@ pub mod time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 TimeBeforeArbiterNonComposing,
-                "src/contracts/TimeBeforeArbiter_NonComposing.json"
+                "src/contracts/arbiters/attestation-properties/non-composing/TimeBeforeArbiter.json"
             );
         }
     }
@@ -685,7 +677,7 @@ pub mod time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 TimeEqualArbiterComposing,
-                "src/contracts/TimeEqualArbiterComposing.json"
+                "src/contracts/arbiters/attestation-properties/composing/TimeEqualArbiter.json"
             );
         }
 
@@ -697,7 +689,7 @@ pub mod time_arbiters {
                 #[sol(rpc)]
                 #[derive(Debug)]
                 TimeEqualArbiterNonComposing,
-                "src/contracts/TimeEqualArbiterNonComposing.json"
+                "src/contracts/arbiters/attestation-properties/non-composing/TimeEqualArbiter.json"
             );
         }
     }
@@ -714,7 +706,7 @@ pub mod extended_uid_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             UidArbiterComposing,
-            "src/contracts/UidArbiterComposing.json"
+            "src/contracts/arbiters/attestation-properties/composing/UidArbiter.json"
         );
     }
 
@@ -726,7 +718,7 @@ pub mod extended_uid_arbiters {
             #[sol(rpc)]
             #[derive(Debug)]
             UidArbiterNonComposing,
-            "src/contracts/UidArbiterNonComposing.json"
+            "src/contracts/arbiters/attestation-properties/non-composing/UidArbiter.json"
         );
     }
 }
@@ -737,7 +729,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug)]
     NotArbiter,
-    "src/contracts/NotArbiter.json"
+    "src/contracts/arbiters/NotArbiter.json"
 );
 
 sol!(
@@ -745,7 +737,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug)]
     AllArbiter,
-    "src/contracts/AllArbiter.json"
+    "src/contracts/arbiters/AllArbiter.json"
 );
 
 // Additional contracts

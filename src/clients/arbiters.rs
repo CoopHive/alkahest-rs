@@ -699,7 +699,7 @@ mod tests {
         );
 
         let result = trivial_arbiter
-            .checkStatement(attestation.clone().into(), demand.clone(), counteroffer)
+            .checkObligation(attestation.clone().into(), demand.clone(), counteroffer)
             .call()
             .await?;
 
@@ -722,7 +722,7 @@ mod tests {
         let counteroffer2 = FixedBytes::<32>::from_slice(&[42u8; 32]);
 
         let result2 = trivial_arbiter
-            .checkStatement(attestation2.into(), demand2, counteroffer2)
+            .checkObligation(attestation2.into(), demand2, counteroffer2)
             .call()
             .await?;
 
@@ -770,7 +770,7 @@ mod tests {
 
         // Call with Bob as the sender (different from demand_data.creator which is Alice)
         let result = trusted_party_arbiter
-            .checkStatement(attestation.into(), demand, counteroffer)
+            .checkObligation(attestation.into(), demand, counteroffer)
             .call()
             .await;
 
@@ -817,7 +817,7 @@ mod tests {
 
         // Call check_statement - should revert with RecipientMismatched
         let result = recipient_arbiter
-            .checkStatement(attestation.clone().into(), demand, counteroffer)
+            .checkObligation(attestation.clone().into(), demand, counteroffer)
             .call()
             .await;
 
@@ -863,7 +863,7 @@ mod tests {
 
         // Call check_statement
         let result = recipient_arbiter
-            .checkStatement(attestation.clone().into(), demand, counteroffer)
+            .checkObligation(attestation.clone().into(), demand, counteroffer)
             .call()
             .await?;
 
@@ -913,7 +913,7 @@ mod tests {
         );
 
         let result = trusted_party_arbiter
-            .checkStatement(attestation.into(), demand, counteroffer)
+            .checkObligation(attestation.into(), demand, counteroffer)
             .call()
             .await;
 
@@ -953,7 +953,7 @@ mod tests {
         );
 
         let result = trusted_oracle_arbiter
-            .checkStatement(attestation.into(), demand, counteroffer)
+            .checkObligation(attestation.into(), demand, counteroffer)
             .call()
             .await?;
 
@@ -997,7 +997,7 @@ mod tests {
 
         // Initially the decision should be false (default value)
         let initial_result = trusted_oracle_arbiter
-            .checkStatement(attestation.clone().into(), demand.clone(), counteroffer)
+            .checkObligation(attestation.clone().into(), demand.clone(), counteroffer)
             .call()
             .await?;
 
@@ -1020,7 +1020,7 @@ mod tests {
 
         // Now the decision should be true
         let final_result = trusted_oracle_arbiter
-            .checkStatement(attestation.into(), demand, counteroffer)
+            .checkObligation(attestation.into(), demand, counteroffer)
             .call()
             .await?;
 
@@ -1092,7 +1092,7 @@ mod tests {
         let counteroffer = FixedBytes::<32>::default();
 
         let result1 = trusted_oracle_arbiter
-            .checkStatement(attestation.clone().into(), demand1, counteroffer)
+            .checkObligation(attestation.clone().into(), demand1, counteroffer)
             .call()
             .await?;
 
@@ -1106,7 +1106,7 @@ mod tests {
         let demand2 = ArbitersClient::encode_trusted_oracle_arbiter_demand(&demand_data2);
 
         let result2 = trusted_oracle_arbiter
-            .checkStatement(attestation.into(), demand2, counteroffer)
+            .checkObligation(attestation.into(), demand2, counteroffer)
             .call()
             .await?;
 
@@ -1147,7 +1147,7 @@ mod tests {
         );
 
         let result = trusted_oracle_arbiter
-            .checkStatement(attestation.into(), demand, counteroffer)
+            .checkObligation(attestation.into(), demand, counteroffer)
             .call()
             .await?;
 
@@ -1185,7 +1185,7 @@ mod tests {
         );
 
         let result = specific_attestation_arbiter
-            .checkStatement(attestation.clone().into(), encoded, FixedBytes::<32>::ZERO)
+            .checkObligation(attestation.clone().into(), encoded, FixedBytes::<32>::ZERO)
             .call()
             .await;
 
@@ -1231,10 +1231,10 @@ mod tests {
             .unwrap()
             .uid_arbiter;
         let uid_arbiter =
-            contracts::UidArbiter::new(uid_arbiter_address, &test.alice_client.public_provider);
+            contracts::extended_uid_arbiters::composing::UidArbiterComposing::new(uid_arbiter_address, &test.alice_client.public_provider);
 
         let result = uid_arbiter
-            .checkStatement(attestation.clone().into(), encoded, FixedBytes::<32>::ZERO)
+            .checkObligation(attestation.clone().into(), encoded, FixedBytes::<32>::ZERO)
             .call()
             .await;
 
@@ -1278,10 +1278,12 @@ mod tests {
             .clone()
             .unwrap()
             .uid_arbiter;
-        let uid_arbiter =
-            contracts::UidArbiter::new(uid_arbiter_address, &test.alice_client.public_provider);
+        let uid_arbiter = contracts::extended_uid_arbiters::composing::UidArbiterComposing::new(
+            uid_arbiter_address,
+            &test.alice_client.public_provider,
+        );
         let result = uid_arbiter
-            .checkStatement(attestation.clone().into(), encoded, FixedBytes::<32>::ZERO)
+            .checkObligation(attestation.clone().into(), encoded, FixedBytes::<32>::ZERO)
             .call()
             .await?;
 
@@ -1317,7 +1319,7 @@ mod tests {
         );
 
         let result = specific_attestation_arbiter
-            .checkStatement(attestation.into(), demand, counteroffer)
+            .checkObligation(attestation.into(), demand, counteroffer)
             .call()
             .await;
 
@@ -1526,7 +1528,7 @@ mod tests {
         // Verify the event data
         assert_eq!(log_result.oracle, oracle, "Oracle in event should match");
         assert_eq!(
-            log_result.statement, statement_uid,
+            log_result.obligation, statement_uid,
             "Statement UID in event should match"
         );
         assert!(log_result.decision, "Decision in event should be true");
@@ -1582,7 +1584,7 @@ mod tests {
 
         // Valid attestation should pass
         let result_valid = intrinsics_arbiter
-            .checkStatement(
+            .checkObligation(
                 valid_attestation.into(),
                 Bytes::default(),
                 FixedBytes::<32>::default(),
@@ -1596,7 +1598,7 @@ mod tests {
 
         // Expired attestation should fail
         let result_expired = intrinsics_arbiter
-            .checkStatement(
+            .checkObligation(
                 expired_attestation.into(),
                 Bytes::default(),
                 FixedBytes::<32>::default(),
@@ -1611,7 +1613,7 @@ mod tests {
 
         // Revoked attestation should fail
         let result_revoked = intrinsics_arbiter
-            .checkStatement(
+            .checkObligation(
                 revoked_attestation.into(),
                 Bytes::default(),
                 FixedBytes::<32>::default(),
@@ -1676,7 +1678,7 @@ mod tests {
 
         // Test with matching schema - should pass
         let result_matching = intrinsics_arbiter2
-            .checkStatement(
+            .checkObligation(
                 valid_attestation.clone().into(),
                 encoded_matching_demand,
                 FixedBytes::<32>::default(),
@@ -1690,7 +1692,7 @@ mod tests {
 
         // Test with non-matching schema - should fail
         let result_non_matching = intrinsics_arbiter2
-            .checkStatement(
+            .checkObligation(
                 valid_attestation.into(),
                 encoded_non_matching_demand,
                 FixedBytes::<32>::default(),
@@ -1754,7 +1756,7 @@ mod tests {
 
         let any_demand1 = ArbitersClient::encode_multi_arbiter_demand(&any_demand_data1);
         let result_any1 = any_arbiter
-            .checkStatement(
+            .checkObligation(
                 attestation.clone().into(),
                 any_demand1,
                 FixedBytes::<32>::default(),
@@ -1781,7 +1783,7 @@ mod tests {
 
         let any_demand2 = ArbitersClient::encode_multi_arbiter_demand(&any_demand_data2);
         let result_any2 = any_arbiter
-            .checkStatement(
+            .checkObligation(
                 attestation.clone().into(),
                 any_demand2,
                 FixedBytes::<32>::default(),
@@ -1809,7 +1811,7 @@ mod tests {
 
         let any_demand3 = ArbitersClient::encode_multi_arbiter_demand(&any_demand_data3);
         let result_any3 = any_arbiter
-            .checkStatement(attestation.into(), any_demand3, FixedBytes::<32>::default())
+            .checkObligation(attestation.into(), any_demand3, FixedBytes::<32>::default())
             .call()
             .await?;
 
@@ -1869,7 +1871,7 @@ mod tests {
 
         let all_demand1 = ArbitersClient::encode_multi_arbiter_demand(&all_demand_data1);
         let result_all1 = all_arbiter
-            .checkStatement(
+            .checkObligation(
                 attestation.clone().into(),
                 all_demand1,
                 FixedBytes::<32>::default(),
@@ -1897,7 +1899,7 @@ mod tests {
 
         let all_demand2 = ArbitersClient::encode_multi_arbiter_demand(&all_demand_data2);
         let result_all2 = all_arbiter
-            .checkStatement(
+            .checkObligation(
                 attestation.clone().into(),
                 all_demand2,
                 FixedBytes::<32>::default(),
@@ -1918,7 +1920,7 @@ mod tests {
 
         let all_demand3 = ArbitersClient::encode_multi_arbiter_demand(&all_demand_data3);
         let result_all3 = all_arbiter
-            .checkStatement(attestation.into(), all_demand3, FixedBytes::<32>::default())
+            .checkObligation(attestation.into(), all_demand3, FixedBytes::<32>::default())
             .call()
             .await?;
 

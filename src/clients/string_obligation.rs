@@ -59,12 +59,12 @@ impl StringObligationClient {
     pub async fn get_statement(
         &self,
         uid: FixedBytes<32>,
-    ) -> eyre::Result<DecodedAttestation<contracts::StringObligation::StatementData>> {
+    ) -> eyre::Result<DecodedAttestation<contracts::StringObligation::ObligationData>> {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
         let attestation = eas_contract.getAttestation(uid).call().await?;
         let statement_data =
-            contracts::StringObligation::StatementData::abi_decode(&attestation.data)?;
+            contracts::StringObligation::ObligationData::abi_decode(&attestation.data)?;
 
         Ok(DecodedAttestation {
             attestation,
@@ -74,9 +74,9 @@ impl StringObligationClient {
 
     pub fn decode(
         statement_data: &Bytes,
-    ) -> eyre::Result<contracts::StringObligation::StatementData> {
+    ) -> eyre::Result<contracts::StringObligation::ObligationData> {
         let statementdata =
-            contracts::StringObligation::StatementData::abi_decode(statement_data.as_ref())?;
+            contracts::StringObligation::ObligationData::abi_decode(statement_data.as_ref())?;
         Ok(statementdata)
     }
 
@@ -85,12 +85,12 @@ impl StringObligationClient {
         Ok(decoded)
     }
 
-    pub fn encode(statement_data: &contracts::StringObligation::StatementData) -> Bytes {
-        return contracts::StringObligation::StatementData::abi_encode(&statement_data).into();
+    pub fn encode(statement_data: &contracts::StringObligation::ObligationData) -> Bytes {
+        return contracts::StringObligation::ObligationData::abi_encode(&statement_data).into();
     }
 
     pub fn encode_json<T: serde::Serialize>(statement_data: T) -> eyre::Result<Bytes> {
-        let encoded = Self::encode(&contracts::StringObligation::StatementData {
+        let encoded = Self::encode(&contracts::StringObligation::ObligationData {
             item: serde_json::to_string(&statement_data)?,
         });
         Ok(encoded)
@@ -98,7 +98,7 @@ impl StringObligationClient {
 
     pub async fn make_statement(
         &self,
-        statement_data: contracts::StringObligation::StatementData,
+        statement_data: contracts::StringObligation::ObligationData,
         ref_uid: Option<FixedBytes<32>>,
     ) -> eyre::Result<TransactionReceipt> {
         let contract =
@@ -108,7 +108,7 @@ impl StringObligationClient {
         let nonce = self.wallet_provider.get_transaction_count(address).await?;
 
         let receipt = contract
-            .makeStatement(
+            .doObligation(
                 statement_data,
                 ref_uid.unwrap_or(FixedBytes::<32>::default()),
             )
@@ -129,11 +129,11 @@ impl StringObligationClient {
         let contract =
             contracts::StringObligation::new(self.addresses.obligation, &self.wallet_provider);
 
-        let statement_data = contracts::StringObligation::StatementData {
+        let statement_data = contracts::StringObligation::ObligationData {
             item: serde_json::to_string(&statement_data)?,
         };
         let receipt = contract
-            .makeStatement(
+            .doObligation(
                 statement_data,
                 ref_uid.unwrap_or(FixedBytes::<32>::default()),
             )
