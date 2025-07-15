@@ -122,12 +122,12 @@ impl Default for ArbitrateOptions {
 #[derive(Clone)]
 pub struct FulfillmentParams<T: SolType> {
     pub filter: AttestationFilter,
-    pub _statement_data: PhantomData<T>,
+    pub _obligation_data: PhantomData<T>,
 }
 
 pub struct FulfillmentParamsWithoutRefUid<T: SolType> {
     pub filter: AttestationFilterWithoutRefUid,
-    pub _statement_data: PhantomData<T>,
+    pub _obligation_data: PhantomData<T>,
 }
 
 pub struct EscrowParams<T: SolType> {
@@ -137,7 +137,7 @@ pub struct EscrowParams<T: SolType> {
 
 pub struct Decision<T: SolType, U: SolType> {
     pub attestation: IEAS::Attestation,
-    pub statement: T::RustType,
+    pub obligation: T::RustType,
     pub demand: Option<U::RustType>,
     pub decision: bool,
     pub receipt: TransactionReceipt,
@@ -150,15 +150,15 @@ sol! {
     }
 }
 
-pub struct ListenAndArbitrateResult<StatementData: SolType> {
-    pub decisions: Vec<Decision<StatementData, ()>>,
+pub struct ListenAndArbitrateResult<ObligationData: SolType> {
+    pub decisions: Vec<Decision<ObligationData, ()>>,
     pub subscription_id: FixedBytes<32>,
 }
 pub struct ListenAndArbitrateNewFulfillmentsResult {
     pub subscription_id: FixedBytes<32>,
 }
-pub struct ListenAndArbitrateForEscrowResult<StatementData: SolType, DemandData: SolType> {
-    pub decisions: Vec<Decision<StatementData, DemandData>>,
+pub struct ListenAndArbitrateForEscrowResult<ObligationData: SolType, DemandData: SolType> {
+    pub decisions: Vec<Decision<ObligationData, DemandData>>,
     pub escrow_attestations: Vec<IEAS::Attestation>,
     pub escrow_subscription_id: FixedBytes<32>,
     pub fulfillment_subscription_id: FixedBytes<32>,
@@ -241,7 +241,7 @@ impl OracleClient {
 
     fn make_arbitration_filter(
         address: Address,
-        statement: FixedBytes<32>,
+        obligation: FixedBytes<32>,
         oracle: Address,
     ) -> Filter {
         let mut filter = Filter::new()
@@ -250,7 +250,7 @@ impl OracleClient {
             .from_block(BlockNumberOrTag::Earliest)
             .to_block(BlockNumberOrTag::Latest);
 
-        filter = filter.topic1(statement);
+        filter = filter.topic1(obligation);
 
         filter = filter.topic2(oracle);
 
@@ -331,11 +331,11 @@ impl OracleClient {
         filter
     }
 
-    async fn get_attestations_and_statements<StatementData: SolType>(
+    async fn get_attestations_and_obligations<ObligationData: SolType>(
         &self,
-        fulfillment: &FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         options: &ArbitrateOptions,
-    ) -> eyre::Result<(Vec<Attestation>, Vec<StatementData::RustType>)> {
+    ) -> eyre::Result<(Vec<Attestation>, Vec<ObligationData::RustType>)> {
         let filter = self.make_filter(&fulfillment.filter);
 
         let logs = self
@@ -396,28 +396,28 @@ impl OracleClient {
             .filter_unarbitrated_attestations(attestations, options.skip_arbitrated)
             .await?;
 
-        let statements = attestations
+        let obligations = attestations
             .iter()
-            .map(|a| StatementData::abi_decode(&a.data))
+            .map(|a| ObligationData::abi_decode(&a.data))
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok((attestations, statements))
+        Ok((attestations, obligations))
     }
 
     pub async fn arbitrate_past<
-        StatementData: SolType,
-        Arbitrate: Fn(&StatementData::RustType) -> Option<bool>,
+        ObligationData: SolType,
+        Arbitrate: Fn(&ObligationData::RustType) -> Option<bool>,
     >(
         &self,
-        fulfillment: &FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: &Arbitrate,
         options: &ArbitrateOptions,
-    ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
-        let (attestations, statements) = self
-            .get_attestations_and_statements(fulfillment, options)
+    ) -> eyre::Result<Vec<Decision<ObligationData, ()>>> {
+        let (attestations, obligations) = self
+            .get_attestations_and_obligations(fulfillment, options)
             .await?;
 
-        let decisions = statements.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
+        let decisions = obligations.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
         let base_nonce = self
             .wallet_provider
             .get_transaction_count(self._signer.address())
@@ -454,35 +454,35 @@ impl OracleClient {
 
         let receipts = try_join_all(receipt_futs).await?;
 
-        let result = izip!(attestations, statements, decisions, receipts)
+        let result = izip!(attestations, obligations, decisions, receipts)
             .filter(|(_, _, d, _)| d.is_some())
-            .map(|(attestation, statement, decision, receipt)| Decision {
+            .map(|(attestation, obligation, decision, receipt)| Decision {
                 attestation,
-                statement,
+                obligation: obligation,
                 demand: None,
                 decision: decision.unwrap(),
                 receipt,
             })
-            .collect::<Vec<Decision<StatementData, ()>>>();
+            .collect::<Vec<Decision<ObligationData, ()>>>();
 
         Ok(result)
     }
 
     pub async fn arbitrate_past_async<
-        StatementData: SolType,
+        ObligationData: SolType,
         ArbitrateFut: Future<Output = Option<bool>>,
-        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy,
+        Arbitrate: Fn(&ObligationData::RustType) -> ArbitrateFut + Copy,
     >(
         &self,
-        fulfillment: &FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: Arbitrate,
         options: &ArbitrateOptions,
-    ) -> eyre::Result<Vec<Decision<StatementData, ()>>> {
-        let (attestations, statements) = self
-            .get_attestations_and_statements(fulfillment, options)
+    ) -> eyre::Result<Vec<Decision<ObligationData, ()>>> {
+        let (attestations, obligations) = self
+            .get_attestations_and_obligations(fulfillment, options)
             .await?;
 
-        let decision_futs = statements.iter().map(|s| async move { arbitrate(s).await });
+        let decision_futs = obligations.iter().map(|s| async move { arbitrate(s).await });
         let decisions = join_all(decision_futs).await;
 
         let base_nonce = self
@@ -521,34 +521,34 @@ impl OracleClient {
 
         let receipts = try_join_all(receipt_futs).await?;
 
-        let result = izip!(attestations, statements, decisions, receipts)
+        let result = izip!(attestations, obligations, decisions, receipts)
             .filter(|(_, _, d, _)| d.is_some())
-            .map(|(attestation, statement, decision, receipt)| Decision {
+            .map(|(attestation, obligation, decision, receipt)| Decision {
                 attestation,
-                statement,
+                obligation: obligation,
                 demand: None,
                 decision: decision.unwrap(),
                 receipt,
             })
-            .collect::<Vec<Decision<StatementData, ()>>>();
+            .collect::<Vec<Decision<ObligationData, ()>>>();
 
         Ok(result)
     }
 
     async fn spawn_fulfillment_listener<
-        StatementData: SolType + Clone + Send + 'static,
-        Arbitrate: Fn(&StatementData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
+        ObligationData: SolType + Clone + Send + 'static,
+        Arbitrate: Fn(&ObligationData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
+        OnAfterArbitrate: Fn(&Decision<ObligationData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
     >(
         &self,
         stream: SubscriptionStream<Log>,
-        fulfillment: FulfillmentParams<StatementData>,
+        fulfillment: FulfillmentParams<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
     ) where
-        <StatementData as SolType>::RustType: Send,
+        <ObligationData as SolType>::RustType: Send,
     {
         let wallet_provider = self.wallet_provider.clone();
         let eas_address = self.addresses.eas;
@@ -624,11 +624,11 @@ impl OracleClient {
                     continue;
                 }
 
-                let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
+                let Ok(obligation) = ObligationData::abi_decode(&attestation.data) else {
                     continue;
                 };
 
-                let Some(decision_value) = arbitrate(&statement) else {
+                let Some(decision_value) = arbitrate(&obligation) else {
                     continue;
                 };
 
@@ -646,7 +646,7 @@ impl OracleClient {
                         if let Ok(receipt) = tx.get_receipt().await {
                             let decision = Decision {
                                 attestation,
-                                statement,
+                                obligation: obligation,
                                 demand: None,
                                 decision: decision_value,
                                 receipt,
@@ -663,20 +663,20 @@ impl OracleClient {
     }
 
     pub async fn spawn_fulfillment_listener_async<
-        StatementData: SolType + Clone + Send + 'static,
+        ObligationData: SolType + Clone + Send + 'static,
         ArbitrateFut: Future<Output = Option<bool>> + Send,
-        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy + Send + Sync + 'static,
+        Arbitrate: Fn(&ObligationData::RustType) -> ArbitrateFut + Copy + Send + Sync + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
+        OnAfterArbitrate: Fn(&Decision<ObligationData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
     >(
         &self,
         stream: SubscriptionStream<Log>,
-        fulfillment: FulfillmentParams<StatementData>,
+        fulfillment: FulfillmentParams<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
     ) where
-        <StatementData as SolType>::RustType: Send,
+        <ObligationData as SolType>::RustType: Send,
     {
         let wallet_provider = self.wallet_provider.clone();
         let eas_address = self.addresses.eas;
@@ -751,11 +751,11 @@ impl OracleClient {
                     continue;
                 }
 
-                let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
+                let Ok(obligation) = ObligationData::abi_decode(&attestation.data) else {
                     continue;
                 };
 
-                let Some(decision_value) = arbitrate(&statement).await else {
+                let Some(decision_value) = arbitrate(&obligation).await else {
                     continue;
                 };
 
@@ -773,7 +773,7 @@ impl OracleClient {
                         if let Ok(receipt) = tx.get_receipt().await {
                             let decision = Decision {
                                 attestation,
-                                statement,
+                                obligation: obligation,
                                 demand: None,
                                 decision: decision_value,
                                 receipt,
@@ -790,19 +790,19 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate<
-        StatementData: SolType + Clone + Send + 'static,
-        Arbitrate: Fn(&StatementData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
+        ObligationData: SolType + Clone + Send + 'static,
+        Arbitrate: Fn(&ObligationData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
+        OnAfterArbitrate: Fn(&Decision<ObligationData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
     >(
         &self,
-        fulfillment: &FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
-    ) -> eyre::Result<ListenAndArbitrateResult<StatementData>>
+    ) -> eyre::Result<ListenAndArbitrateResult<ObligationData>>
     where
-        <StatementData as SolType>::RustType: Send,
+        <ObligationData as SolType>::RustType: Send,
     {
         let decisions = self
             .arbitrate_past(&fulfillment, arbitrate, options)
@@ -829,20 +829,20 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate_async<
-        StatementData: SolType + Clone + Send + 'static,
+        ObligationData: SolType + Clone + Send + 'static,
         ArbitrateFut: Future<Output = Option<bool>> + Send,
-        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy + Send + Sync + 'static,
+        Arbitrate: Fn(&ObligationData::RustType) -> ArbitrateFut + Copy + Send + Sync + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
+        OnAfterArbitrate: Fn(&Decision<ObligationData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
     >(
         &self,
-        fulfillment: &FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
-    ) -> eyre::Result<ListenAndArbitrateResult<StatementData>>
+    ) -> eyre::Result<ListenAndArbitrateResult<ObligationData>>
     where
-        <StatementData as SolType>::RustType: Send,
+        <ObligationData as SolType>::RustType: Send,
     {
         let decisions = self
             .arbitrate_past_async(&fulfillment, arbitrate, options)
@@ -869,20 +869,20 @@ impl OracleClient {
     }
 
     async fn handle_fulfillment_stream_no_spawn<
-        StatementData: SolType,
-        Arbitrate: Fn(&StatementData::RustType) -> Option<bool>,
+        ObligationData: SolType,
+        Arbitrate: Fn(&ObligationData::RustType) -> Option<bool>,
         OnAfterArbitrateFut: Future<Output = ()>,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut,
+        OnAfterArbitrate: Fn(&Decision<ObligationData, ()>) -> OnAfterArbitrateFut,
     >(
         &self,
         mut stream: SubscriptionStream<Log>,
-        fulfillment: &FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
         timeout: Option<Duration>,
     ) where
-        <StatementData as SolType>::RustType: Send,
+        <ObligationData as SolType>::RustType: Send,
     {
         let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
         let arbiter =
@@ -965,11 +965,11 @@ impl OracleClient {
                 continue;
             }
 
-            let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
+            let Ok(obligation) = ObligationData::abi_decode(&attestation.data) else {
                 continue;
             };
 
-            let Some(decision_value) = arbitrate(&statement) else {
+            let Some(decision_value) = arbitrate(&obligation) else {
                 continue;
             };
 
@@ -991,7 +991,7 @@ impl OracleClient {
                     if let Ok(receipt) = tx.get_receipt().await {
                         let decision = Decision {
                             attestation,
-                            statement,
+                            obligation: obligation,
                             demand: None,
                             decision: decision_value,
                             receipt,
@@ -1007,20 +1007,20 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate_no_spawn<
-        StatementData: SolType,
-        Arbitrate: Fn(&StatementData::RustType) -> Option<bool>,
+        ObligationData: SolType,
+        Arbitrate: Fn(&ObligationData::RustType) -> Option<bool>,
         OnAfterArbitrateFut: Future<Output = ()>,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut,
+        OnAfterArbitrate: Fn(&Decision<ObligationData, ()>) -> OnAfterArbitrateFut,
     >(
         &self,
-        fulfillment: &FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
         timeout: Option<Duration>,
-    ) -> eyre::Result<ListenAndArbitrateResult<StatementData>>
+    ) -> eyre::Result<ListenAndArbitrateResult<ObligationData>>
     where
-        <StatementData as SolType>::RustType: Send,
+        <ObligationData as SolType>::RustType: Send,
     {
         let decisions = self
             .arbitrate_past(&fulfillment, &arbitrate, options)
@@ -1048,20 +1048,20 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate_new_fulfillments_no_spawn<
-        StatementData: SolType,
-        Arbitrate: Fn(&StatementData::RustType) -> Option<bool>,
+        ObligationData: SolType,
+        Arbitrate: Fn(&ObligationData::RustType) -> Option<bool>,
         OnAfterArbitrateFut: Future<Output = ()>,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut,
+        OnAfterArbitrate: Fn(&Decision<ObligationData, ()>) -> OnAfterArbitrateFut,
     >(
         &self,
-        fulfillment: &FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
         timeout: Option<Duration>,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
     where
-        <StatementData as SolType>::RustType: Send,
+        <ObligationData as SolType>::RustType: Send,
     {
         let filter = self.make_filter(&fulfillment.filter);
 
@@ -1085,19 +1085,19 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate_new_fulfillments<
-        StatementData: SolType + Clone + Send + 'static,
-        Arbitrate: Fn(&StatementData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
+        ObligationData: SolType + Clone + Send + 'static,
+        Arbitrate: Fn(&ObligationData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
+        OnAfterArbitrate: Fn(&Decision<ObligationData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
     >(
         &self,
-        fulfillment: &FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
     where
-        <StatementData as SolType>::RustType: Send,
+        <ObligationData as SolType>::RustType: Send,
     {
         let filter = self.make_filter(&fulfillment.filter);
 
@@ -1120,20 +1120,20 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate_new_fulfillments_async<
-        StatementData: SolType + Clone + Send + 'static,
+        ObligationData: SolType + Clone + Send + 'static,
         ArbitrateFut: Future<Output = Option<bool>> + Send,
-        Arbitrate: Fn(&StatementData::RustType) -> ArbitrateFut + Copy + Send + Sync + 'static,
+        Arbitrate: Fn(&ObligationData::RustType) -> ArbitrateFut + Copy + Send + Sync + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
+        OnAfterArbitrate: Fn(&Decision<ObligationData, ()>) -> OnAfterArbitrateFut + Copy + Send + Sync + 'static,
     >(
         &self,
-        fulfillment: &FulfillmentParams<StatementData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsResult>
     where
-        <StatementData as SolType>::RustType: Send,
+        <ObligationData as SolType>::RustType: Send,
     {
         let filter = self.make_filter(&fulfillment.filter);
 
@@ -1156,17 +1156,17 @@ impl OracleClient {
     }
 
     pub async fn arbitrate_past_for_escrow<
-        StatementData: SolType,
+        ObligationData: SolType,
         DemandData: SolType,
-        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> Option<bool>,
+        Arbitrate: Fn(&ObligationData::RustType, &DemandData::RustType) -> Option<bool>,
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         skip_arbitrated: Option<bool>,
     ) -> eyre::Result<(
-        Vec<Decision<StatementData, DemandData>>,
+        Vec<Decision<ObligationData, DemandData>>,
         Vec<IEAS::Attestation>,
         Vec<<DemandData as SolType>::RustType>,
     )>
@@ -1239,12 +1239,12 @@ impl OracleClient {
             })
             .collect::<Vec<_>>();
 
-        let escrow_statements = escrow_attestations
+        let escrow_obligations = escrow_attestations
             .iter()
             .map(|a| ArbiterDemand::abi_decode(&a.data))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let escrow_demands = escrow_statements
+        let escrow_demands = escrow_obligations
             .iter()
             .map(|s| DemandData::abi_decode(&s.demand))
             .collect::<Result<Vec<_>, _>>()?;
@@ -1268,17 +1268,17 @@ impl OracleClient {
             )
             .await?;
 
-        let fulfillment_statements = fulfillment_attestations
+        let fulfillment_obligations = fulfillment_attestations
             .iter()
-            .map(|a| StatementData::abi_decode(&a.data))
+            .map(|a| ObligationData::abi_decode(&a.data))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let decisions = fulfillment_statements
+        let decisions = fulfillment_obligations
             .iter()
             .zip(fulfillment_attestations.iter())
-            .map(|(statement, attestation)| {
+            .map(|(obligation, attestation)| {
                 let demand = demands_map.get(&attestation.refUID)?;
-                arbitrate(statement, demand)
+                arbitrate(obligation, demand)
             })
             .collect::<Vec<_>>();
 
@@ -1320,22 +1320,22 @@ impl OracleClient {
 
         let result = izip!(
             fulfillment_attestations,
-            fulfillment_statements,
+            fulfillment_obligations,
             decisions,
             receipts
         )
         .filter(|(_, _, d, _)| d.is_some())
-        .map(|(attestation, statement, decision, receipt)| {
+        .map(|(attestation, obligation, decision, receipt)| {
             let demand = demands_map.get(&attestation.refUID).map(|&x| x.clone());
             Decision {
                 attestation,
-                statement,
+                obligation: obligation,
                 demand,
                 decision: decision.unwrap(),
                 receipt,
             }
         })
-        .collect::<Vec<Decision<StatementData, DemandData>>>();
+        .collect::<Vec<Decision<ObligationData, DemandData>>>();
 
         Ok((result, escrow_attestations, escrow_demands))
     }
@@ -1396,12 +1396,12 @@ impl OracleClient {
             })
             .collect::<Vec<_>>();
 
-        let escrow_statements = escrow_attestations
+        let escrow_obligations = escrow_attestations
             .iter()
             .map(|a| ArbiterDemand::abi_decode(&a.data))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let escrow_demands = escrow_statements
+        let escrow_demands = escrow_obligations
             .iter()
             .map(|s| DemandData::abi_decode(&s.demand))
             .collect::<Result<Vec<_>, _>>()?;
@@ -1410,18 +1410,18 @@ impl OracleClient {
     }
 
     pub async fn arbitrate_past_for_escrow_async<
-        StatementData: SolType,
+        ObligationData: SolType,
         DemandData: SolType,
         ArbitrateFut: Future<Output = Option<bool>>,
-        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> ArbitrateFut + Copy,
+        Arbitrate: Fn(&ObligationData::RustType, &DemandData::RustType) -> ArbitrateFut + Copy,
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         skip_arbitrated: Option<bool>,
     ) -> eyre::Result<(
-        Vec<Decision<StatementData, DemandData>>,
+        Vec<Decision<ObligationData, DemandData>>,
         Vec<IEAS::Attestation>,
         Vec<<DemandData as SolType>::RustType>,
     )>
@@ -1494,12 +1494,12 @@ impl OracleClient {
             })
             .collect::<Vec<_>>();
 
-        let escrow_statements = escrow_attestations
+        let escrow_obligations = escrow_attestations
             .iter()
             .map(|a| ArbiterDemand::abi_decode(&a.data))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let escrow_demands = escrow_statements
+        let escrow_demands = escrow_obligations
             .iter()
             .map(|s| DemandData::abi_decode(&s.demand))
             .collect::<Result<Vec<_>, _>>()?;
@@ -1523,17 +1523,17 @@ impl OracleClient {
             )
             .await?;
 
-        let fulfillment_statements = fulfillment_attestations
+        let fulfillment_obligations = fulfillment_attestations
             .iter()
-            .map(|a| StatementData::abi_decode(&a.data))
+            .map(|a| ObligationData::abi_decode(&a.data))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let decisions_fut = fulfillment_statements
+        let decisions_fut = fulfillment_obligations
             .iter()
             .zip(fulfillment_attestations.iter())
-            .map(|(statement, attestation)| {
+            .map(|(obligation, attestation)| {
                 let demand = demands_map.get(&attestation.refUID)?;
-                Some(async move { arbitrate(statement, demand).await })
+                Some(async move { arbitrate(obligation, demand).await })
             })
             .flatten()
             .collect::<Vec<_>>();
@@ -1578,36 +1578,36 @@ impl OracleClient {
 
         let result = izip!(
             fulfillment_attestations,
-            fulfillment_statements,
+            fulfillment_obligations,
             decisions,
             receipts
         )
         .filter(|(_, _, d, _)| d.is_some())
-        .map(|(attestation, statement, decision, receipt)| {
+        .map(|(attestation, obligation, decision, receipt)| {
             let demand = demands_map.get(&attestation.refUID).map(|&x| x.clone());
             Decision {
                 attestation,
-                statement,
+                obligation: obligation,
                 demand,
                 decision: decision.unwrap(),
                 receipt,
             }
         })
-        .collect::<Vec<Decision<StatementData, DemandData>>>();
+        .collect::<Vec<Decision<ObligationData, DemandData>>>();
 
         Ok((result, escrow_attestations, escrow_demands))
     }
 
     pub async fn listen_and_arbitrate_for_escrow<
-        StatementData: SolType + Clone + Send + Sync + 'static,
+        ObligationData: SolType + Clone + Send + Sync + 'static,
         DemandData: SolType + Clone + Send + Sync + 'static,
-        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> Option<bool>
+        Arbitrate: Fn(&ObligationData::RustType, &DemandData::RustType) -> Option<bool>
             + Send
             + Sync
             + Copy
             + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, DemandData>) -> OnAfterArbitrateFut
+        OnAfterArbitrate: Fn(&Decision<ObligationData, DemandData>) -> OnAfterArbitrateFut
             + Send
             + Sync
             + Copy
@@ -1615,14 +1615,14 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         skip_arbitrated: Option<bool>,
-    ) -> eyre::Result<ListenAndArbitrateForEscrowResult<StatementData, DemandData>>
+    ) -> eyre::Result<ListenAndArbitrateForEscrowResult<ObligationData, DemandData>>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
-        <StatementData as SolType>::RustType: Send + 'static,
+        <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (decisions, escrow_attestations, escrow_demands) = self
             .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, skip_arbitrated)
@@ -1671,8 +1671,8 @@ impl OracleClient {
                                 continue;
                             }
 
-                            if let Ok(statement) = ArbiterDemand::abi_decode(&attestation.data) {
-                                if let Ok(demand) = DemandData::abi_decode(&statement.demand) {
+                            if let Ok(obligation) = ArbiterDemand::abi_decode(&attestation.data) {
+                                if let Ok(demand) = DemandData::abi_decode(&obligation.demand) {
                                     demands_map.write().await.insert(attestation.uid, demand);
                                 }
                             }
@@ -1721,11 +1721,11 @@ impl OracleClient {
                         continue;
                     };
 
-                    let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
+                    let Ok(obligation) = ObligationData::abi_decode(&attestation.data) else {
                         continue;
                     };
 
-                    let Some(decision_value) = arbitrate(&statement, &demand) else {
+                    let Some(decision_value) = arbitrate(&obligation, &demand) else {
                         continue;
                     };
 
@@ -1745,7 +1745,7 @@ impl OracleClient {
                             Ok(receipt) => {
                                 let decision = Decision {
                                     attestation,
-                                    statement,
+                                    obligation: obligation,
                                     demand: None,
                                     decision: decision_value,
                                     receipt,
@@ -1771,23 +1771,23 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate_for_escrow_no_spawn<
-        StatementData: SolType,
+        ObligationData: SolType,
         DemandData: SolType,
-        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> Option<bool>,
+        Arbitrate: Fn(&ObligationData::RustType, &DemandData::RustType) -> Option<bool>,
         OnAfterArbitrateFut: Future<Output = ()>,
-        OnAfterArbitrate: Fn(&Decision<StatementData, DemandData>) -> OnAfterArbitrateFut,
+        OnAfterArbitrate: Fn(&Decision<ObligationData, DemandData>) -> OnAfterArbitrateFut,
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         skip_arbitrated: Option<bool>,
         timeout: Option<Duration>,
-    ) -> eyre::Result<ListenAndArbitrateForEscrowResult<StatementData, DemandData>>
+    ) -> eyre::Result<ListenAndArbitrateForEscrowResult<ObligationData, DemandData>>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
-        <StatementData as SolType>::RustType: Send + 'static,
+        <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (decisions, escrow_attestations, escrow_demands) = self
             .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, skip_arbitrated)
@@ -1835,8 +1835,8 @@ impl OracleClient {
                         if attestation.expirationTime != 0 && attestation.expirationTime < now { continue; }
                         if attestation.revocationTime != 0 && attestation.revocationTime < now { continue; }
 
-                        if let Ok(statement) = ArbiterDemand::abi_decode(&attestation.data) {
-                            if let Ok(demand) = DemandData::abi_decode(&statement.demand) {
+                        if let Ok(obligation) = ArbiterDemand::abi_decode(&attestation.data) {
+                            if let Ok(demand) = DemandData::abi_decode(&obligation.demand) {
                                 demands_map.write().await.insert(attestation.uid, demand);
                             }
                         }
@@ -1853,8 +1853,8 @@ impl OracleClient {
                     if attestation.revocationTime != 0 && attestation.revocationTime < now { continue; }
 
                     let Some(demand) = demands_map.read().await.get(&attestation.refUID).cloned() else { continue; };
-                    let Ok(statement) = StatementData::abi_decode(&attestation.data) else { continue; };
-                    let Some(decision_value) = arbitrate(&statement, &demand) else { continue; };
+                    let Ok(obligation) = ObligationData::abi_decode(&attestation.data) else { continue; };
+                    let Some(decision_value) = arbitrate(&obligation, &demand) else { continue; };
 
                     let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await else {
                         tracing::error!("Failed to get transaction count for {}", signer_address);
@@ -1866,7 +1866,7 @@ impl OracleClient {
                             Ok(receipt) => {
                                 let decision = Decision {
                                     attestation,
-                                    statement,
+                                    obligation,
                                     demand: None,
                                     decision: decision_value,
                                     receipt,
@@ -1897,16 +1897,16 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate_for_escrow_async<
-        StatementData: SolType,
+        ObligationData: SolType,
         DemandData: SolType,
         ArbitrateFut: Future<Output = Option<bool>> + Send,
-        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> ArbitrateFut
+        Arbitrate: Fn(&ObligationData::RustType, &DemandData::RustType) -> ArbitrateFut
             + Copy
             + Send
             + Sync
             + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, DemandData>) -> OnAfterArbitrateFut
+        OnAfterArbitrate: Fn(&Decision<ObligationData, DemandData>) -> OnAfterArbitrateFut
             + Copy
             + Send
             + Sync
@@ -1914,14 +1914,14 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         skip_arbitrated: Option<bool>,
-    ) -> eyre::Result<ListenAndArbitrateForEscrowResult<StatementData, DemandData>>
+    ) -> eyre::Result<ListenAndArbitrateForEscrowResult<ObligationData, DemandData>>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
-        <StatementData as SolType>::RustType: Send + 'static,
+        <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (decisions, escrow_attestations, escrow_demands) = self
             .arbitrate_past_for_escrow_async(&escrow, &fulfillment, arbitrate, skip_arbitrated)
@@ -1970,8 +1970,8 @@ impl OracleClient {
                                 continue;
                             }
 
-                            if let Ok(statement) = ArbiterDemand::abi_decode(&attestation.data) {
-                                if let Ok(demand) = DemandData::abi_decode(&statement.demand) {
+                            if let Ok(obligation) = ArbiterDemand::abi_decode(&attestation.data) {
+                                if let Ok(demand) = DemandData::abi_decode(&obligation.demand) {
                                     demands_map.write().await.insert(attestation.uid, demand);
                                 }
                             }
@@ -2020,11 +2020,11 @@ impl OracleClient {
                         continue;
                     };
 
-                    let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
+                    let Ok(obligation) = ObligationData::abi_decode(&attestation.data) else {
                         continue;
                     };
 
-                    let Some(decision_value) = arbitrate(&statement, &demand).await else {
+                    let Some(decision_value) = arbitrate(&obligation, &demand).await else {
                         continue;
                     };
 
@@ -2044,7 +2044,7 @@ impl OracleClient {
                             Ok(receipt) => {
                                 let decision = Decision {
                                     attestation,
-                                    statement,
+                                    obligation: obligation,
                                     demand: None,
                                     decision: decision_value,
                                     receipt,
@@ -2070,15 +2070,15 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate_new_fulfillments_for_escrow<
-        StatementData: SolType + Clone + Send + Sync + 'static,
+        ObligationData: SolType + Clone + Send + Sync + 'static,
         DemandData: SolType + Clone + Send + Sync + 'static,
-        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> Option<bool>
+        Arbitrate: Fn(&ObligationData::RustType, &DemandData::RustType) -> Option<bool>
             + Send
             + Sync
             + Copy
             + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, DemandData>) -> OnAfterArbitrateFut
+        OnAfterArbitrate: Fn(&Decision<ObligationData, DemandData>) -> OnAfterArbitrateFut
             + Send
             + Sync
             + Copy
@@ -2086,13 +2086,13 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsForEscrowResult>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
-        <StatementData as SolType>::RustType: Send + 'static,
+        <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (escrow_attestations, escrow_demands) = self.get_escrows(&escrow).await?;
 
@@ -2139,8 +2139,8 @@ impl OracleClient {
                                 continue;
                             }
 
-                            if let Ok(statement) = ArbiterDemand::abi_decode(&attestation.data) {
-                                if let Ok(demand) = DemandData::abi_decode(&statement.demand) {
+                            if let Ok(obligation) = ArbiterDemand::abi_decode(&attestation.data) {
+                                if let Ok(demand) = DemandData::abi_decode(&obligation.demand) {
                                     demands_map.write().await.insert(attestation.uid, demand);
                                 }
                             }
@@ -2189,11 +2189,11 @@ impl OracleClient {
                         continue;
                     };
 
-                    let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
+                    let Ok(obligation) = ObligationData::abi_decode(&attestation.data) else {
                         continue;
                     };
 
-                    let Some(decision_value) = arbitrate(&statement, &demand) else {
+                    let Some(decision_value) = arbitrate(&obligation, &demand) else {
                         continue;
                     };
 
@@ -2213,7 +2213,7 @@ impl OracleClient {
                             Ok(receipt) => {
                                 let decision = Decision {
                                     attestation,
-                                    statement,
+                                    obligation: obligation,
                                     demand: None,
                                     decision: decision_value,
                                     receipt,
@@ -2238,15 +2238,15 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate_new_fulfillments_for_escrow_no_spawn<
-        StatementData: SolType,
+        ObligationData: SolType,
         DemandData: SolType,
-        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> Option<bool>,
+        Arbitrate: Fn(&ObligationData::RustType, &DemandData::RustType) -> Option<bool>,
         OnAfterArbitrateFut: Future<Output = ()>,
-        OnAfterArbitrate: Fn(&Decision<StatementData, DemandData>) -> OnAfterArbitrateFut,
+        OnAfterArbitrate: Fn(&Decision<ObligationData, DemandData>) -> OnAfterArbitrateFut,
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         skip_arbitrated: Option<bool>,
@@ -2254,7 +2254,7 @@ impl OracleClient {
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsForEscrowResult>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
-        <StatementData as SolType>::RustType: Send + 'static,
+        <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (escrow_attestations, escrow_demands) = self.get_escrows(&escrow).await?;
 
@@ -2300,8 +2300,8 @@ impl OracleClient {
                         if attestation.expirationTime != 0 && attestation.expirationTime < now { continue; }
                         if attestation.revocationTime != 0 && attestation.revocationTime < now { continue; }
 
-                        if let Ok(statement) = ArbiterDemand::abi_decode(&attestation.data) {
-                            if let Ok(demand) = DemandData::abi_decode(&statement.demand) {
+                        if let Ok(obligation) = ArbiterDemand::abi_decode(&attestation.data) {
+                            if let Ok(demand) = DemandData::abi_decode(&obligation.demand) {
                                 demands_map.write().await.insert(attestation.uid, demand);
                             }
                         }
@@ -2318,8 +2318,8 @@ impl OracleClient {
                     if attestation.revocationTime != 0 && attestation.revocationTime < now { continue; }
 
                     let Some(demand) = demands_map.read().await.get(&attestation.refUID).cloned() else { continue; };
-                    let Ok(statement) = StatementData::abi_decode(&attestation.data) else { continue; };
-                    let Some(decision_value) = arbitrate(&statement, &demand) else { continue; };
+                    let Ok(obligation) = ObligationData::abi_decode(&attestation.data) else { continue; };
+                    let Some(decision_value) = arbitrate(&obligation, &demand) else { continue; };
 
                     let Ok(nonce) = wallet_provider.get_transaction_count(signer_address).await else {
                         tracing::error!("Failed to get transaction count for {}", signer_address);
@@ -2331,7 +2331,7 @@ impl OracleClient {
                             Ok(receipt) => {
                                 let decision = Decision {
                                     attestation,
-                                    statement,
+                                    obligation,
                                     demand: None,
                                     decision: decision_value,
                                     receipt,
@@ -2361,16 +2361,16 @@ impl OracleClient {
     }
 
     pub async fn listen_and_arbitrate_new_fulfillments_for_escrow_async<
-        StatementData: SolType,
+        ObligationData: SolType,
         DemandData: SolType,
         ArbitrateFut: Future<Output = Option<bool>> + Send,
-        Arbitrate: Fn(&StatementData::RustType, &DemandData::RustType) -> ArbitrateFut
+        Arbitrate: Fn(&ObligationData::RustType, &DemandData::RustType) -> ArbitrateFut
             + Copy
             + Send
             + Sync
             + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
-        OnAfterArbitrate: Fn(&Decision<StatementData, DemandData>) -> OnAfterArbitrateFut
+        OnAfterArbitrate: Fn(&Decision<ObligationData, DemandData>) -> OnAfterArbitrateFut
             + Copy
             + Send
             + Sync
@@ -2378,13 +2378,13 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<StatementData>,
+        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsForEscrowResult>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
-        <StatementData as SolType>::RustType: Send + 'static,
+        <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (escrow_attestations, escrow_demands) = self.get_escrows(&escrow).await?;
 
@@ -2431,8 +2431,8 @@ impl OracleClient {
                                 continue;
                             }
 
-                            if let Ok(statement) = ArbiterDemand::abi_decode(&attestation.data) {
-                                if let Ok(demand) = DemandData::abi_decode(&statement.demand) {
+                            if let Ok(obligation) = ArbiterDemand::abi_decode(&attestation.data) {
+                                if let Ok(demand) = DemandData::abi_decode(&obligation.demand) {
                                     demands_map.write().await.insert(attestation.uid, demand);
                                 }
                             }
@@ -2481,11 +2481,11 @@ impl OracleClient {
                         continue;
                     };
 
-                    let Ok(statement) = StatementData::abi_decode(&attestation.data) else {
+                    let Ok(obligation) = ObligationData::abi_decode(&attestation.data) else {
                         continue;
                     };
 
-                    let Some(decision_value) = arbitrate(&statement, &demand).await else {
+                    let Some(decision_value) = arbitrate(&obligation, &demand).await else {
                         continue;
                     };
 
@@ -2505,7 +2505,7 @@ impl OracleClient {
                             Ok(receipt) => {
                                 let decision = Decision {
                                     attestation,
-                                    statement,
+                                    obligation: obligation,
                                     demand: None,
                                     decision: decision_value,
                                     receipt,

@@ -70,77 +70,77 @@ impl TokenBundleClient {
         })
     }
 
-    /// Decodes TokenBundleEscrowObligation.StatementData from bytes.
+    /// Decodes TokenBundleEscrowObligation.ObligationData from bytes.
     ///
     /// # Arguments
-    /// * `statement_data` - The statement data
+    /// * `obligation_data` - The obligation data
     ///
     /// # Returns
-    /// * `Result<contracts::TokenBundleEscrowObligation::StatementData>` - The decoded statement data
-    pub fn decode_escrow_statement(
-        statement_data: Bytes,
-    ) -> eyre::Result<contracts::TokenBundleEscrowObligation::StatementData> {
-        let statement_data = contracts::TokenBundleEscrowObligation::StatementData::abi_decode(
-            statement_data.as_ref(),
+    /// * `Result<contracts::TokenBundleEscrowObligation::ObligationData>` - The decoded obligation data
+    pub fn decode_escrow_obligation(
+        obligation_data: Bytes,
+    ) -> eyre::Result<contracts::TokenBundleEscrowObligation::ObligationData> {
+        let obligation_data = contracts::TokenBundleEscrowObligation::ObligationData::abi_decode(
+            obligation_data.as_ref(),
         )?;
-        return Ok(statement_data);
+        return Ok(obligation_data);
     }
 
-    /// Decodes TokenBundlePaymentObligation.StatementData from bytes.
+    /// Decodes TokenBundlePaymentObligation.ObligationData from bytes.
     ///
     /// # Arguments
     ///
-    /// * `statement_data` - The statement data
+    /// * `obligation_data` - The obligation data
     ///
     /// # Returns
     ///
-    /// * `eyre::Result<contracts::TokenBundlePaymentObligation::StatementData>` - The decoded statement data
-    pub fn decode_payment_statement(
-        statement_data: Bytes,
-    ) -> eyre::Result<contracts::TokenBundlePaymentObligation::StatementData> {
-        let statement_data = contracts::TokenBundlePaymentObligation::StatementData::abi_decode(
-            statement_data.as_ref(),
+    /// * `eyre::Result<contracts::TokenBundlePaymentObligation::ObligationData>` - The decoded obligation data
+    pub fn decode_payment_obligation(
+        obligation_data: Bytes,
+    ) -> eyre::Result<contracts::TokenBundlePaymentObligation::ObligationData> {
+        let obligation_data = contracts::TokenBundlePaymentObligation::ObligationData::abi_decode(
+            obligation_data.as_ref(),
         )?;
-        return Ok(statement_data);
+        return Ok(obligation_data);
     }
 
-    pub async fn get_escrow_statement(
+    pub async fn get_escrow_obligation(
         &self,
         uid: FixedBytes<32>,
     ) -> eyre::Result<
-        DecodedAttestation<contracts::token_bundle::TokenBundleEscrowObligation::StatementData>,
+        DecodedAttestation<contracts::token_bundle::TokenBundleEscrowObligation::ObligationData>,
     > {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
         let attestation = eas_contract.getAttestation(uid).call().await?;
-        let statement_data =
-            contracts::token_bundle::TokenBundleEscrowObligation::StatementData::abi_decode(
+        let obligation_data =
+            contracts::token_bundle::TokenBundleEscrowObligation::ObligationData::abi_decode(
                 &attestation.data,
             )?;
 
         Ok(DecodedAttestation {
             attestation,
-            data: statement_data,
+            data: obligation_data,
         })
     }
 
-    pub async fn get_payment_statement(
+    pub async fn get_payment_obligation(
         &self,
         uid: FixedBytes<32>,
     ) -> eyre::Result<
-        DecodedAttestation<contracts::token_bundle::TokenBundlePaymentObligation::StatementData>,
+        DecodedAttestation<contracts::token_bundle::TokenBundlePaymentObligation::ObligationData>,
     > {
         let eas_contract = contracts::IEAS::new(self.addresses.eas, &self.wallet_provider);
 
         let attestation = eas_contract.getAttestation(uid).call().await?;
-        let statement_data =
-            contracts::token_bundle::TokenBundlePaymentObligation::StatementData::abi_decode(
+        let obligation_data =
+            contracts::token_bundle::TokenBundlePaymentObligation::ObligationData::abi_decode(
                 &attestation.data,
             )?;
 
         Ok(DecodedAttestation {
             attestation,
-            data: statement_data,
+            data: obligation_data,
         })
     }
 
@@ -152,7 +152,7 @@ impl TokenBundleClient {
     ///
     /// # Returns
     /// * `Result<TransactionReceipt>` - The transaction receipt
-    pub async fn collect_payment(
+    pub async fn collect_escrow(
         &self,
         buy_attestation: FixedBytes<32>,
         fulfillment: FixedBytes<32>,
@@ -163,7 +163,7 @@ impl TokenBundleClient {
         );
 
         let receipt = escrow_contract
-            .collectPayment(buy_attestation, fulfillment)
+            .collectEscrow(buy_attestation, fulfillment)
             .send()
             .await?
             .get_receipt()
@@ -179,7 +179,7 @@ impl TokenBundleClient {
     ///
     /// # Returns
     /// * `Result<TransactionReceipt>` - The transaction receipt
-    pub async fn collect_expired(
+    pub async fn reclaim_expired(
         &self,
         buy_attestation: FixedBytes<32>,
     ) -> eyre::Result<TransactionReceipt> {
@@ -189,7 +189,7 @@ impl TokenBundleClient {
         );
 
         let receipt = escrow_contract
-            .collectExpired(buy_attestation)
+            .reclaimExpired(buy_attestation)
             .send()
             .await?
             .get_receipt()
@@ -219,7 +219,7 @@ impl TokenBundleClient {
         );
 
         let receipt = escrow_obligation_contract
-            .makeStatement((price, item).into(), expiration)
+            .doObligation((price, item).into(), expiration)
             .send()
             .await?
             .get_receipt()
@@ -248,7 +248,7 @@ impl TokenBundleClient {
             );
 
         let receipt = payment_obligation_contract
-            .makeStatement((price, payee).into())
+            .doObligation((price, payee).into())
             .send()
             .await?
             .get_receipt()
@@ -705,8 +705,8 @@ mod tests {
             .approve(&bob_bundle, ApprovalPurpose::Escrow)
             .await?;
 
-        // Create payment statement for Alice's bundle
-        let payment_statement: TokenBundlePaymentObligation::StatementData =
+        // Create payment obligation for Alice's bundle
+        let payment_obligation: TokenBundlePaymentObligation::ObligationData =
             (alice_bundle.clone(), test.bob.address()).into();
 
         // Set expiration time
@@ -724,7 +724,7 @@ mod tests {
                         .token_bundle_addresses
                         .ok_or(eyre::eyre!("no erc20-related addresses"))?
                         .payment_obligation,
-                    demand: payment_statement.abi_encode().into(),
+                    demand: payment_obligation.abi_encode().into(),
                 },
                 expiration,
             )
@@ -912,7 +912,7 @@ mod tests {
         // Alice collects her expired escrow
         test.alice_client
             .token_bundle
-            .collect_expired(buy_attestation)
+            .reclaim_expired(buy_attestation)
             .await?;
 
         // Verify Alice got her tokens back
@@ -948,7 +948,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_decode_escrow_statement() -> eyre::Result<()> {
+    async fn test_decode_escrow_obligation() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
 
@@ -968,15 +968,15 @@ mod tests {
             demand: demand.clone(),
         };
 
-        // Create the statement data
-        let escrow_data: TokenBundleEscrowObligation::StatementData =
+        // Create the obligation data
+        let escrow_data: TokenBundleEscrowObligation::ObligationData =
             (alice_bundle, arbiter_data).into();
 
         // Encode the data
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = TokenBundleClient::decode_escrow_statement(encoded.into())?;
+        let decoded = TokenBundleClient::decode_escrow_obligation(encoded.into())?;
 
         // Verify decoded data - note that the bundle verification would need more complex comparison
         assert_eq!(decoded.arbiter, arbiter, "Arbiter should match");
@@ -986,7 +986,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_decode_payment_statement() -> eyre::Result<()> {
+    async fn test_decode_payment_obligation() -> eyre::Result<()> {
         // Test setup
         let test = setup_test_environment().await?;
 
@@ -994,15 +994,15 @@ mod tests {
         let alice_bundle = create_alice_bundle(&test)?;
         let payee = test.alice.address();
 
-        // Create the statement data
-        let payment_data: TokenBundlePaymentObligation::StatementData =
+        // Create the obligation data
+        let payment_data: TokenBundlePaymentObligation::ObligationData =
             (alice_bundle, payee).into();
 
         // Encode the data
         let encoded = payment_data.abi_encode();
 
         // Decode the data
-        let decoded = TokenBundleClient::decode_payment_statement(encoded.into())?;
+        let decoded = TokenBundleClient::decode_payment_obligation(encoded.into())?;
 
         // Verify decoded data - note that the bundle verification would need more complex comparison
         assert_eq!(decoded.payee, payee, "Payee should match");
@@ -1276,7 +1276,7 @@ mod tests {
             "ERC1155 tokens should be in escrow"
         );
 
-        // Escrow statement made
+        // Escrow obligation made
         let attested_event = AlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
@@ -1370,7 +1370,7 @@ mod tests {
             "ERC1155 tokens should be transferred to Bob"
         );
 
-        // Payment statement made
+        // Payment obligation made
         let attested_event = AlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 

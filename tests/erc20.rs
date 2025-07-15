@@ -136,16 +136,16 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
     let escrow = AlkahestClient::get_attested_event(escrow)?;
     println!("escrow: {escrow:?}");
 
-    // now the seller manually decodes the statement and demand
+    // now the seller manually decodes the obligation and demand
     // and creates a StringResultObligation
     // and manually collects payment
-    let buy_statement = client_seller
+    let buy_obligation = client_seller
         .attestation
         .get_attestation(escrow.uid)
         .await?;
-    let buy_statement = Erc20Client::decode_escrow_statement(&buy_statement.data)?;
+    let buy_obligation = Erc20Client::decode_escrow_obligation(&buy_obligation.data)?;
 
-    let decoded_demand = ArbitersClient::decode_trusted_party_arbiter_demand(&buy_statement.demand)?;
+    let decoded_demand = ArbitersClient::decode_trusted_party_arbiter_demand(&buy_obligation.demand)?;
     let decoded_base_demand = ResultDemandData::abi_decode(decoded_demand.baseDemand.as_ref());
 
     // uppercase string for the example;
@@ -156,7 +156,7 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
     let result = decoded_base_demand?.query.to_uppercase();
     println!("result: {}", result);
 
-    // manually make result statement
+    // manually make result obligation
     sol!(
         #[allow(missing_docs)]
         #[sol(rpc)]
@@ -196,13 +196,13 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
     // and collect the payment from escrow
     let collection = client_seller
         .erc20
-        .collect_payment(escrow.uid, result.uid)
+        .collect_escrow(escrow.uid, result.uid)
         .await?;
     println!("collection: {collection:?}");
 
     // meanwhile, the buyer can wait for fulfillment of her escrow.
     // if called after fulfillment, like in this case, it will
-    // return the fulfilling statement immediately
+    // return the fulfilling obligation immediately
     let fulfillment = client_buyer
         .wait_for_fulfillment(
             client_buyer.erc20.addresses.escrow_obligation,
@@ -211,7 +211,7 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
         )
         .await?;
 
-    // and extract the result from the fulfillment statement
+    // and extract the result from the fulfillment obligation
     let fulfillment = client_buyer
         .attestation
         .get_attestation(fulfillment.fulfillment)

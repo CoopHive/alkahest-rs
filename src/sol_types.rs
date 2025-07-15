@@ -6,8 +6,9 @@ use alloy::{
 use crate::{
     contracts::{
         self, AllArbiter, AnyArbiter, AttestationBarterUtils, AttestationEscrowObligation, IEAS,
-        IntrinsicsArbiter, IntrinsicsArbiter2, RecipientArbiter, SpecificAttestationArbiter, TrivialArbiter,
-        TrustedOracleArbiter, TrustedPartyArbiter, UidArbiter,
+        IntrinsicsArbiter, IntrinsicsArbiter2, RecipientArbiter, SpecificAttestationArbiter,
+        TrivialArbiter, TrustedOracleArbiter, TrustedPartyArbiter,
+        extended_uid_arbiters::composing::UidArbiterComposing,
     },
     types::{ArbiterData, TokenBundleData},
 };
@@ -100,20 +101,20 @@ macro_rules! impl_escrow_obligation {
     };
 }
 
-impl_payment_obligation!(contracts::token_bundle::TokenBundlePaymentObligation::StatementData);
+impl_payment_obligation!(contracts::token_bundle::TokenBundlePaymentObligation::ObligationData);
 impl_payment_obligation!(
-    contracts::erc20_barter_cross_token::TokenBundlePaymentObligation::StatementData
+    contracts::erc20_barter_cross_token::TokenBundlePaymentObligation::ObligationData
 );
 impl_payment_obligation!(
-    contracts::erc721_barter_cross_token::TokenBundlePaymentObligation::StatementData
+    contracts::erc721_barter_cross_token::TokenBundlePaymentObligation::ObligationData
 );
 impl_payment_obligation!(
-    contracts::erc1155_barter_cross_token::TokenBundlePaymentObligation::StatementData
+    contracts::erc1155_barter_cross_token::TokenBundlePaymentObligation::ObligationData
 );
-impl_payment_obligation!(contracts::TokenBundlePaymentObligation::StatementData);
+impl_payment_obligation!(contracts::TokenBundlePaymentObligation::ObligationData);
 
-impl_escrow_obligation!(contracts::token_bundle::TokenBundleEscrowObligation::StatementData);
-impl_escrow_obligation!(contracts::TokenBundleEscrowObligation::StatementData);
+impl_escrow_obligation!(contracts::token_bundle::TokenBundleEscrowObligation::ObligationData);
+impl_escrow_obligation!(contracts::TokenBundleEscrowObligation::ObligationData);
 
 macro_rules! impl_attestation_request {
     ($target:ident) => {
@@ -173,5 +174,5 @@ impl_from_attestation!(IntrinsicsArbiter);
 impl_from_attestation!(IntrinsicsArbiter2);
 impl_from_attestation!(AnyArbiter);
 impl_from_attestation!(AllArbiter);
-impl_from_attestation!(UidArbiter);
+impl_from_attestation!(UidArbiterComposing);
 impl_from_attestation!(RecipientArbiter);
