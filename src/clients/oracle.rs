@@ -22,7 +22,7 @@ use futures::{
 };
 use itertools::izip;
 use tokio::{sync::RwLock, time::Duration};
-use tracing;
+use tracing::{self, event};
 
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
@@ -108,6 +108,7 @@ impl
 pub struct ArbitrateOptions {
     pub require_oracle: bool,
     pub skip_arbitrated: bool,
+    pub require_request: bool,
 }
 
 impl Default for ArbitrateOptions {
@@ -115,6 +116,7 @@ impl Default for ArbitrateOptions {
         ArbitrateOptions {
             require_oracle: false,
             skip_arbitrated: false,
+            require_request: false,
         }
     }
 }
@@ -193,10 +195,15 @@ impl OracleClient {
             .map_err(Into::into)
     }
 
-    fn make_filter(&self, p: &AttestationFilter) -> Filter {
+    fn make_filter(&self, p: &AttestationFilter, options: &ArbitrateOptions) -> Filter {
+        let event_signature = if options.require_request {
+            TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH
+        } else {
+            IEAS::Attested::SIGNATURE_HASH
+        };
         let mut filter = Filter::new()
             .address(self.addresses.eas)
-            .event_signature(IEAS::Attested::SIGNATURE_HASH)
+            .event_signature(event_signature)
             .from_block(
                 p.block_option
                     .as_ref()
@@ -336,7 +343,7 @@ impl OracleClient {
         fulfillment: &FulfillmentParams<ObligationData>,
         options: &ArbitrateOptions,
     ) -> eyre::Result<(Vec<Attestation>, Vec<ObligationData::RustType>)> {
-        let filter = self.make_filter(&fulfillment.filter);
+        let filter = self.make_filter(&fulfillment.filter, &options);
 
         let logs = self
             .public_provider
@@ -392,9 +399,12 @@ impl OracleClient {
             attestations
         };
 
-        let attestations = self
-            .filter_unarbitrated_attestations(attestations, options.skip_arbitrated)
-            .await?;
+        let attestations = if options.skip_arbitrated {
+            self.filter_unarbitrated_attestations(attestations, options.skip_arbitrated)
+                .await?
+        } else {
+            attestations
+        };
 
         let obligations = attestations
             .iter()
@@ -482,7 +492,9 @@ impl OracleClient {
             .get_attestations_and_obligations(fulfillment, options)
             .await?;
 
-        let decision_futs = obligations.iter().map(|s| async move { arbitrate(s).await });
+        let decision_futs = obligations
+            .iter()
+            .map(|s| async move { arbitrate(s).await });
         let decisions = join_all(decision_futs).await;
 
         let base_nonce = self
@@ -807,7 +819,7 @@ impl OracleClient {
         let decisions = self
             .arbitrate_past(&fulfillment, arbitrate, options)
             .await?;
-        let filter = self.make_filter(&fulfillment.filter);
+        let filter = self.make_filter(&fulfillment.filter, &options);
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
@@ -847,7 +859,7 @@ impl OracleClient {
         let decisions = self
             .arbitrate_past_async(&fulfillment, arbitrate, options)
             .await?;
-        let filter = self.make_filter(&fulfillment.filter);
+        let filter = self.make_filter(&fulfillment.filter, &options);
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
@@ -1025,7 +1037,7 @@ impl OracleClient {
         let decisions = self
             .arbitrate_past(&fulfillment, &arbitrate, options)
             .await?;
-        let filter = self.make_filter(&fulfillment.filter);
+        let filter = self.make_filter(&fulfillment.filter, &options);
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
@@ -1063,7 +1075,7 @@ impl OracleClient {
     where
         <ObligationData as SolType>::RustType: Send,
     {
-        let filter = self.make_filter(&fulfillment.filter);
+        let filter = self.make_filter(&fulfillment.filter, &options);
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
@@ -1099,7 +1111,7 @@ impl OracleClient {
     where
         <ObligationData as SolType>::RustType: Send,
     {
-        let filter = self.make_filter(&fulfillment.filter);
+        let filter = self.make_filter(&fulfillment.filter, &options);
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
@@ -1135,7 +1147,7 @@ impl OracleClient {
     where
         <ObligationData as SolType>::RustType: Send,
     {
-        let filter = self.make_filter(&fulfillment.filter);
+        let filter = self.make_filter(&fulfillment.filter, &options);
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
@@ -1164,7 +1176,7 @@ impl OracleClient {
         escrow: &EscrowParams<DemandData>,
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<(
         Vec<Decision<ObligationData, DemandData>>,
         Vec<IEAS::Attestation>,
@@ -1173,11 +1185,11 @@ impl OracleClient {
     where
         DemandData::RustType: Clone,
     {
-        let escrow_filter = self.make_filter(&escrow.filter);
+        let escrow_filter = self.make_filter(&escrow.filter, &ArbitrateOptions::default());
         let escrow_logs_fut = async move { self.public_provider.get_logs(&escrow_filter).await };
 
         let fulfillment_filter: AttestationFilter = (fulfillment.filter.clone(), None).into();
-        let fulfillment_filter = self.make_filter(&fulfillment_filter);
+        let fulfillment_filter = self.make_filter(&fulfillment_filter, &options);
         let fulfillment_logs_fut =
             async move { self.public_provider.get_logs(&fulfillment_filter).await };
 
@@ -1261,12 +1273,12 @@ impl OracleClient {
             .filter(|a| demands_map.contains_key(&a.refUID))
             .collect::<Vec<_>>();
 
-        let fulfillment_attestations = self
-            .filter_unarbitrated_attestations(
-                fulfillment_attestations,
-                skip_arbitrated.unwrap_or(false),
-            )
-            .await?;
+        let fulfillment_attestations = if options.skip_arbitrated {
+            self.filter_unarbitrated_attestations(fulfillment_attestations, options.skip_arbitrated)
+                .await?
+        } else {
+            fulfillment_attestations
+        };
 
         let fulfillment_obligations = fulfillment_attestations
             .iter()
@@ -1350,7 +1362,7 @@ impl OracleClient {
     where
         DemandData::RustType: Clone,
     {
-        let escrow_filter = self.make_filter(&escrow.filter);
+        let escrow_filter = self.make_filter(&escrow.filter, &ArbitrateOptions::default());
         let escrow_logs_fut = async move { self.public_provider.get_logs(&escrow_filter).await };
 
         let escrow_logs = tokio::try_join!(escrow_logs_fut)?.0;
@@ -1419,7 +1431,7 @@ impl OracleClient {
         escrow: &EscrowParams<DemandData>,
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<(
         Vec<Decision<ObligationData, DemandData>>,
         Vec<IEAS::Attestation>,
@@ -1428,11 +1440,11 @@ impl OracleClient {
     where
         DemandData::RustType: Clone,
     {
-        let escrow_filter = self.make_filter(&escrow.filter);
+        let escrow_filter = self.make_filter(&escrow.filter, &ArbitrateOptions::default());
         let escrow_logs_fut = async move { self.public_provider.get_logs(&escrow_filter).await };
 
         let fulfillment_filter: AttestationFilter = (fulfillment.filter.clone(), None).into();
-        let fulfillment_filter = self.make_filter(&fulfillment_filter);
+        let fulfillment_filter = self.make_filter(&fulfillment_filter, &options);
         let fulfillment_logs_fut =
             async move { self.public_provider.get_logs(&fulfillment_filter).await };
 
@@ -1516,12 +1528,12 @@ impl OracleClient {
             .filter(|a| demands_map.contains_key(&a.refUID))
             .collect::<Vec<_>>();
 
-        let fulfillment_attestations = self
-            .filter_unarbitrated_attestations(
-                fulfillment_attestations,
-                skip_arbitrated.unwrap_or(false),
-            )
-            .await?;
+        let fulfillment_attestations = if options.skip_arbitrated {
+            self.filter_unarbitrated_attestations(fulfillment_attestations, options.skip_arbitrated)
+                .await?
+        } else {
+            fulfillment_attestations
+        };
 
         let fulfillment_obligations = fulfillment_attestations
             .iter()
@@ -1618,14 +1630,14 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateForEscrowResult<ObligationData, DemandData>>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
         <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (decisions, escrow_attestations, escrow_demands) = self
-            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, skip_arbitrated)
+            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, &options)
             .await?;
 
         let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
@@ -1647,7 +1659,7 @@ impl OracleClient {
         // Listen for escrow demands
         {
             let demands_map = Arc::clone(&demands_map);
-            let filter = self.make_filter(&escrow.filter);
+            let filter = self.make_filter(&escrow.filter, &ArbitrateOptions::default());
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             escrow_subscription_id = *sub.local_id();
 
@@ -1782,7 +1794,8 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
+
         timeout: Option<Duration>,
     ) -> eyre::Result<ListenAndArbitrateForEscrowResult<ObligationData, DemandData>>
     where
@@ -1790,7 +1803,7 @@ impl OracleClient {
         <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (decisions, escrow_attestations, escrow_demands) = self
-            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, skip_arbitrated)
+            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, &options)
             .await?;
 
         let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
@@ -1802,7 +1815,7 @@ impl OracleClient {
                     .collect(),
             ));
 
-        let escrow_filter = self.make_filter(&escrow.filter);
+        let escrow_filter = self.make_filter(&escrow.filter, &ArbitrateOptions::default());
         let fulfillment_filter = self.make_filter_without_refuid(&fulfillment.filter);
 
         let escrow_sub = self.public_provider.subscribe_logs(&escrow_filter).await?;
@@ -1917,14 +1930,14 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateForEscrowResult<ObligationData, DemandData>>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
         <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (decisions, escrow_attestations, escrow_demands) = self
-            .arbitrate_past_for_escrow_async(&escrow, &fulfillment, arbitrate, skip_arbitrated)
+            .arbitrate_past_for_escrow_async(&escrow, &fulfillment, arbitrate, &options)
             .await?;
 
         let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
@@ -1946,7 +1959,7 @@ impl OracleClient {
         // Listen for escrow demands
         {
             let demands_map = Arc::clone(&demands_map);
-            let filter = self.make_filter(&escrow.filter);
+            let filter = self.make_filter(&escrow.filter, &ArbitrateOptions::default());
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             escrow_subscription_id = *sub.local_id();
 
@@ -2115,7 +2128,7 @@ impl OracleClient {
         // Listen for escrow demands
         {
             let demands_map = Arc::clone(&demands_map);
-            let filter = self.make_filter(&escrow.filter);
+            let filter = self.make_filter(&escrow.filter, &ArbitrateOptions::default());
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             escrow_subscription_id = *sub.local_id();
 
@@ -2249,7 +2262,8 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
+
         timeout: Option<Duration>,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsForEscrowResult>
     where
@@ -2267,7 +2281,7 @@ impl OracleClient {
                     .collect(),
             ));
 
-        let escrow_filter = self.make_filter(&escrow.filter);
+        let escrow_filter = self.make_filter(&escrow.filter, &ArbitrateOptions::default());
         let fulfillment_filter = self.make_filter_without_refuid(&fulfillment.filter);
 
         let escrow_sub = self.public_provider.subscribe_logs(&escrow_filter).await?;
@@ -2407,7 +2421,7 @@ impl OracleClient {
         // Listen for escrow demands
         {
             let demands_map = Arc::clone(&demands_map);
-            let filter = self.make_filter(&escrow.filter);
+            let filter = self.make_filter(&escrow.filter, &ArbitrateOptions::default());
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             escrow_subscription_id = *sub.local_id();
 

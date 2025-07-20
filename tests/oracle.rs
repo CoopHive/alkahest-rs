@@ -195,6 +195,44 @@ mod tests {
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: false,
+                    require_request: false,
+                },
+            )
+            .await?;
+
+        assert_eq!(decisions.len(), 1);
+        assert_eq!(decisions[0].decision, true);
+
+        let collection = test
+            .bob_client
+            .erc20
+            .collect_escrow(escrow_uid, fulfillment_uid)
+            .await?;
+
+        println!("✅ Arbitrate decision passed. Tx: {:?}", collection);
+
+        Ok(())
+    }
+    #[tokio::test]
+    async fn test_arbitrate_past_require_request() -> eyre::Result<()> {
+        let test = setup_test_environment().await?;
+        let (_, _, escrow_uid) = setup_escrow(&test).await?;
+
+        let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
+
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
+
+        let decisions = test
+            .bob_client
+            .oracle
+            .arbitrate_past(
+                &fulfillment,
+                &|s| Some(s.item == "good"),
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                    require_request: true,
                 },
             )
             .await?;
@@ -285,6 +323,7 @@ mod tests {
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: true,
+                    require_request: false,
                 },
             )
             .await?;
@@ -304,6 +343,7 @@ mod tests {
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: true,
+                    require_request: false,
                 },
             )
             .await?;
@@ -357,6 +397,7 @@ mod tests {
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: true,
+                    require_request: false,
                 },
             )
             .await?;
@@ -377,6 +418,7 @@ mod tests {
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: true,
+                    require_request: false,
                 },
             )
             .await?;
@@ -435,6 +477,7 @@ mod tests {
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: false,
+                    require_request: false,
                 },
             )
             .await?;
@@ -492,6 +535,7 @@ mod tests {
                     &ArbitrateOptions {
                         require_oracle: true,
                         skip_arbitrated: false,
+                        require_request: false,
                     },
                     Some(Duration::from_secs(10)),
                 )
@@ -550,6 +594,7 @@ mod tests {
                     &ArbitrateOptions {
                         require_oracle: true,
                         skip_arbitrated: false,
+                        require_request: false,
                     },
                     Some(Duration::from_secs(10)),
                 )
@@ -607,6 +652,7 @@ mod tests {
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: false,
+                    require_request: false,
                 },
             )
             .await?;
@@ -679,6 +725,7 @@ mod tests {
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: false,
+                    require_request: false,
                 },
             )
             .await?;
@@ -747,6 +794,7 @@ mod tests {
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: false,
+                    require_request: false,
                 },
             )
             .await?;
@@ -806,6 +854,7 @@ mod tests {
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: false,
+                    require_request: false,
                 },
             )
             .await?;
@@ -877,6 +926,7 @@ mod tests {
                 &ArbitrateOptions {
                     require_oracle: true,
                     skip_arbitrated: false,
+                    require_request: false,
                 },
             )
             .await?;
@@ -944,7 +994,11 @@ mod tests {
                     println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
                     Some(item == "good")
                 },
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                    require_request: false,
+                },
             )
             .await?;
 
@@ -991,7 +1045,11 @@ mod tests {
                     println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
                     Some(item == "good")
                 },
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                    require_request: false,
+                },
             )
             .await?;
 
@@ -1051,7 +1109,11 @@ mod tests {
                     println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
                     Some(item == "good")
                 },
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                    require_request: false,
+                },
             )
             .await?;
         assert_eq!(decisions.len(), 1);
@@ -1074,7 +1136,11 @@ mod tests {
                     println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
                     Some(item == "good")
                 },
-                Some(true),
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: true,
+                    require_request: false,
+                },
             )
             .await?;
 
@@ -1137,7 +1203,11 @@ mod tests {
                     println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
                     async move { Some(item == "good") }
                 },
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                    require_request: false,
+                },
             )
             .await?;
 
@@ -1197,7 +1267,11 @@ mod tests {
                     println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
                     async move { Some(item == "good") }
                 },
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                    require_request: false,
+                },
             )
             .await?;
         assert_eq!(decisions.len(), 1);
@@ -1220,7 +1294,11 @@ mod tests {
                     println!("🔍 Checking item: '{}', oracle: {}", item, oracle_addr);
                     async move { Some(item == "good") }
                 },
-                Some(true),
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: true,
+                    require_request: false,
+                },
             )
             .await?;
 
@@ -1288,7 +1366,11 @@ mod tests {
                         assert!(decision_value);
                     }
                 },
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                    require_request: false,
+                },
             )
             .await?;
 
@@ -1352,7 +1434,11 @@ mod tests {
                         assert!(decision_value);
                     }
                 },
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                    require_request: false,
+                },
             )
             .await?;
 
@@ -1420,7 +1506,11 @@ mod tests {
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
                     }
                 },
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                    require_request: false,
+                },
             )
             .await?;
 
@@ -1515,7 +1605,11 @@ mod tests {
                             println!("📣 Decision for '{}': {}", statement_item, decision_value);
                         }
                     },
-                    None,
+                    &ArbitrateOptions {
+                        require_oracle: true,
+                        skip_arbitrated: false,
+                        require_request: false,
+                    },
                     Some(Duration::from_secs(10)),
                 )
                 .await
@@ -1604,7 +1698,11 @@ mod tests {
                         println!("📣 Decision for '{}': {}", statement_item, decision_value);
                     }
                 },
-                None,
+                &ArbitrateOptions {
+                    require_oracle: true,
+                    skip_arbitrated: false,
+                    require_request: false,
+                },
             )
             .await?;
 
@@ -1884,7 +1982,11 @@ mod tests {
                             println!("📣 Decision for '{}': {}", statement_item, decision_value);
                         }
                     },
-                    None,
+                    &ArbitrateOptions {
+                        require_oracle: true,
+                        skip_arbitrated: false,
+                        require_request: false,
+                    },
                     Some(Duration::from_secs(10)),
                 )
                 .await
