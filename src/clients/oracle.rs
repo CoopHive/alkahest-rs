@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     marker::PhantomData,
+    option,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -10,8 +11,8 @@ use alloy::{
     eips::BlockNumberOrTag,
     primitives::{Address, FixedBytes},
     providers::Provider,
-    pubsub::SubscriptionStream,
-    rpc::types::{Filter, FilterBlockOption, Log, TransactionReceipt, ValueOrArray},
+    pubsub::{self, SubscriptionStream},
+    rpc::types::{Filter, FilterBlockOption, Log, TransactionReceipt, ValueOrArray, trace::filter},
     signers::local::PrivateKeySigner,
     sol,
     sol_types::SolEvent,
@@ -22,7 +23,7 @@ use futures::{
 };
 use itertools::izip;
 use tokio::{sync::RwLock, time::Duration};
-use tracing;
+use tracing::{self, event};
 
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
@@ -108,6 +109,7 @@ impl
 pub struct ArbitrateOptions {
     pub require_oracle: bool,
     pub skip_arbitrated: bool,
+    pub require_request: bool,
 }
 
 impl Default for ArbitrateOptions {
@@ -115,6 +117,7 @@ impl Default for ArbitrateOptions {
         ArbitrateOptions {
             require_oracle: false,
             skip_arbitrated: false,
+            require_request: false,
         }
     }
 }
@@ -241,18 +244,22 @@ impl OracleClient {
 
     fn make_arbitration_filter(
         address: Address,
-        obligation: FixedBytes<32>,
-        oracle: Address,
+        event_signature: FixedBytes<32>,
+        obligation: Option<FixedBytes<32>>,
+        oracle: Option<Address>,
     ) -> Filter {
         let mut filter = Filter::new()
             .address(address)
-            .event_signature(TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH)
+            .event_signature(event_signature)
             .from_block(BlockNumberOrTag::Earliest)
             .to_block(BlockNumberOrTag::Latest);
 
-        filter = filter.topic1(obligation);
-
-        filter = filter.topic2(oracle);
+        if let Some(obligation) = obligation {
+            filter = filter.topic1(obligation);
+        }
+        if let Some(oracle) = oracle {
+            filter = filter.topic2(oracle);
+        }
 
         filter
     }
@@ -260,17 +267,13 @@ impl OracleClient {
     async fn filter_unarbitrated_attestations(
         &self,
         attestations: Vec<Attestation>,
-        skip_arbitrated: bool,
     ) -> eyre::Result<Vec<Attestation>> {
-        if !skip_arbitrated {
-            return Ok(attestations);
-        }
-
         let futs = attestations.into_iter().map(|a| {
             let filter = Self::make_arbitration_filter(
                 self.addresses.trusted_oracle_arbiter,
-                a.uid,
-                self._signer.address(),
+                TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
+                Some(a.uid),
+                Some(self._signer.address()),
             );
             async move {
                 let logs = self.public_provider.get_logs(&filter).await?;
@@ -282,6 +285,30 @@ impl OracleClient {
         Ok(results
             .into_iter()
             .filter_map(|(a, is_arbitrated)| if is_arbitrated { None } else { Some(a) })
+            .collect())
+    }
+
+    async fn filter_requested_attestations(
+        &self,
+        attestations: Vec<Attestation>,
+    ) -> eyre::Result<Vec<Attestation>> {
+        let futs = attestations.into_iter().map(|a| {
+            let filter = Self::make_arbitration_filter(
+                self.addresses.trusted_oracle_arbiter,
+                TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                Some(a.uid),
+                Some(self._signer.address()),
+            );
+            async move {
+                let logs = self.public_provider.get_logs(&filter).await?;
+                Ok::<_, eyre::Error>((a, !logs.is_empty()))
+            }
+        });
+
+        let results = try_join_all(futs).await?;
+        Ok(results
+            .into_iter()
+            .filter_map(|(a, is_requested)| if is_requested { Some(a) } else { None })
             .collect())
     }
 
@@ -392,9 +419,17 @@ impl OracleClient {
             attestations
         };
 
-        let attestations = self
-            .filter_unarbitrated_attestations(attestations, options.skip_arbitrated)
-            .await?;
+        let attestations = if options.skip_arbitrated {
+            self.filter_unarbitrated_attestations(attestations).await?
+        } else {
+            attestations
+        };
+
+        let attestations = if options.require_request {
+            self.filter_requested_attestations(attestations).await?
+        } else {
+            attestations
+        };
 
         let obligations = attestations
             .iter()
@@ -416,7 +451,6 @@ impl OracleClient {
         let (attestations, obligations) = self
             .get_attestations_and_obligations(fulfillment, options)
             .await?;
-
         let decisions = obligations.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
         let base_nonce = self
             .wallet_provider
@@ -482,7 +516,9 @@ impl OracleClient {
             .get_attestations_and_obligations(fulfillment, options)
             .await?;
 
-        let decision_futs = obligations.iter().map(|s| async move { arbitrate(s).await });
+        let decision_futs = obligations
+            .iter()
+            .map(|s| async move { arbitrate(s).await });
         let decisions = join_all(decision_futs).await;
 
         let base_nonce = self
@@ -535,6 +571,29 @@ impl OracleClient {
         Ok(result)
     }
 
+    pub async fn request_arbitration(
+        &self,
+        obligation_uid: FixedBytes<32>,
+        oracle: Address,
+    ) -> eyre::Result<TransactionReceipt> {
+        let trusted_oracle_arbiter =
+            TrustedOracleArbiter::new(self.addresses.trusted_oracle_arbiter, &self.wallet_provider);
+
+        let nonce = self
+            .wallet_provider
+            .get_transaction_count(self._signer.address())
+            .await?;
+
+        let tx = trusted_oracle_arbiter
+            .requestArbitration(obligation_uid, oracle)
+            .nonce(nonce)
+            .send()
+            .await?;
+
+        let receipt = tx.get_receipt().await?;
+        Ok(receipt)
+    }
+
     async fn spawn_fulfillment_listener<
         ObligationData: SolType + Clone + Send + 'static,
         Arbitrate: Fn(&ObligationData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
@@ -563,14 +622,36 @@ impl OracleClient {
             let mut stream = stream;
 
             while let Some(log) = stream.next().await {
-                let Ok(log) = log.log_decode::<IEAS::Attested>() else {
-                    continue;
-                };
+                println!("Received log: {:?}", log);
 
-                let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
-                    continue;
+                let attestation = if options.require_request {
+                    // Decode as ArbitrationRequested event
+                    let Ok(arbitration_log) =
+                        log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
+                    else {
+                        continue;
+                    };
+                    // Get the attestation using the obligation UID from the event
+                    let Ok(attestation) = eas
+                        .getAttestation(arbitration_log.inner.obligation)
+                        .call()
+                        .await
+                    else {
+                        continue;
+                    };
+                    attestation
+                } else {
+                    // Decode as regular Attested event
+                    let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
+                        continue;
+                    };
+                    let Ok(attestation) = eas.getAttestation(attested_log.inner.uid).call().await
+                    else {
+                        continue;
+                    };
+                    attestation
                 };
-
+                println!("Attestation: {:?}", attestation);
                 if options.require_oracle {
                     let escrow_att = match eas.getAttestation(attestation.refUID).call().await {
                         Ok(a) => a,
@@ -586,12 +667,13 @@ impl OracleClient {
                         continue;
                     }
                 }
-
+                println!("Escrow attestation: {:?}", attestation.refUID);
                 if options.skip_arbitrated {
                     let filter = Self::make_arbitration_filter(
                         arbiter_address,
-                        attestation.uid,
-                        signer_address,
+                        TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
+                        Some(attestation.uid),
+                        Some(signer_address),
                     );
                     let logs_result = public_provider.get_logs(&filter).await;
 
@@ -601,7 +683,7 @@ impl OracleClient {
                         }
                     }
                 }
-
+                println!("Filter applied, checking ref_uid...");
                 match &fulfillment.filter.ref_uid {
                     Some(ValueOrArray::Value(ref_uid)) if attestation.refUID != *ref_uid => {
                         continue;
@@ -690,14 +772,34 @@ impl OracleClient {
             let mut stream = stream;
 
             while let Some(log) = stream.next().await {
-                let Ok(log) = log.log_decode::<IEAS::Attested>() else {
-                    continue;
+                let attestation = if options.require_request {
+                    // Decode as ArbitrationRequested event
+                    let Ok(arbitration_log) =
+                        log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
+                    else {
+                        continue;
+                    };
+                    // Get the attestation using the obligation UID from the event
+                    let Ok(attestation) = eas
+                        .getAttestation(arbitration_log.inner.obligation)
+                        .call()
+                        .await
+                    else {
+                        continue;
+                    };
+                    attestation
+                } else {
+                    // Decode as regular Attested event
+                    let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
+                        continue;
+                    };
+                    let Ok(attestation) = eas.getAttestation(attested_log.inner.uid).call().await
+                    else {
+                        continue;
+                    };
+                    attestation
                 };
-
-                let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
-                    continue;
-                };
-
+                println!("Attestation: {:?}", attestation);
                 if options.require_oracle {
                     let escrow_att = match eas.getAttestation(attestation.refUID).call().await {
                         Ok(a) => a,
@@ -717,8 +819,9 @@ impl OracleClient {
                 if options.skip_arbitrated {
                     let filter = Self::make_arbitration_filter(
                         arbiter_address,
-                        attestation.uid,
-                        signer_address,
+                        TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
+                        Some(attestation.uid),
+                        Some(signer_address),
                     );
                     let logs_result = public_provider.get_logs(&filter).await;
 
@@ -807,8 +910,16 @@ impl OracleClient {
         let decisions = self
             .arbitrate_past(&fulfillment, arbitrate, options)
             .await?;
-        let filter = self.make_filter(&fulfillment.filter);
-
+        let filter = if options.require_request {
+            Self::make_arbitration_filter(
+                self.addresses.trusted_oracle_arbiter,
+                TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                None,
+                Some(self._signer.address()),
+            )
+        } else {
+            self.make_filter(&fulfillment.filter)
+        };
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
         let stream: SubscriptionStream<Log> = sub.into_stream();
@@ -847,7 +958,17 @@ impl OracleClient {
         let decisions = self
             .arbitrate_past_async(&fulfillment, arbitrate, options)
             .await?;
-        let filter = self.make_filter(&fulfillment.filter);
+
+        let filter = if options.require_request {
+            Self::make_arbitration_filter(
+                self.addresses.trusted_oracle_arbiter,
+                TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                None,
+                Some(self._signer.address()),
+            )
+        } else {
+            self.make_filter(&fulfillment.filter)
+        };
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
@@ -906,12 +1027,32 @@ impl OracleClient {
                 break; // Stream ended
             };
 
-            let Ok(log) = log.log_decode::<IEAS::Attested>() else {
-                continue;
-            };
-
-            let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
-                continue;
+            let attestation = if options.require_request {
+                // Decode as ArbitrationRequested event
+                let Ok(arbitration_log) =
+                    log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
+                else {
+                    continue;
+                };
+                // Get the attestation using the obligation UID from the event
+                let Ok(attestation) = eas
+                    .getAttestation(arbitration_log.inner.obligation)
+                    .call()
+                    .await
+                else {
+                    continue;
+                };
+                attestation
+            } else {
+                // Decode as regular Attested event
+                let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
+                    continue;
+                };
+                let Ok(attestation) = eas.getAttestation(attested_log.inner.uid).call().await
+                else {
+                    continue;
+                };
+                attestation
             };
 
             if options.require_oracle {
@@ -933,8 +1074,9 @@ impl OracleClient {
             if options.skip_arbitrated {
                 let filter = Self::make_arbitration_filter(
                     self.addresses.trusted_oracle_arbiter,
-                    attestation.uid,
-                    self._signer.address(),
+                    TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
+                    Some(attestation.uid),
+                    Some(self._signer.address()),
                 );
                 let logs_result = self.public_provider.get_logs(&filter).await;
 
@@ -1025,7 +1167,16 @@ impl OracleClient {
         let decisions = self
             .arbitrate_past(&fulfillment, &arbitrate, options)
             .await?;
-        let filter = self.make_filter(&fulfillment.filter);
+        let filter = if options.require_request {
+            Self::make_arbitration_filter(
+                self.addresses.trusted_oracle_arbiter,
+                TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                None,
+                Some(self._signer.address()),
+            )
+        } else {
+            self.make_filter(&fulfillment.filter)
+        };
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
@@ -1063,7 +1214,16 @@ impl OracleClient {
     where
         <ObligationData as SolType>::RustType: Send,
     {
-        let filter = self.make_filter(&fulfillment.filter);
+        let filter = if options.require_request {
+            Self::make_arbitration_filter(
+                self.addresses.trusted_oracle_arbiter,
+                TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                None,
+                Some(self._signer.address()),
+            )
+        } else {
+            self.make_filter(&fulfillment.filter)
+        };
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
@@ -1099,7 +1259,16 @@ impl OracleClient {
     where
         <ObligationData as SolType>::RustType: Send,
     {
-        let filter = self.make_filter(&fulfillment.filter);
+        let filter = if options.require_request {
+            Self::make_arbitration_filter(
+                self.addresses.trusted_oracle_arbiter,
+                TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                None,
+                Some(self._signer.address()),
+            )
+        } else {
+            self.make_filter(&fulfillment.filter)
+        };
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
@@ -1135,7 +1304,16 @@ impl OracleClient {
     where
         <ObligationData as SolType>::RustType: Send,
     {
-        let filter = self.make_filter(&fulfillment.filter);
+        let filter = if options.require_request {
+            Self::make_arbitration_filter(
+                self.addresses.trusted_oracle_arbiter,
+                TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                None,
+                Some(self._signer.address()),
+            )
+        } else {
+            self.make_filter(&fulfillment.filter)
+        };
 
         let sub = self.public_provider.subscribe_logs(&filter).await?;
         let local_id = *sub.local_id();
@@ -1164,7 +1342,7 @@ impl OracleClient {
         escrow: &EscrowParams<DemandData>,
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<(
         Vec<Decision<ObligationData, DemandData>>,
         Vec<IEAS::Attestation>,
@@ -1177,7 +1355,16 @@ impl OracleClient {
         let escrow_logs_fut = async move { self.public_provider.get_logs(&escrow_filter).await };
 
         let fulfillment_filter: AttestationFilter = (fulfillment.filter.clone(), None).into();
-        let fulfillment_filter = self.make_filter(&fulfillment_filter);
+        let fulfillment_filter = if options.require_request {
+            Self::make_arbitration_filter(
+                self.addresses.trusted_oracle_arbiter,
+                TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                None,
+                Some(self._signer.address()),
+            )
+        } else {
+            self.make_filter(&fulfillment_filter)
+        };
         let fulfillment_logs_fut =
             async move { self.public_provider.get_logs(&fulfillment_filter).await };
 
@@ -1189,22 +1376,38 @@ impl OracleClient {
             .map(|log| log.log_decode::<IEAS::Attested>())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let fulfillment_logs = fulfillment_logs
-            .into_iter()
-            .map(|log| log.log_decode::<IEAS::Attested>())
-            .collect::<Result<Vec<_>, _>>()?;
-
         let escrow_attestation_futs = escrow_logs.into_iter().map(|log| {
             let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
             async move { eas.getAttestation(log.inner.uid).call().await }
         });
+        let escrow_attestations_fut = async move { try_join_all(escrow_attestation_futs).await };
 
-        let fulfillment_attestation_futs = fulfillment_logs.into_iter().map(|log| {
+        // Handle fulfillment logs based on options.require_request
+        let fulfillment_logs = if options.require_request {
+            // Decode as ArbitrationRequested events and extract obligation UIDs
+            fulfillment_logs
+                .into_iter()
+                .map(|log| {
+                    log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
+                        .map(|decoded| decoded.inner.obligation)
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            // Decode as regular Attested events and extract UIDs
+            fulfillment_logs
+                .into_iter()
+                .map(|log| {
+                    log.log_decode::<IEAS::Attested>()
+                        .map(|decoded| decoded.inner.uid)
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        };
+
+        let fulfillment_attestation_futs = fulfillment_logs.into_iter().map(|uid| {
             let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
-            async move { eas.getAttestation(log.inner.uid).call().await }
+            async move { eas.getAttestation(uid).call().await }
         });
 
-        let escrow_attestations_fut = async move { try_join_all(escrow_attestation_futs).await };
         let fulfillment_attestations_fut =
             async move { try_join_all(fulfillment_attestation_futs).await };
 
@@ -1261,12 +1464,12 @@ impl OracleClient {
             .filter(|a| demands_map.contains_key(&a.refUID))
             .collect::<Vec<_>>();
 
-        let fulfillment_attestations = self
-            .filter_unarbitrated_attestations(
-                fulfillment_attestations,
-                skip_arbitrated.unwrap_or(false),
-            )
-            .await?;
+        let fulfillment_attestations = if options.skip_arbitrated {
+            self.filter_unarbitrated_attestations(fulfillment_attestations)
+                .await?
+        } else {
+            fulfillment_attestations
+        };
 
         let fulfillment_obligations = fulfillment_attestations
             .iter()
@@ -1419,7 +1622,7 @@ impl OracleClient {
         escrow: &EscrowParams<DemandData>,
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<(
         Vec<Decision<ObligationData, DemandData>>,
         Vec<IEAS::Attestation>,
@@ -1432,7 +1635,16 @@ impl OracleClient {
         let escrow_logs_fut = async move { self.public_provider.get_logs(&escrow_filter).await };
 
         let fulfillment_filter: AttestationFilter = (fulfillment.filter.clone(), None).into();
-        let fulfillment_filter = self.make_filter(&fulfillment_filter);
+        let fulfillment_filter = if options.require_request {
+            Self::make_arbitration_filter(
+                self.addresses.trusted_oracle_arbiter,
+                TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                None,
+                Some(self._signer.address()),
+            )
+        } else {
+            self.make_filter(&fulfillment_filter)
+        };
         let fulfillment_logs_fut =
             async move { self.public_provider.get_logs(&fulfillment_filter).await };
 
@@ -1444,19 +1656,35 @@ impl OracleClient {
             .map(|log| log.log_decode::<IEAS::Attested>())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let fulfillment_logs = fulfillment_logs
-            .into_iter()
-            .map(|log| log.log_decode::<IEAS::Attested>())
-            .collect::<Result<Vec<_>, _>>()?;
+        // Handle fulfillment logs based on options.require_request
+        let fulfillment_logs = if options.require_request {
+            // Decode as ArbitrationRequested events and extract obligation UIDs
+            fulfillment_logs
+                .into_iter()
+                .map(|log| {
+                    log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
+                        .map(|decoded| decoded.inner.obligation)
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            // Decode as regular Attested events and extract UIDs
+            fulfillment_logs
+                .into_iter()
+                .map(|log| {
+                    log.log_decode::<IEAS::Attested>()
+                        .map(|decoded| decoded.inner.uid)
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        };
 
         let escrow_attestation_futs = escrow_logs.into_iter().map(|log| {
             let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
             async move { eas.getAttestation(log.inner.uid).call().await }
         });
 
-        let fulfillment_attestation_futs = fulfillment_logs.into_iter().map(|log| {
+        let fulfillment_attestation_futs = fulfillment_logs.into_iter().map(|uid| {
             let eas = IEAS::new(self.addresses.eas, &self.wallet_provider);
-            async move { eas.getAttestation(log.inner.uid).call().await }
+            async move { eas.getAttestation(uid).call().await }
         });
 
         let escrow_attestations_fut = async move { try_join_all(escrow_attestation_futs).await };
@@ -1516,12 +1744,12 @@ impl OracleClient {
             .filter(|a| demands_map.contains_key(&a.refUID))
             .collect::<Vec<_>>();
 
-        let fulfillment_attestations = self
-            .filter_unarbitrated_attestations(
-                fulfillment_attestations,
-                skip_arbitrated.unwrap_or(false),
-            )
-            .await?;
+        let fulfillment_attestations = if options.skip_arbitrated {
+            self.filter_unarbitrated_attestations(fulfillment_attestations)
+                .await?
+        } else {
+            fulfillment_attestations
+        };
 
         let fulfillment_obligations = fulfillment_attestations
             .iter()
@@ -1618,14 +1846,14 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateForEscrowResult<ObligationData, DemandData>>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
         <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (decisions, escrow_attestations, escrow_demands) = self
-            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, skip_arbitrated)
+            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, &options)
             .await?;
 
         let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
@@ -1684,27 +1912,75 @@ impl OracleClient {
 
         // Listen for fulfillments
         {
+            let public_provider = self.public_provider.clone();
             let demands_map = Arc::clone(&demands_map);
-            let filter = self.make_filter_without_refuid(&fulfillment.filter);
+            let filter = if options.require_request {
+                Self::make_arbitration_filter(
+                    self.addresses.trusted_oracle_arbiter,
+                    TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                    None,
+                    Some(self._signer.address()),
+                )
+            } else {
+                self.make_filter_without_refuid(&fulfillment.filter)
+            };
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             fulfillment_subscription_id = *sub.local_id();
-
             let mut stream = sub.into_stream();
             let eas_address = eas_address.clone();
             let wallet_provider = Arc::new(wallet_provider.clone());
             let signer_address = self._signer.address();
+            let options = options.clone();
 
             tokio::spawn(async move {
                 let eas = IEAS::new(eas_address, &*wallet_provider);
                 let arbiter = TrustedOracleArbiter::new(arbiter_address, &*wallet_provider);
 
                 while let Some(log) = stream.next().await {
-                    let Ok(log) = log.log_decode::<IEAS::Attested>() else {
-                        continue;
+                    let attestation = if options.require_request {
+                        // Decode as ArbitrationRequested event
+                        let Ok(arbitration_log) =
+                            log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
+                        else {
+                            continue;
+                        };
+                        // Get the attestation using the obligation UID from the event
+                        let Ok(attestation) = eas
+                            .getAttestation(arbitration_log.inner.obligation)
+                            .call()
+                            .await
+                        else {
+                            continue;
+                        };
+                        attestation
+                    } else {
+                        // Decode as regular Attested event
+                        let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
+                            continue;
+                        };
+                        let Ok(attestation) =
+                            eas.getAttestation(attested_log.inner.uid).call().await
+                        else {
+                            continue;
+                        };
+                        attestation
                     };
-                    let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
-                        continue;
-                    };
+
+                    if options.skip_arbitrated {
+                        let filter = Self::make_arbitration_filter(
+                            arbiter_address,
+                            TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
+                            Some(attestation.uid),
+                            None,
+                        );
+                        let logs_result = public_provider.get_logs(&filter).await;
+
+                        if let Ok(logs) = logs_result {
+                            if logs.len() > 0 {
+                                continue;
+                            }
+                        }
+                    }
 
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
@@ -1782,7 +2058,8 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
+
         timeout: Option<Duration>,
     ) -> eyre::Result<ListenAndArbitrateForEscrowResult<ObligationData, DemandData>>
     where
@@ -1790,7 +2067,7 @@ impl OracleClient {
         <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (decisions, escrow_attestations, escrow_demands) = self
-            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, skip_arbitrated)
+            .arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, &options)
             .await?;
 
         let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
@@ -1845,8 +2122,34 @@ impl OracleClient {
 
                 maybe_log = fulfillment_stream.next() => {
                     let Some(log) = maybe_log else { break };
-                    let Ok(log) = log.log_decode::<IEAS::Attested>() else { continue };
-                    let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else { continue };
+                    let attestation = if options.require_request {
+                        // Decode as ArbitrationRequested event
+                        let Ok(arbitration_log) =
+                            log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
+                        else {
+                            continue;
+                        };
+                        // Get the attestation using the obligation UID from the event
+                        let Ok(attestation) = eas
+                            .getAttestation(arbitration_log.inner.obligation)
+                            .call()
+                            .await
+                        else {
+                            continue;
+                        };
+                        attestation
+                    } else {
+                        // Decode as regular Attested event
+                        let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
+                            continue;
+                        };
+                        let Ok(attestation) =
+                            eas.getAttestation(attested_log.inner.uid).call().await
+                        else {
+                            continue;
+                        };
+                        attestation
+                    };
 
                     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                     if attestation.expirationTime != 0 && attestation.expirationTime < now { continue; }
@@ -1917,14 +2220,14 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateForEscrowResult<ObligationData, DemandData>>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
         <ObligationData as SolType>::RustType: Send + 'static,
     {
         let (decisions, escrow_attestations, escrow_demands) = self
-            .arbitrate_past_for_escrow_async(&escrow, &fulfillment, arbitrate, skip_arbitrated)
+            .arbitrate_past_for_escrow_async(&escrow, &fulfillment, arbitrate, &options)
             .await?;
 
         let demands_map: Arc<RwLock<HashMap<FixedBytes<32>, DemandData::RustType>>> =
@@ -1983,8 +2286,18 @@ impl OracleClient {
 
         // Listen for fulfillments
         {
+            let public_provider = self.public_provider.clone();
             let demands_map = Arc::clone(&demands_map);
-            let filter = self.make_filter_without_refuid(&fulfillment.filter);
+            let filter = if options.require_request {
+                Self::make_arbitration_filter(
+                    self.addresses.trusted_oracle_arbiter,
+                    TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                    None,
+                    Some(self._signer.address()),
+                )
+            } else {
+                self.make_filter_without_refuid(&fulfillment.filter)
+            };
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             fulfillment_subscription_id = *sub.local_id();
 
@@ -1992,18 +2305,57 @@ impl OracleClient {
             let eas_address = eas_address.clone();
             let wallet_provider = Arc::new(wallet_provider.clone());
             let signer_address = self._signer.address();
+            let options = options.clone();
 
             tokio::spawn(async move {
                 let eas = IEAS::new(eas_address, &*wallet_provider);
                 let arbiter = TrustedOracleArbiter::new(arbiter_address, &*wallet_provider);
 
                 while let Some(log) = stream.next().await {
-                    let Ok(log) = log.log_decode::<IEAS::Attested>() else {
-                        continue;
+                    let attestation = if options.require_request {
+                        // Decode as ArbitrationRequested event
+                        let Ok(arbitration_log) =
+                            log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
+                        else {
+                            continue;
+                        };
+                        // Get the attestation using the obligation UID from the event
+                        let Ok(attestation) = eas
+                            .getAttestation(arbitration_log.inner.obligation)
+                            .call()
+                            .await
+                        else {
+                            continue;
+                        };
+                        attestation
+                    } else {
+                        // Decode as regular Attested event
+                        let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
+                            continue;
+                        };
+                        let Ok(attestation) =
+                            eas.getAttestation(attested_log.inner.uid).call().await
+                        else {
+                            continue;
+                        };
+                        attestation
                     };
-                    let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
-                        continue;
-                    };
+
+                    if options.skip_arbitrated {
+                        let filter = Self::make_arbitration_filter(
+                            arbiter_address,
+                            TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
+                            Some(attestation.uid),
+                            None,
+                        );
+                        let logs_result = public_provider.get_logs(&filter).await;
+
+                        if let Ok(logs) = logs_result {
+                            if logs.len() > 0 {
+                                continue;
+                            }
+                        }
+                    }
 
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
@@ -2044,7 +2396,7 @@ impl OracleClient {
                             Ok(receipt) => {
                                 let decision = Decision {
                                     attestation,
-                                    obligation: obligation,
+                                    obligation,
                                     demand: None,
                                     decision: decision_value,
                                     receipt,
@@ -2089,6 +2441,7 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsForEscrowResult>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
@@ -2152,8 +2505,18 @@ impl OracleClient {
 
         // Listen for fulfillments
         {
+            let public_provider = self.public_provider.clone();
             let demands_map = Arc::clone(&demands_map);
-            let filter = self.make_filter_without_refuid(&fulfillment.filter);
+            let filter = if options.require_request {
+                Self::make_arbitration_filter(
+                    self.addresses.trusted_oracle_arbiter,
+                    TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                    None,
+                    Some(self._signer.address()),
+                )
+            } else {
+                self.make_filter_without_refuid(&fulfillment.filter)
+            };
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             fulfillment_subscription_id = *sub.local_id();
 
@@ -2161,18 +2524,56 @@ impl OracleClient {
             let eas_address = eas_address.clone();
             let wallet_provider = Arc::new(wallet_provider.clone());
             let signer_address = self._signer.address();
-
+            let options = options.clone();
             tokio::spawn(async move {
                 let eas = IEAS::new(eas_address, &*wallet_provider);
                 let arbiter = TrustedOracleArbiter::new(arbiter_address, &*wallet_provider);
 
                 while let Some(log) = stream.next().await {
-                    let Ok(log) = log.log_decode::<IEAS::Attested>() else {
-                        continue;
+                    let attestation = if options.require_request {
+                        // Decode as ArbitrationRequested event
+                        let Ok(arbitration_log) =
+                            log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
+                        else {
+                            continue;
+                        };
+                        // Get the attestation using the obligation UID from the event
+                        let Ok(attestation) = eas
+                            .getAttestation(arbitration_log.inner.obligation)
+                            .call()
+                            .await
+                        else {
+                            continue;
+                        };
+                        attestation
+                    } else {
+                        // Decode as regular Attested event
+                        let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
+                            continue;
+                        };
+                        let Ok(attestation) =
+                            eas.getAttestation(attested_log.inner.uid).call().await
+                        else {
+                            continue;
+                        };
+                        attestation
                     };
-                    let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
-                        continue;
-                    };
+
+                    if options.skip_arbitrated {
+                        let filter = Self::make_arbitration_filter(
+                            arbiter_address,
+                            TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
+                            Some(attestation.uid),
+                            None,
+                        );
+                        let logs_result = public_provider.get_logs(&filter).await;
+
+                        if let Ok(logs) = logs_result {
+                            if logs.len() > 0 {
+                                continue;
+                            }
+                        }
+                    }
 
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
@@ -2249,7 +2650,8 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
-        skip_arbitrated: Option<bool>,
+        options: &ArbitrateOptions,
+
         timeout: Option<Duration>,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsForEscrowResult>
     where
@@ -2268,7 +2670,16 @@ impl OracleClient {
             ));
 
         let escrow_filter = self.make_filter(&escrow.filter);
-        let fulfillment_filter = self.make_filter_without_refuid(&fulfillment.filter);
+        let fulfillment_filter = if options.require_request {
+            Self::make_arbitration_filter(
+                self.addresses.trusted_oracle_arbiter,
+                TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                None,
+                Some(self._signer.address()),
+            )
+        } else {
+            self.make_filter_without_refuid(&fulfillment.filter)
+        };
 
         let escrow_sub = self.public_provider.subscribe_logs(&escrow_filter).await?;
         let fulfillment_sub = self
@@ -2310,9 +2721,34 @@ impl OracleClient {
 
                 maybe_log = fulfillment_stream.next() => {
                     let Some(log) = maybe_log else { break };
-                    let Ok(log) = log.log_decode::<IEAS::Attested>() else { continue };
-                    let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else { continue };
-
+                    let attestation = if options.require_request {
+                        // Decode as ArbitrationRequested event
+                        let Ok(arbitration_log) =
+                            log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
+                        else {
+                            continue;
+                        };
+                        // Get the attestation using the obligation UID from the event
+                        let Ok(attestation) = eas
+                            .getAttestation(arbitration_log.inner.obligation)
+                            .call()
+                            .await
+                        else {
+                            continue;
+                        };
+                        attestation
+                    } else {
+                        // Decode as regular Attested event
+                        let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
+                            continue;
+                        };
+                        let Ok(attestation) =
+                            eas.getAttestation(attested_log.inner.uid).call().await
+                        else {
+                            continue;
+                        };
+                        attestation
+                    };
                     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                     if attestation.expirationTime != 0 && attestation.expirationTime < now { continue; }
                     if attestation.revocationTime != 0 && attestation.revocationTime < now { continue; }
@@ -2381,6 +2817,7 @@ impl OracleClient {
         fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
+        options: &ArbitrateOptions,
     ) -> eyre::Result<ListenAndArbitrateNewFulfillmentsForEscrowResult>
     where
         <DemandData as SolType>::RustType: Clone + Send + Sync + 'static,
@@ -2444,8 +2881,18 @@ impl OracleClient {
 
         // Listen for fulfillments
         {
+            let public_provider = self.public_provider.clone();
             let demands_map = Arc::clone(&demands_map);
-            let filter = self.make_filter_without_refuid(&fulfillment.filter);
+            let filter = if options.require_request {
+                Self::make_arbitration_filter(
+                    self.addresses.trusted_oracle_arbiter,
+                    TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
+                    None,
+                    Some(self._signer.address()),
+                )
+            } else {
+                self.make_filter_without_refuid(&fulfillment.filter)
+            };
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             fulfillment_subscription_id = *sub.local_id();
 
@@ -2453,18 +2900,56 @@ impl OracleClient {
             let eas_address = eas_address.clone();
             let wallet_provider = Arc::new(wallet_provider.clone());
             let signer_address = self._signer.address();
-
+            let options = options.clone();
             tokio::spawn(async move {
                 let eas = IEAS::new(eas_address, &*wallet_provider);
                 let arbiter = TrustedOracleArbiter::new(arbiter_address, &*wallet_provider);
 
                 while let Some(log) = stream.next().await {
-                    let Ok(log) = log.log_decode::<IEAS::Attested>() else {
-                        continue;
+                    let attestation = if options.require_request {
+                        // Decode as ArbitrationRequested event
+                        let Ok(arbitration_log) =
+                            log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
+                        else {
+                            continue;
+                        };
+                        // Get the attestation using the obligation UID from the event
+                        let Ok(attestation) = eas
+                            .getAttestation(arbitration_log.inner.obligation)
+                            .call()
+                            .await
+                        else {
+                            continue;
+                        };
+                        attestation
+                    } else {
+                        // Decode as regular Attested event
+                        let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
+                            continue;
+                        };
+                        let Ok(attestation) =
+                            eas.getAttestation(attested_log.inner.uid).call().await
+                        else {
+                            continue;
+                        };
+                        attestation
                     };
-                    let Ok(attestation) = eas.getAttestation(log.inner.uid).call().await else {
-                        continue;
-                    };
+
+                    if options.skip_arbitrated {
+                        let filter = Self::make_arbitration_filter(
+                            arbiter_address,
+                            TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
+                            Some(attestation.uid),
+                            None,
+                        );
+                        let logs_result = public_provider.get_logs(&filter).await;
+
+                        if let Ok(logs) = logs_result {
+                            if logs.len() > 0 {
+                                continue;
+                            }
+                        }
+                    }
 
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
