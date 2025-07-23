@@ -121,16 +121,9 @@ pub struct ListenAndArbitrateResult<ObligationData: SolType> {
     pub decisions: Vec<Decision<ObligationData, ()>>,
     pub subscription_id: FixedBytes<32>,
 }
-pub struct ListenAndArbitrateNewFulfillmentsResult {
-    pub subscription_id: FixedBytes<32>,
-}
+
 pub struct ListenAndArbitrateForEscrowResult<ObligationData: SolType, DemandData: SolType> {
     pub decisions: Vec<Decision<ObligationData, DemandData>>,
-    pub escrow_attestations: Vec<IEAS::Attestation>,
-    pub escrow_subscription_id: FixedBytes<32>,
-    pub fulfillment_subscription_id: FixedBytes<32>,
-}
-pub struct ListenAndArbitrateNewFulfillmentsForEscrowResult {
     pub escrow_attestations: Vec<IEAS::Attestation>,
     pub escrow_subscription_id: FixedBytes<32>,
     pub fulfillment_subscription_id: FixedBytes<32>,
@@ -158,6 +151,29 @@ impl OracleClient {
             .unsubscribe(local_id)
             .await
             .map_err(Into::into)
+    }
+    
+    pub async fn request_arbitration(
+        &self,
+        obligation_uid: FixedBytes<32>,
+        oracle: Address,
+    ) -> eyre::Result<TransactionReceipt> {
+        let trusted_oracle_arbiter =
+            TrustedOracleArbiter::new(self.addresses.trusted_oracle_arbiter, &self.wallet_provider);
+
+        let nonce = self
+            .wallet_provider
+            .get_transaction_count(self._signer.address())
+            .await?;
+
+        let tx = trusted_oracle_arbiter
+            .requestArbitration(obligation_uid, oracle)
+            .nonce(nonce)
+            .send()
+            .await?;
+
+        let receipt = tx.get_receipt().await?;
+        Ok(receipt)
     }
 
     fn make_filter(&self, p: &AttestationFilter) -> Filter {
@@ -206,7 +222,7 @@ impl OracleClient {
         filter
     }
 
-    fn make_arbitration_filter(
+    fn make_event_filter(
         address: Address,
         event_signature: FixedBytes<32>,
         obligation: Option<FixedBytes<32>>,
@@ -233,7 +249,7 @@ impl OracleClient {
         attestations: Vec<Attestation>,
     ) -> eyre::Result<Vec<Attestation>> {
         let futs = attestations.into_iter().map(|a| {
-            let filter = Self::make_arbitration_filter(
+            let filter = Self::make_event_filter(
                 self.addresses.trusted_oracle_arbiter,
                 TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
                 Some(a.uid),
@@ -257,7 +273,7 @@ impl OracleClient {
         attestations: Vec<Attestation>,
     ) -> eyre::Result<Vec<Attestation>> {
         let futs = attestations.into_iter().map(|a| {
-            let filter = Self::make_arbitration_filter(
+            let filter = Self::make_event_filter(
                 self.addresses.trusted_oracle_arbiter,
                 TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
                 Some(a.uid),
@@ -357,19 +373,13 @@ impl OracleClient {
         Ok((attestations, obligations))
     }
 
-    pub async fn arbitrate_past<
-        ObligationData: SolType,
-        Arbitrate: Fn(&ObligationData::RustType) -> Option<bool>,
-    >(
+    async fn arbitrate_past_internal<ObligationData: SolType>(
         &self,
-        fulfillment: &FulfillmentParams<ObligationData>,
-        arbitrate: &Arbitrate,
-        options: &ArbitrateOptions,
+        _fulfillment: &FulfillmentParams<ObligationData>,
+        decisions: Vec<Option<bool>>,
+        attestations: Vec<Attestation>,
+        obligations: Vec<ObligationData::RustType>,
     ) -> eyre::Result<Vec<Decision<ObligationData, ()>>> {
-        let (attestations, obligations) = self
-            .get_attestations_and_obligations(fulfillment, options)
-            .await?;
-        let decisions = obligations.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
         let base_nonce = self
             .wallet_provider
             .get_transaction_count(self._signer.address())
@@ -418,6 +428,24 @@ impl OracleClient {
             .collect::<Vec<Decision<ObligationData, ()>>>();
 
         Ok(result)
+    }
+
+    pub async fn arbitrate_past<
+        ObligationData: SolType,
+        Arbitrate: Fn(&ObligationData::RustType) -> Option<bool>,
+    >(
+        &self,
+        fulfillment: &FulfillmentParams<ObligationData>,
+        arbitrate: &Arbitrate,
+        options: &ArbitrateOptions,
+    ) -> eyre::Result<Vec<Decision<ObligationData, ()>>> {
+        let (attestations, obligations) = self
+            .get_attestations_and_obligations(fulfillment, options)
+            .await?;
+        let decisions = obligations.iter().map(|s| arbitrate(s)).collect::<Vec<_>>();
+
+        self.arbitrate_past_internal(fulfillment, decisions, attestations, obligations)
+            .await
     }
 
     pub async fn arbitrate_past_async<
@@ -439,77 +467,8 @@ impl OracleClient {
             .map(|s| async move { arbitrate(s).await });
         let decisions = join_all(decision_futs).await;
 
-        let base_nonce = self
-            .wallet_provider
-            .get_transaction_count(self._signer.address())
-            .await?;
-
-        let arbitration_futs = attestations
-            .iter()
-            .zip(decisions.iter())
-            .enumerate()
-            .filter_map(|(i, (attestation, decision))| {
-                let trusted_oracle_arbiter = TrustedOracleArbiter::new(
-                    self.addresses.trusted_oracle_arbiter,
-                    &self.wallet_provider,
-                );
-                let nonce = base_nonce + i as u64;
-                if let Some(decision) = decision {
-                    Some(async move {
-                        trusted_oracle_arbiter
-                            .arbitrate(attestation.uid, *decision)
-                            .nonce(nonce)
-                            .send()
-                            .await
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let pending_txs = try_join_all(arbitration_futs).await?;
-        let receipt_futs = pending_txs
-            .into_iter()
-            .map(|tx| async move { tx.get_receipt().await });
-
-        let receipts = try_join_all(receipt_futs).await?;
-
-        let result = izip!(attestations, obligations, decisions, receipts)
-            .filter(|(_, _, d, _)| d.is_some())
-            .map(|(attestation, obligation, decision, receipt)| Decision {
-                attestation,
-                obligation: obligation,
-                demand: None,
-                decision: decision.unwrap(),
-                receipt,
-            })
-            .collect::<Vec<Decision<ObligationData, ()>>>();
-
-        Ok(result)
-    }
-
-    pub async fn request_arbitration(
-        &self,
-        obligation_uid: FixedBytes<32>,
-        oracle: Address,
-    ) -> eyre::Result<TransactionReceipt> {
-        let trusted_oracle_arbiter =
-            TrustedOracleArbiter::new(self.addresses.trusted_oracle_arbiter, &self.wallet_provider);
-
-        let nonce = self
-            .wallet_provider
-            .get_transaction_count(self._signer.address())
-            .await?;
-
-        let tx = trusted_oracle_arbiter
-            .requestArbitration(obligation_uid, oracle)
-            .nonce(nonce)
-            .send()
-            .await?;
-
-        let receipt = tx.get_receipt().await?;
-        Ok(receipt)
+        self.arbitrate_past_internal(fulfillment, decisions, attestations, obligations)
+            .await
     }
 
     async fn spawn_fulfillment_listener<
@@ -581,7 +540,7 @@ impl OracleClient {
                     }
                 }
                 if options.skip_arbitrated {
-                    let filter = Self::make_arbitration_filter(
+                    let filter = Self::make_event_filter(
                         arbiter_address,
                         TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
                         Some(attestation.uid),
@@ -725,7 +684,7 @@ impl OracleClient {
                 }
 
                 if options.skip_arbitrated {
-                    let filter = Self::make_arbitration_filter(
+                    let filter = Self::make_event_filter(
                         arbiter_address,
                         TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
                         Some(attestation.uid),
@@ -880,7 +839,7 @@ impl OracleClient {
             }
 
             if options.skip_arbitrated {
-                let filter = Self::make_arbitration_filter(
+                let filter = Self::make_event_filter(
                     self.addresses.trusted_oracle_arbiter,
                     TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
                     Some(attestation.uid),
@@ -978,7 +937,7 @@ impl OracleClient {
                 .await?
         };
         let filter = if options.require_request {
-            Self::make_arbitration_filter(
+            Self::make_event_filter(
                 self.addresses.trusted_oracle_arbiter,
                 TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
                 None,
@@ -1030,7 +989,7 @@ impl OracleClient {
         };
 
         let filter = if options.require_request {
-            Self::make_arbitration_filter(
+            Self::make_event_filter(
                 self.addresses.trusted_oracle_arbiter,
                 TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
                 None,
@@ -1082,7 +1041,7 @@ impl OracleClient {
                 .await?
         };
         let filter = if options.require_request {
-            Self::make_arbitration_filter(
+            Self::make_event_filter(
                 self.addresses.trusted_oracle_arbiter,
                 TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
                 None,
@@ -1135,7 +1094,7 @@ impl OracleClient {
 
         let fulfillment_filter: AttestationFilter = fulfillment.filter.clone();
         let fulfillment_filter = if options.require_request {
-            Self::make_arbitration_filter(
+            Self::make_event_filter(
                 self.addresses.trusted_oracle_arbiter,
                 TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
                 None,
@@ -1412,7 +1371,7 @@ impl OracleClient {
 
         let fulfillment_filter: AttestationFilter = fulfillment.filter.clone();
         let fulfillment_filter = if options.require_request {
-            Self::make_arbitration_filter(
+            Self::make_event_filter(
                 self.addresses.trusted_oracle_arbiter,
                 TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
                 None,
@@ -1692,7 +1651,7 @@ impl OracleClient {
             let public_provider = self.public_provider.clone();
             let demands_map = Arc::clone(&demands_map);
             let filter = if options.require_request {
-                Self::make_arbitration_filter(
+                Self::make_event_filter(
                     self.addresses.trusted_oracle_arbiter,
                     TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
                     None,
@@ -1741,7 +1700,7 @@ impl OracleClient {
                     };
 
                     if options.skip_arbitrated {
-                        let filter = Self::make_arbitration_filter(
+                        let filter = Self::make_event_filter(
                             arbiter_address,
                             TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
                             Some(attestation.uid),
@@ -2068,7 +2027,7 @@ impl OracleClient {
             let public_provider = self.public_provider.clone();
             let demands_map = Arc::clone(&demands_map);
             let filter = if options.require_request {
-                Self::make_arbitration_filter(
+                Self::make_event_filter(
                     self.addresses.trusted_oracle_arbiter,
                     TrustedOracleArbiter::ArbitrationRequested::SIGNATURE_HASH,
                     None,
@@ -2118,7 +2077,7 @@ impl OracleClient {
                     };
 
                     if options.skip_arbitrated {
-                        let filter = Self::make_arbitration_filter(
+                        let filter = Self::make_event_filter(
                             arbiter_address,
                             TrustedOracleArbiter::ArbitrationMade::SIGNATURE_HASH,
                             Some(attestation.uid),
