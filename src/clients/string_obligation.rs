@@ -98,11 +98,13 @@ impl StringObligationClient {
 
     pub async fn do_obligation(
         &self,
-        obligation_data: contracts::StringObligation::ObligationData,
+        item: String,
         ref_uid: Option<FixedBytes<32>>,
     ) -> eyre::Result<TransactionReceipt> {
         let contract =
             contracts::StringObligation::new(self.addresses.obligation, &self.wallet_provider);
+
+        let obligation_data = contracts::StringObligation::ObligationData { item };
 
         let address = self._signer.address();
         let nonce = self.wallet_provider.get_transaction_count(address).await?;

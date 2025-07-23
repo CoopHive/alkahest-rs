@@ -350,7 +350,12 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::{
-        clients::attestation::AttestationClient, contracts::{self, IEAS}, extensions::{HasAttestation, HasStringObligation}, types::ArbiterData, utils::{setup_test_environment, TestContext}, AlkahestClient
+        AlkahestClient,
+        clients::attestation::AttestationClient,
+        contracts::{self, IEAS},
+        extensions::{HasAttestation, HasStringObligation},
+        types::ArbiterData,
+        utils::{TestContext, setup_test_environment},
     };
     use crate::{DefaultAlkahestClient, contracts::StringObligation};
 
@@ -941,12 +946,7 @@ mod tests {
         let fulfillment_receipt = test
             .bob_client
             .string_obligation()
-            .do_obligation(
-                StringObligation::ObligationData {
-                    item: "fulfillment data".to_string(),
-                },
-                None,
-            )
+            .do_obligation("fulfillment data".to_string(), None)
             .await?;
 
         let fulfillment_event = DefaultAlkahestClient::get_attested_event(fulfillment_receipt)?;
