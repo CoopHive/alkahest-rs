@@ -622,10 +622,7 @@ impl OracleClient {
             let mut stream = stream;
 
             while let Some(log) = stream.next().await {
-                println!("Received log: {:?}", log);
-
                 let attestation = if options.require_request {
-                    // Decode as ArbitrationRequested event
                     let Ok(arbitration_log) =
                         log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
                     else {
@@ -641,7 +638,6 @@ impl OracleClient {
                     };
                     attestation
                 } else {
-                    // Decode as regular Attested event
                     let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
                         continue;
                     };
@@ -651,7 +647,6 @@ impl OracleClient {
                     };
                     attestation
                 };
-                println!("Attestation: {:?}", attestation);
                 if options.require_oracle {
                     let escrow_att = match eas.getAttestation(attestation.refUID).call().await {
                         Ok(a) => a,
@@ -667,7 +662,6 @@ impl OracleClient {
                         continue;
                     }
                 }
-                println!("Escrow attestation: {:?}", attestation.refUID);
                 if options.skip_arbitrated {
                     let filter = Self::make_arbitration_filter(
                         arbiter_address,
@@ -683,7 +677,6 @@ impl OracleClient {
                         }
                     }
                 }
-                println!("Filter applied, checking ref_uid...");
                 match &fulfillment.filter.ref_uid {
                     Some(ValueOrArray::Value(ref_uid)) if attestation.refUID != *ref_uid => {
                         continue;
@@ -773,7 +766,6 @@ impl OracleClient {
 
             while let Some(log) = stream.next().await {
                 let attestation = if options.require_request {
-                    // Decode as ArbitrationRequested event
                     let Ok(arbitration_log) =
                         log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
                     else {
@@ -789,7 +781,6 @@ impl OracleClient {
                     };
                     attestation
                 } else {
-                    // Decode as regular Attested event
                     let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
                         continue;
                     };
@@ -799,7 +790,6 @@ impl OracleClient {
                     };
                     attestation
                 };
-                println!("Attestation: {:?}", attestation);
                 if options.require_oracle {
                     let escrow_att = match eas.getAttestation(attestation.refUID).call().await {
                         Ok(a) => a,
@@ -1028,13 +1018,11 @@ impl OracleClient {
             };
 
             let attestation = if options.require_request {
-                // Decode as ArbitrationRequested event
                 let Ok(arbitration_log) =
                     log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
                 else {
                     continue;
                 };
-                // Get the attestation using the obligation UID from the event
                 let Ok(attestation) = eas
                     .getAttestation(arbitration_log.inner.obligation)
                     .call()
@@ -1044,7 +1032,6 @@ impl OracleClient {
                 };
                 attestation
             } else {
-                // Decode as regular Attested event
                 let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
                     continue;
                 };
@@ -1382,9 +1369,7 @@ impl OracleClient {
         });
         let escrow_attestations_fut = async move { try_join_all(escrow_attestation_futs).await };
 
-        // Handle fulfillment logs based on options.require_request
         let fulfillment_logs = if options.require_request {
-            // Decode as ArbitrationRequested events and extract obligation UIDs
             fulfillment_logs
                 .into_iter()
                 .map(|log| {
@@ -1393,7 +1378,6 @@ impl OracleClient {
                 })
                 .collect::<Result<Vec<_>, _>>()?
         } else {
-            // Decode as regular Attested events and extract UIDs
             fulfillment_logs
                 .into_iter()
                 .map(|log| {
@@ -1656,9 +1640,7 @@ impl OracleClient {
             .map(|log| log.log_decode::<IEAS::Attested>())
             .collect::<Result<Vec<_>, _>>()?;
 
-        // Handle fulfillment logs based on options.require_request
         let fulfillment_logs = if options.require_request {
-            // Decode as ArbitrationRequested events and extract obligation UIDs
             fulfillment_logs
                 .into_iter()
                 .map(|log| {
@@ -1667,7 +1649,6 @@ impl OracleClient {
                 })
                 .collect::<Result<Vec<_>, _>>()?
         } else {
-            // Decode as regular Attested events and extract UIDs
             fulfillment_logs
                 .into_iter()
                 .map(|log| {
@@ -1938,13 +1919,11 @@ impl OracleClient {
 
                 while let Some(log) = stream.next().await {
                     let attestation = if options.require_request {
-                        // Decode as ArbitrationRequested event
                         let Ok(arbitration_log) =
                             log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
                         else {
                             continue;
                         };
-                        // Get the attestation using the obligation UID from the event
                         let Ok(attestation) = eas
                             .getAttestation(arbitration_log.inner.obligation)
                             .call()
@@ -1954,7 +1933,6 @@ impl OracleClient {
                         };
                         attestation
                     } else {
-                        // Decode as regular Attested event
                         let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
                             continue;
                         };
@@ -2123,13 +2101,11 @@ impl OracleClient {
                 maybe_log = fulfillment_stream.next() => {
                     let Some(log) = maybe_log else { break };
                     let attestation = if options.require_request {
-                        // Decode as ArbitrationRequested event
                         let Ok(arbitration_log) =
                             log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
                         else {
                             continue;
                         };
-                        // Get the attestation using the obligation UID from the event
                         let Ok(attestation) = eas
                             .getAttestation(arbitration_log.inner.obligation)
                             .call()
@@ -2139,7 +2115,6 @@ impl OracleClient {
                         };
                         attestation
                     } else {
-                        // Decode as regular Attested event
                         let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
                             continue;
                         };
@@ -2313,13 +2288,11 @@ impl OracleClient {
 
                 while let Some(log) = stream.next().await {
                     let attestation = if options.require_request {
-                        // Decode as ArbitrationRequested event
                         let Ok(arbitration_log) =
                             log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
                         else {
                             continue;
                         };
-                        // Get the attestation using the obligation UID from the event
                         let Ok(attestation) = eas
                             .getAttestation(arbitration_log.inner.obligation)
                             .call()
@@ -2329,7 +2302,6 @@ impl OracleClient {
                         };
                         attestation
                     } else {
-                        // Decode as regular Attested event
                         let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
                             continue;
                         };
@@ -2531,13 +2503,11 @@ impl OracleClient {
 
                 while let Some(log) = stream.next().await {
                     let attestation = if options.require_request {
-                        // Decode as ArbitrationRequested event
                         let Ok(arbitration_log) =
                             log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
                         else {
                             continue;
                         };
-                        // Get the attestation using the obligation UID from the event
                         let Ok(attestation) = eas
                             .getAttestation(arbitration_log.inner.obligation)
                             .call()
@@ -2547,7 +2517,6 @@ impl OracleClient {
                         };
                         attestation
                     } else {
-                        // Decode as regular Attested event
                         let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
                             continue;
                         };
@@ -2722,13 +2691,11 @@ impl OracleClient {
                 maybe_log = fulfillment_stream.next() => {
                     let Some(log) = maybe_log else { break };
                     let attestation = if options.require_request {
-                        // Decode as ArbitrationRequested event
                         let Ok(arbitration_log) =
                             log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
                         else {
                             continue;
                         };
-                        // Get the attestation using the obligation UID from the event
                         let Ok(attestation) = eas
                             .getAttestation(arbitration_log.inner.obligation)
                             .call()
@@ -2738,7 +2705,6 @@ impl OracleClient {
                         };
                         attestation
                     } else {
-                        // Decode as regular Attested event
                         let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
                             continue;
                         };
@@ -2907,13 +2873,11 @@ impl OracleClient {
 
                 while let Some(log) = stream.next().await {
                     let attestation = if options.require_request {
-                        // Decode as ArbitrationRequested event
                         let Ok(arbitration_log) =
                             log.log_decode::<TrustedOracleArbiter::ArbitrationRequested>()
                         else {
                             continue;
                         };
-                        // Get the attestation using the obligation UID from the event
                         let Ok(attestation) = eas
                             .getAttestation(arbitration_log.inner.obligation)
                             .call()
@@ -2923,7 +2887,6 @@ impl OracleClient {
                         };
                         attestation
                     } else {
-                        // Decode as regular Attested event
                         let Ok(attested_log) = log.log_decode::<IEAS::Attested>() else {
                             continue;
                         };

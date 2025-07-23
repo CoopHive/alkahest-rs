@@ -1,15 +1,10 @@
 #[cfg(test)]
 mod tests {
     use alkahest_rs::{
-        AlkahestClient,
         clients::oracle::{
             ArbitrateOptions, AttestationFilter, AttestationFilterWithoutRefUid, EscrowParams,
             FulfillmentParams, FulfillmentParamsWithoutRefUid,
-        },
-        contracts::StringObligation,
-        fixtures::MockERC20Permit,
-        types::{ArbiterData, Erc20Data},
-        utils::TestContext,
+        }, contracts::StringObligation, extensions::{HasErc20, HasOracle, HasStringObligation}, fixtures::MockERC20Permit, types::{ArbiterData, Erc20Data}, utils::TestContext, AlkahestClient, DefaultAlkahestClient
     };
     use alloy::{
         eips::BlockNumberOrTag,
@@ -69,11 +64,11 @@ mod tests {
 
         let escrow_receipt = test
             .alice_client
-            .erc20
+            .erc20()
             .permit_and_buy_with_erc20(&price, &item, expiration)
             .await?;
 
-        let escrow_event = AlkahestClient::get_attested_event(escrow_receipt)?;
+        let escrow_event = DefaultAlkahestClient::get_attested_event(escrow_receipt)?;
 
         Ok((price, item, escrow_event.uid))
     }
@@ -85,7 +80,7 @@ mod tests {
     ) -> eyre::Result<FixedBytes<32>> {
         let receipt = test
             .bob_client
-            .string_obligation
+            .string_obligation()
             .do_obligation(
                 StringObligation::ObligationData {
                     item: statement.to_string(),
@@ -93,7 +88,7 @@ mod tests {
                 Some(ref_uid),
             )
             .await?;
-        Ok(AlkahestClient::get_attested_event(receipt)?.uid)
+        Ok(DefaultAlkahestClient::get_attested_event(receipt)?.uid)
     }
 
     fn make_filter(test: &TestContext, ref_uid: Option<FixedBytes<32>>) -> AttestationFilter {
@@ -188,7 +183,7 @@ mod tests {
 
         let decisions = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past(
                 &fulfillment,
                 &|s| Some(s.item == "good"),
@@ -205,7 +200,7 @@ mod tests {
 
         let collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
@@ -226,7 +221,7 @@ mod tests {
 
         let request1 = test
             .bob_client
-            .oracle
+            .oracle()
             .request_arbitration(fulfillment_uid1, test.bob.address())
             .await?;
 
@@ -234,7 +229,7 @@ mod tests {
 
         let decisions = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past(
                 &fulfillment,
                 &|s| Some(s.item == "good"),
@@ -251,7 +246,7 @@ mod tests {
 
         let collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid1)
             .await?;
 
@@ -259,7 +254,7 @@ mod tests {
 
         let collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid2)
             .await;
 
@@ -283,7 +278,7 @@ mod tests {
 
         let request1 = test
             .bob_client
-            .oracle
+            .oracle()
             .request_arbitration(fulfillment_uid1, test.bob.address())
             .await?;
 
@@ -291,7 +286,7 @@ mod tests {
 
         let decisions = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past_async(
                 &fulfillment,
                 |s| {
@@ -312,7 +307,7 @@ mod tests {
 
         let collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid1)
             .await?;
 
@@ -320,7 +315,7 @@ mod tests {
 
         let collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid2)
             .await;
 
@@ -344,7 +339,7 @@ mod tests {
 
         let decisions = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past(
                 &fulfillment,
                 &|s| Some(s.item == "good"),
@@ -358,7 +353,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -369,7 +364,7 @@ mod tests {
 
         let bad_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
@@ -393,7 +388,7 @@ mod tests {
 
         let decisions = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past(
                 &fulfillment,
                 &|s| {
@@ -413,7 +408,7 @@ mod tests {
 
         let decisions = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past(
                 &fulfillment,
                 &|s| {
@@ -431,7 +426,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -442,7 +437,7 @@ mod tests {
 
         let bad_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
@@ -466,7 +461,7 @@ mod tests {
 
         let decisions = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past_async(
                 &fulfillment,
                 |s| {
@@ -487,7 +482,7 @@ mod tests {
 
         let decisions = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past_async(
                 &fulfillment,
                 |s| {
@@ -506,7 +501,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -517,7 +512,7 @@ mod tests {
 
         let bad_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
@@ -539,7 +534,7 @@ mod tests {
 
         println!("Listening for decisions...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         // ⬇️ Directly call listen_and_arbitrate (no need to spawn)
         let listen_result = oracle
@@ -570,7 +565,7 @@ mod tests {
 
         let collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
@@ -592,7 +587,7 @@ mod tests {
 
         println!("Listening for decisions...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate(
@@ -623,7 +618,7 @@ mod tests {
 
         let request1 = test
             .bob_client
-            .oracle
+            .oracle()
             .request_arbitration(fulfillment_uid1, test.bob.address())
             .await?;
         println!("Request for arbitration sent: {:?}", request1);
@@ -631,7 +626,7 @@ mod tests {
 
         let collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid1)
             .await?;
 
@@ -639,7 +634,7 @@ mod tests {
 
         let collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid2)
             .await;
 
@@ -662,7 +657,7 @@ mod tests {
 
         println!("Listening for decisions...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate_new_fulfillments(
@@ -693,7 +688,7 @@ mod tests {
 
         let request1 = test
             .bob_client
-            .oracle
+            .oracle()
             .request_arbitration(fulfillment_uid1, test.bob.address())
             .await?;
         println!("Request for arbitration sent: {:?}", request1);
@@ -701,7 +696,7 @@ mod tests {
 
         let collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid1)
             .await?;
 
@@ -709,7 +704,7 @@ mod tests {
 
         let collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid2)
             .await;
 
@@ -733,7 +728,7 @@ mod tests {
 
         println!("Listening for decisions...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate_async(
@@ -772,7 +767,7 @@ mod tests {
 
         let request1 = test
             .bob_client
-            .oracle
+            .oracle()
             .request_arbitration(fulfillment_uid1, test.bob.address())
             .await?;
         println!("Request for arbitration sent: {:?}", request1);
@@ -780,7 +775,7 @@ mod tests {
 
         let collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid1)
             .await?;
 
@@ -788,7 +783,7 @@ mod tests {
 
         let collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid2)
             .await;
 
@@ -813,7 +808,7 @@ mod tests {
 
         println!("Listening for decisions...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate_new_fulfillments_async(
@@ -852,7 +847,7 @@ mod tests {
 
         let request1 = test
             .bob_client
-            .oracle
+            .oracle()
             .request_arbitration(fulfillment_uid1, test.bob.address())
             .await?;
         println!("Request for arbitration sent: {:?}", request1);
@@ -860,7 +855,7 @@ mod tests {
 
         let collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid1)
             .await?;
 
@@ -868,7 +863,7 @@ mod tests {
 
         let collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid2)
             .await;
 
@@ -892,7 +887,7 @@ mod tests {
 
         println!("Listening for decisions no spawn ...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         // ⬇️ Spawn the listen_and_arbitrate_no_spawn as a background task
         let listen_handle = tokio::spawn(async move {
@@ -933,7 +928,7 @@ mod tests {
 
         let collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
@@ -954,7 +949,7 @@ mod tests {
 
         println!("Listening for decisions no spawn ...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         // ⬇️ Spawn the listen_and_arbitrate_no_spawn as a background task
         let listen_handle = tokio::spawn(async move {
@@ -994,7 +989,7 @@ mod tests {
 
         let request1 = test
             .bob_client
-            .oracle
+            .oracle()
             .request_arbitration(fulfillment_uid1, test.bob.address())
             .await?;
         println!("Request for arbitration sent: {:?}", request1);
@@ -1004,7 +999,7 @@ mod tests {
 
         let collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid1)
             .await?;
 
@@ -1012,7 +1007,7 @@ mod tests {
 
         let collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid2)
             .await;
 
@@ -1034,7 +1029,7 @@ mod tests {
 
         println!("Listening for decisions no spawn ...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         // ⬇️ Spawn the listen_and_arbitrate_no_spawn as a background task
         let listen_handle = tokio::spawn(async move {
@@ -1072,7 +1067,7 @@ mod tests {
 
         let collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
@@ -1094,7 +1089,7 @@ mod tests {
 
         println!("Listening for decisions no spawn ...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         // ⬇️ Spawn the listen_and_arbitrate_no_spawn as a background task
         let listen_handle = tokio::spawn(async move {
@@ -1134,7 +1129,7 @@ mod tests {
 
         let request1 = test
             .bob_client
-            .oracle
+            .oracle()
             .request_arbitration(fulfillment_uid1, test.bob.address())
             .await?;
         println!("Request for arbitration sent: {:?}", request1);
@@ -1144,7 +1139,7 @@ mod tests {
 
         let collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid1)
             .await?;
 
@@ -1152,7 +1147,7 @@ mod tests {
 
         let collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid2)
             .await;
 
@@ -1174,10 +1169,10 @@ mod tests {
 
         println!("Listening for decisions...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
         let listen_result = test
             .bob_client
-            .oracle
+            .oracle()
             .listen_and_arbitrate(
                 &fulfillment,
                 &|_statement: &StringObligation::ObligationData| -> Option<bool> {
@@ -1208,7 +1203,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -1219,7 +1214,7 @@ mod tests {
 
         let bad_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
@@ -1243,7 +1238,7 @@ mod tests {
 
         println!("Listening for decisions...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
         let listen_result = oracle
             .listen_and_arbitrate_new_fulfillments(
                 &fulfillment,
@@ -1278,7 +1273,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -1289,7 +1284,7 @@ mod tests {
 
         let bad_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
@@ -1311,7 +1306,7 @@ mod tests {
         let filter = make_filter(&test, Some(escrow_uid));
         let fulfillment = make_fulfillment_params(filter);
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
         let listen_result = oracle
             .listen_and_arbitrate_async(
                 &fulfillment,
@@ -1349,7 +1344,7 @@ mod tests {
 
         let _collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
@@ -1367,7 +1362,7 @@ mod tests {
         let fulfillment = make_fulfillment_params(filter);
 
         // ✅ Spawn async listener
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
         let listen_result = oracle
             .listen_and_arbitrate_async(
                 &fulfillment,
@@ -1413,7 +1408,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -1421,7 +1416,7 @@ mod tests {
 
         let bad_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
@@ -1443,7 +1438,7 @@ mod tests {
 
         println!("Listening for decisions...");
 
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
         let listen_result = oracle
             .listen_and_arbitrate_new_fulfillments_async(
                 &fulfillment,
@@ -1479,7 +1474,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -1490,7 +1485,7 @@ mod tests {
 
         let bad_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
@@ -1521,7 +1516,7 @@ mod tests {
         };
         let (decisions, _, _) = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past_for_escrow(
                 &escrow,
                 &fulfillment,
@@ -1545,7 +1540,7 @@ mod tests {
 
         let collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
@@ -1572,7 +1567,7 @@ mod tests {
         };
         let (decisions, _, _) = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past_for_escrow(
                 &escrow,
                 &fulfillment,
@@ -1596,7 +1591,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -1607,7 +1602,7 @@ mod tests {
 
         let bad_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
@@ -1636,7 +1631,7 @@ mod tests {
         };
         let (decisions, _, _) = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past_for_escrow(
                 &escrow,
                 &fulfillment,
@@ -1663,7 +1658,7 @@ mod tests {
 
         let (decisions, _, _) = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past_for_escrow(
                 &escrow,
                 &fulfillment,
@@ -1689,7 +1684,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -1700,7 +1695,7 @@ mod tests {
 
         let bad_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
@@ -1730,7 +1725,7 @@ mod tests {
         };
         let (decisions, _, _) = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past_for_escrow_async(
                 &escrow,
                 &fulfillment,
@@ -1754,7 +1749,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -1765,7 +1760,7 @@ mod tests {
 
         let bad_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
@@ -1794,7 +1789,7 @@ mod tests {
         };
         let (decisions, _, _) = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past_for_escrow_async(
                 &escrow,
                 &fulfillment,
@@ -1821,7 +1816,7 @@ mod tests {
 
         let (decisions, _, _) = test
             .bob_client
-            .oracle
+            .oracle()
             .arbitrate_past_for_escrow_async(
                 &escrow,
                 &fulfillment,
@@ -1847,7 +1842,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -1858,7 +1853,7 @@ mod tests {
 
         let bad_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid)
             .await;
 
@@ -1882,7 +1877,7 @@ mod tests {
             filter: make_filter_for_escrow(&test, None),
             _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate_for_escrow(
@@ -1923,7 +1918,7 @@ mod tests {
 
         let _collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
@@ -1949,7 +1944,7 @@ mod tests {
             filter: make_filter_for_escrow(&test, None),
             _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate_for_escrow(
@@ -1990,7 +1985,7 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         let request1 = test
             .bob_client
-            .oracle
+            .oracle()
             .request_arbitration(fulfillment_uid1, test.bob.address())
             .await?;
         println!("Request for arbitration sent: {:?}", request1);
@@ -2002,7 +1997,7 @@ mod tests {
 
         let collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid1)
             .await?;
 
@@ -2010,7 +2005,7 @@ mod tests {
 
         let collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid2)
             .await;
 
@@ -2041,7 +2036,7 @@ mod tests {
             filter: make_filter_for_escrow(&test, None),
             _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate_for_escrow_async(
@@ -2081,7 +2076,7 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         let request1 = test
             .bob_client
-            .oracle
+            .oracle()
             .request_arbitration(fulfillment_uid1, test.bob.address())
             .await?;
         println!("Request for arbitration sent: {:?}", request1);
@@ -2093,7 +2088,7 @@ mod tests {
 
         let collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid1)
             .await?;
 
@@ -2101,7 +2096,7 @@ mod tests {
 
         let collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid2)
             .await;
 
@@ -2133,7 +2128,7 @@ mod tests {
             filter: make_filter_for_escrow(&test, None),
             _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate_for_escrow_async(
@@ -2174,7 +2169,7 @@ mod tests {
 
         let _collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
@@ -2204,7 +2199,7 @@ mod tests {
             filter: make_filter_for_escrow(&test, None),
             _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate_for_escrow(
@@ -2245,7 +2240,7 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -2256,7 +2251,7 @@ mod tests {
 
         let bad_collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
@@ -2267,7 +2262,7 @@ mod tests {
 
         let bad_collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
 
@@ -2302,7 +2297,7 @@ mod tests {
             filter: make_filter_for_escrow(&test, None),
             _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_handle = tokio::spawn(async move {
             oracle
@@ -2348,7 +2343,7 @@ mod tests {
         println!("Waiting for decisions...");
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -2359,7 +2354,7 @@ mod tests {
 
         let bad_collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
@@ -2370,7 +2365,7 @@ mod tests {
 
         let bad_collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
 
@@ -2398,7 +2393,7 @@ mod tests {
             filter: make_filter_for_escrow(&test, None),
             _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate_for_escrow_async(
@@ -2437,7 +2432,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -2448,7 +2443,7 @@ mod tests {
 
         let bad_collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
@@ -2459,7 +2454,7 @@ mod tests {
 
         let bad_collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
         assert!(
@@ -2494,7 +2489,7 @@ mod tests {
             filter: make_filter_for_escrow(&test, None),
             _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate_new_fulfillments_for_escrow(
@@ -2535,7 +2530,7 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -2546,7 +2541,7 @@ mod tests {
 
         let bad_collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
@@ -2557,7 +2552,7 @@ mod tests {
 
         let bad_collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
 
@@ -2593,7 +2588,7 @@ mod tests {
             filter: make_filter_for_escrow(&test, None),
             _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
             .listen_and_arbitrate_new_fulfillments_for_escrow_async(
@@ -2632,7 +2627,7 @@ mod tests {
 
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -2643,7 +2638,7 @@ mod tests {
 
         let bad_collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
@@ -2654,7 +2649,7 @@ mod tests {
 
         let bad_collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
         assert!(
@@ -2689,7 +2684,7 @@ mod tests {
             filter: make_filter_for_escrow(&test, None),
             _demand_data: PhantomData::<TrustedOracleArbiter::DemandData>,
         };
-        let oracle = test.bob_client.oracle.clone();
+        let oracle = test.bob_client.oracle().clone();
 
         let listen_handle = tokio::spawn(async move {
             oracle
@@ -2735,7 +2730,7 @@ mod tests {
         println!("Waiting for decisions...");
         let good_collection = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, good_fulfillment_uid)
             .await?;
 
@@ -2746,7 +2741,7 @@ mod tests {
 
         let bad_collection1 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid1)
             .await;
 
@@ -2757,7 +2752,7 @@ mod tests {
 
         let bad_collection2 = test
             .bob_client
-            .erc20
+            .erc20()
             .collect_escrow(escrow_uid, bad_fulfillment_uid2)
             .await;
 

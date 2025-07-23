@@ -75,8 +75,9 @@ impl Erc721Client {
     pub fn decode_escrow_obligation(
         obligation_data: &Bytes,
     ) -> eyre::Result<contracts::ERC721EscrowObligation::ObligationData> {
-        let obligation_data =
-            contracts::ERC721EscrowObligation::ObligationData::abi_decode(obligation_data.as_ref())?;
+        let obligation_data = contracts::ERC721EscrowObligation::ObligationData::abi_decode(
+            obligation_data.as_ref(),
+        )?;
         return Ok(obligation_data);
     }
 
@@ -92,8 +93,9 @@ impl Erc721Client {
     pub fn decode_payment_obligation(
         obligation_data: &Bytes,
     ) -> eyre::Result<contracts::ERC721PaymentObligation::ObligationData> {
-        let obligation_data =
-            contracts::ERC721PaymentObligation::ObligationData::abi_decode(obligation_data.as_ref())?;
+        let obligation_data = contracts::ERC721PaymentObligation::ObligationData::abi_decode(
+            obligation_data.as_ref(),
+        )?;
         return Ok(obligation_data);
     }
 
@@ -593,13 +595,9 @@ mod tests {
     };
 
     use crate::{
-        AlkahestClient,
-        clients::erc721::Erc721Client,
-        fixtures::{MockERC20Permit, MockERC721, MockERC1155},
-        types::{
-            ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
-        },
-        utils::setup_test_environment,
+        clients::erc721::Erc721Client, extensions::{HasErc1155, HasErc20, HasErc721, HasTokenBundle}, fixtures::{MockERC1155, MockERC20Permit, MockERC721}, types::{
+            ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData
+        }, utils::setup_test_environment, AlkahestClient, DefaultAlkahestClient
     };
 
     #[tokio::test]
@@ -691,7 +689,7 @@ mod tests {
         // Test approve for payment
         let _receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .approve(&token, ApprovalPurpose::Payment)
             .await?;
 
@@ -711,7 +709,7 @@ mod tests {
         // Test approve for escrow
         let _receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .approve(&token, ApprovalPurpose::Escrow)
             .await?;
 
@@ -754,7 +752,7 @@ mod tests {
         // Test approve_all for payment
         let _receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .approve_all(test.mock_addresses.erc721_a, ApprovalPurpose::Payment)
             .await?;
 
@@ -779,7 +777,7 @@ mod tests {
         // Test approve_all for escrow
         let _receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .approve_all(test.mock_addresses.erc721_a, ApprovalPurpose::Escrow)
             .await?;
 
@@ -819,14 +817,14 @@ mod tests {
 
         // First approve all
         test.alice_client
-            .erc721
+            .erc721()
             .approve_all(test.mock_addresses.erc721_a, ApprovalPurpose::Payment)
             .await?;
 
         // Then revoke all
         let _receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .revoke_all(test.mock_addresses.erc721_a, ApprovalPurpose::Payment)
             .await?;
 
@@ -879,14 +877,14 @@ mod tests {
 
         // approve token for escrow
         test.alice_client
-            .erc721
+            .erc721()
             .approve(&price, ApprovalPurpose::Escrow)
             .await?;
 
         // alice creates escrow with custom demand
         let receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .buy_with_erc721(&price, &item, 0)
             .await?;
 
@@ -904,7 +902,7 @@ mod tests {
         );
 
         // escrow obligation made
-        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        let attested_event = DefaultAlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
         Ok(())
@@ -931,14 +929,14 @@ mod tests {
 
         // approve token for payment
         test.alice_client
-            .erc721
+            .erc721()
             .approve(&price, ApprovalPurpose::Payment)
             .await?;
 
         // alice makes direct payment to bob
         let receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .pay_with_erc721(&price, test.bob.address())
             .await?;
 
@@ -949,7 +947,7 @@ mod tests {
         assert_eq!(owner, test.bob.address(), "Token should be owned by Bob");
 
         // payment obligation made
-        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        let attested_event = DefaultAlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
         Ok(())
@@ -981,14 +979,14 @@ mod tests {
 
         // alice approves token for escrow
         test.alice_client
-            .erc721
+            .erc721()
             .approve(&bid, ApprovalPurpose::Escrow)
             .await?;
 
         // alice makes escrow
         let receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .buy_erc721_for_erc721(&bid, &ask, 0)
             .await?;
 
@@ -1005,7 +1003,7 @@ mod tests {
         );
 
         // escrow obligation made
-        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        let attested_event = DefaultAlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
         Ok(())
@@ -1045,28 +1043,28 @@ mod tests {
 
         // alice approves token for escrow and creates buy attestation
         test.alice_client
-            .erc721
+            .erc721()
             .approve(&bid, ApprovalPurpose::Escrow)
             .await?;
 
         let buy_receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .buy_erc721_for_erc721(&bid, &ask, 0)
             .await?;
 
-        let buy_attestation = AlkahestClient::get_attested_event(buy_receipt)?.uid;
+        let buy_attestation = DefaultAlkahestClient::get_attested_event(buy_receipt)?.uid;
 
         // bob approves token for payment
         test.bob_client
-            .erc721
+            .erc721()
             .approve(&ask, ApprovalPurpose::Payment)
             .await?;
 
         // bob fulfills the buy attestation
         let _sell_receipt = test
             .bob_client
-            .erc721
+            .erc721()
             .pay_erc721_for_erc721(buy_attestation)
             .await?;
 
@@ -1115,7 +1113,7 @@ mod tests {
 
         // alice approves token for escrow
         test.alice_client
-            .erc721
+            .erc721()
             .approve(&bid, ApprovalPurpose::Escrow)
             .await?;
 
@@ -1123,11 +1121,11 @@ mod tests {
         let expiration = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 10;
         let receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .buy_erc721_for_erc721(&bid, &ask, expiration as u64 + 1)
             .await?;
 
-        let buy_attestation = AlkahestClient::get_attested_event(receipt)?.uid;
+        let buy_attestation = DefaultAlkahestClient::get_attested_event(receipt)?.uid;
 
         // Wait for expiration
         test.god_provider.anvil_increase_time(20).await?;
@@ -1135,7 +1133,7 @@ mod tests {
         // alice collects expired funds
         let _collect_receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .reclaim_expired(buy_attestation)
             .await?;
 
@@ -1177,14 +1175,14 @@ mod tests {
 
         // alice approves token for escrow
         test.alice_client
-            .erc721
+            .erc721()
             .approve(&bid, ApprovalPurpose::Escrow)
             .await?;
 
         // alice creates purchase offer
         let receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .buy_erc20_with_erc721(&bid, &ask, 0)
             .await?;
 
@@ -1201,7 +1199,7 @@ mod tests {
         );
 
         // escrow obligation made
-        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        let attested_event = DefaultAlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
         Ok(())
@@ -1234,14 +1232,14 @@ mod tests {
 
         // alice approves token for escrow
         test.alice_client
-            .erc721
+            .erc721()
             .approve(&bid, ApprovalPurpose::Escrow)
             .await?;
 
         // alice creates purchase offer
         let receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .buy_erc1155_with_erc721(&bid, &ask, 0)
             .await?;
 
@@ -1258,7 +1256,7 @@ mod tests {
         );
 
         // escrow obligation made
-        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        let attested_event = DefaultAlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
         Ok(())
@@ -1303,14 +1301,14 @@ mod tests {
 
         // alice approves token for escrow
         test.alice_client
-            .erc721
+            .erc721()
             .approve(&bid, ApprovalPurpose::Escrow)
             .await?;
 
         // alice creates purchase offer
         let receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .buy_bundle_with_erc721(&bid, bundle, 0)
             .await?;
 
@@ -1327,7 +1325,7 @@ mod tests {
         );
 
         // escrow obligation made
-        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        let attested_event = DefaultAlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
         Ok(())
@@ -1370,28 +1368,28 @@ mod tests {
 
         // bob approves tokens for escrow and creates buy attestation
         test.bob_client
-            .erc20
+            .erc20()
             .approve(&bid, ApprovalPurpose::Escrow)
             .await?;
 
         let buy_receipt = test
             .bob_client
-            .erc20
+            .erc20()
             .buy_erc721_for_erc20(&bid, &ask, 0)
             .await?;
 
-        let buy_attestation = AlkahestClient::get_attested_event(buy_receipt)?.uid;
+        let buy_attestation = DefaultAlkahestClient::get_attested_event(buy_receipt)?.uid;
 
         // alice approves her ERC721 token for payment
         test.alice_client
-            .erc721
+            .erc721()
             .approve(&ask, ApprovalPurpose::Payment)
             .await?;
 
         // alice fulfills bob's buy attestation with her ERC721
         let _sell_receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .pay_erc721_for_erc20(buy_attestation)
             .await?;
 
@@ -1453,28 +1451,28 @@ mod tests {
 
         // bob approves tokens for escrow and creates buy attestation
         test.bob_client
-            .erc1155
+            .erc1155()
             .approve_all(test.mock_addresses.erc1155_a, ApprovalPurpose::Escrow)
             .await?;
 
         let buy_receipt = test
             .bob_client
-            .erc1155
+            .erc1155()
             .buy_erc721_with_erc1155(&bid, &ask, 0)
             .await?;
 
-        let buy_attestation = AlkahestClient::get_attested_event(buy_receipt)?.uid;
+        let buy_attestation = DefaultAlkahestClient::get_attested_event(buy_receipt)?.uid;
 
         // alice approves her token for payment
         test.alice_client
-            .erc721
+            .erc721()
             .approve(&ask, ApprovalPurpose::Payment)
             .await?;
 
         // alice fulfills the buy attestation
         let _sell_receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .pay_erc721_for_erc1155(buy_attestation)
             .await?;
 
@@ -1578,14 +1576,14 @@ mod tests {
 
         // bob approves all tokens for the bundle escrow
         test.bob_client
-            .token_bundle
+            .token_bundle()
             .approve(&bundle, ApprovalPurpose::Escrow)
             .await?;
 
         // bob creates bundle escrow demanding ERC721 from Alice
         let buy_receipt = test
             .bob_client
-            .token_bundle
+            .token_bundle()
             .buy_with_bundle(
                 &bundle,
                 &ArbiterData {
@@ -1600,11 +1598,11 @@ mod tests {
             )
             .await?;
 
-        let buy_attestation = AlkahestClient::get_attested_event(buy_receipt)?.uid;
+        let buy_attestation = DefaultAlkahestClient::get_attested_event(buy_receipt)?.uid;
 
         // alice approves her ERC721 for payment
         test.alice_client
-            .erc721
+            .erc721()
             .approve(
                 &Erc721Data {
                     address: test.mock_addresses.erc721_a,
@@ -1617,12 +1615,12 @@ mod tests {
         // alice fulfills bob's buy attestation with her ERC721
         let pay_receipt = test
             .alice_client
-            .erc721
+            .erc721()
             .pay_erc721_for_bundle(buy_attestation)
             .await?;
 
         // Verify the payment attestation was created
-        let pay_attestation = AlkahestClient::get_attested_event(pay_receipt)?;
+        let pay_attestation = DefaultAlkahestClient::get_attested_event(pay_receipt)?;
         assert_ne!(pay_attestation.uid, FixedBytes::<32>::default());
 
         // verify token transfers

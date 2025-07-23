@@ -349,14 +349,10 @@ mod tests {
     };
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use crate::contracts::StringObligation;
     use crate::{
-        AlkahestClient,
-        clients::attestation::AttestationClient,
-        contracts::{self, IEAS},
-        types::ArbiterData,
-        utils::{TestContext, setup_test_environment},
+        clients::attestation::AttestationClient, contracts::{self, IEAS}, extensions::{HasAttestation, HasStringObligation}, types::ArbiterData, utils::{setup_test_environment, TestContext}, AlkahestClient
     };
+    use crate::{DefaultAlkahestClient, contracts::StringObligation};
 
     // Helper function to register a schema for testing
     async fn register_test_schema(
@@ -441,7 +437,7 @@ mod tests {
             .await?;
 
         // Extract attestation UID from receipt
-        let uid = AlkahestClient::get_attested_event(receipt.clone())?.uid;
+        let uid = DefaultAlkahestClient::get_attested_event(receipt.clone())?.uid;
 
         Ok((receipt, uid))
     }
@@ -562,7 +558,7 @@ mod tests {
         // Get attestation using the client method
         let attestation = test
             .alice_client
-            .attestation
+            .attestation()
             .get_attestation(attestation_uid)
             .await?;
 
@@ -592,7 +588,7 @@ mod tests {
         // Register schema using the client
         let receipt = test
             .alice_client
-            .attestation
+            .attestation()
             .register_schema(
                 schema.clone(),
                 test.addresses
@@ -661,12 +657,12 @@ mod tests {
         // Attest using the client
         let receipt = test
             .alice_client
-            .attestation
+            .attestation()
             .attest(attestation_request)
             .await?;
 
         // Extract attestation UID
-        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        let attested_event = DefaultAlkahestClient::get_attested_event(receipt)?;
 
         // Verify attestation was created
         assert_ne!(
@@ -738,12 +734,12 @@ mod tests {
         // Create escrow using the client
         let receipt = test
             .alice_client
-            .attestation
+            .attestation()
             .create_escrow(attestation_request, demand_data, escrow_expiration)
             .await?;
 
         // Extract escrow attestation UID
-        let escrow_event = AlkahestClient::get_attested_event(receipt)?;
+        let escrow_event = DefaultAlkahestClient::get_attested_event(receipt)?;
 
         // Verify escrow was created
         assert_ne!(
@@ -755,7 +751,7 @@ mod tests {
         // Get the attestation to verify details
         let escrow_attestation = test
             .alice_client
-            .attestation
+            .attestation()
             .get_attestation(escrow_event.uid)
             .await?;
 
@@ -824,12 +820,12 @@ mod tests {
         // Create escrow using the client (version 2 - references attestation by UID)
         let receipt = test
             .alice_client
-            .attestation
+            .attestation()
             .create_escrow_2(attestation_uid, demand_data, escrow_expiration)
             .await?;
 
         // Extract escrow attestation UID
-        let escrow_event = AlkahestClient::get_attested_event(receipt)?;
+        let escrow_event = DefaultAlkahestClient::get_attested_event(receipt)?;
 
         // Verify escrow was created
         assert_ne!(
@@ -841,7 +837,7 @@ mod tests {
         // Get the attestation to verify details
         let escrow_attestation = test
             .alice_client
-            .attestation
+            .attestation()
             .get_attestation(escrow_event.uid)
             .await?;
 
@@ -929,7 +925,7 @@ mod tests {
         // Create escrow using the client
         let escrow_receipt = test
             .alice_client
-            .attestation
+            .attestation()
             .create_escrow(
                 attestation_request,
                 demand_data,
@@ -938,13 +934,13 @@ mod tests {
             .await?;
 
         // Extract escrow attestation UID
-        let escrow_event = AlkahestClient::get_attested_event(escrow_receipt)?;
+        let escrow_event = DefaultAlkahestClient::get_attested_event(escrow_receipt)?;
         let escrow_uid = escrow_event.uid;
 
         // Bob creates a fulfillment using StringObligation
         let fulfillment_receipt = test
             .bob_client
-            .string_obligation
+            .string_obligation()
             .do_obligation(
                 StringObligation::ObligationData {
                     item: "fulfillment data".to_string(),
@@ -953,18 +949,18 @@ mod tests {
             )
             .await?;
 
-        let fulfillment_event = AlkahestClient::get_attested_event(fulfillment_receipt)?;
+        let fulfillment_event = DefaultAlkahestClient::get_attested_event(fulfillment_receipt)?;
         let fulfillment_uid = fulfillment_event.uid;
 
         // Bob collects payment using the fulfillment
         let collection_receipt = test
             .bob_client
-            .attestation
+            .attestation()
             .collect_escrow(escrow_uid, fulfillment_uid)
             .await?;
 
         // Extract payment attestation UID
-        let payment_event = AlkahestClient::get_attested_event(collection_receipt)?;
+        let payment_event = DefaultAlkahestClient::get_attested_event(collection_receipt)?;
         let payment_uid = payment_event.uid;
 
         // Verify payment was collected
@@ -977,7 +973,7 @@ mod tests {
         // Verify escrow attestation was revoked
         let escrow_attestation = test
             .bob_client
-            .attestation
+            .attestation()
             .get_attestation(escrow_uid)
             .await?;
         assert_ne!(
@@ -1041,12 +1037,12 @@ mod tests {
         // Create escrow using the client (version 2 - references attestation by UID)
         let escrow_receipt = test
             .alice_client
-            .attestation
+            .attestation()
             .create_escrow_2(attestation_uid, demand_data, escrow_expiration)
             .await?;
 
         // Extract escrow attestation UID
-        let escrow_event = AlkahestClient::get_attested_event(escrow_receipt)?;
+        let escrow_event = DefaultAlkahestClient::get_attested_event(escrow_receipt)?;
         let escrow_uid = escrow_event.uid;
 
         // Bob creates a fulfillment using StringObligation
@@ -1070,18 +1066,18 @@ mod tests {
             .get_receipt()
             .await?;
 
-        let fulfillment_event = AlkahestClient::get_attested_event(fulfillment_receipt)?;
+        let fulfillment_event = DefaultAlkahestClient::get_attested_event(fulfillment_receipt)?;
         let fulfillment_uid = fulfillment_event.uid;
 
         // Bob collects payment using the fulfillment
         let collection_receipt = test
             .bob_client
-            .attestation
+            .attestation()
             .collect_escrow_2(escrow_uid, fulfillment_uid)
             .await?;
 
         // Extract validation attestation UID
-        let validation_event = AlkahestClient::get_attested_event(collection_receipt)?;
+        let validation_event = DefaultAlkahestClient::get_attested_event(collection_receipt)?;
         let validation_uid = validation_event.uid;
 
         // Verify validation was created
@@ -1094,7 +1090,7 @@ mod tests {
         // Get the validation attestation
         let validation_attestation = test
             .bob_client
-            .attestation
+            .attestation()
             .get_attestation(validation_uid)
             .await?;
 
@@ -1127,7 +1123,7 @@ mod tests {
         // Verify escrow attestation was revoked
         let escrow_attestation = test
             .bob_client
-            .attestation
+            .attestation()
             .get_attestation(escrow_uid)
             .await?;
         assert!(
@@ -1196,7 +1192,7 @@ mod tests {
         // Attest and create escrow in one step
         let receipt = test
             .alice_client
-            .attestation
+            .attestation()
             .attest_and_create_escrow(attestation_request, demand_data, escrow_expiration)
             .await?;
 

@@ -1,3 +1,14 @@
+use crate::extensions::{
+    HasArbiters, HasAttestation, HasErc20, HasErc721, HasErc1155, HasOracle, HasStringObligation,
+    HasTokenBundle,
+};
+
+use crate::{
+    addresses::BASE_SEPOLIA_ADDRESSES,
+    contracts,
+    types::{PublicProvider, WalletProvider},
+    utils,
+};
 use alloy::{
     primitives::{Address, Bytes, FixedBytes, Log},
     providers::Provider as _,
@@ -7,13 +18,6 @@ use alloy::{
     sol_types::{SolEvent as _, SolValue as _},
 };
 use futures_util::StreamExt as _;
-
-use crate::{
-    addresses::BASE_SEPOLIA_ADDRESSES,
-    contracts,
-    types::{PublicProvider, WalletProvider},
-    utils,
-};
 
 #[derive(Debug, Clone)]
 pub struct ArbitersAddresses {
@@ -637,6 +641,7 @@ impl ArbitersClient {
 
 #[cfg(test)]
 mod tests {
+    use crate::extensions::HasArbiters;
     use alloy::{
         primitives::{Address, Bytes, FixedBytes, bytes},
         providers::Provider as _,
@@ -1006,7 +1011,7 @@ mod tests {
         // Make a positive arbitration decision using our client
         let arbitrate_hash = test
             .bob_client
-            .arbiters
+            .arbiters()
             .arbitrate_as_trusted_oracle(obligation_uid, true)
             .await?
             .transaction_hash;
@@ -1046,7 +1051,7 @@ mod tests {
         // Oracle 1 (Bob) makes a positive decision
         let arbitrate_hash1 = test
             .bob_client
-            .arbiters
+            .arbiters()
             .arbitrate_as_trusted_oracle(obligation_uid, true)
             .await?
             .transaction_hash;
@@ -1061,7 +1066,7 @@ mod tests {
         // Oracle 2 (Alice) makes a negative decision
         let arbitrate_hash2 = test
             .alice_client
-            .arbiters
+            .arbiters()
             .arbitrate_as_trusted_oracle(obligation_uid, false)
             .await?
             .transaction_hash;
@@ -1230,8 +1235,10 @@ mod tests {
             .clone()
             .unwrap()
             .uid_arbiter;
-        let uid_arbiter =
-            contracts::extended_uid_arbiters::composing::UidArbiterComposing::new(uid_arbiter_address, &test.alice_client.public_provider);
+        let uid_arbiter = contracts::extended_uid_arbiters::composing::UidArbiterComposing::new(
+            uid_arbiter_address,
+            &test.alice_client.public_provider,
+        );
 
         let result = uid_arbiter
             .checkObligation(attestation.clone().into(), encoded, FixedBytes::<32>::ZERO)
@@ -1497,7 +1504,8 @@ mod tests {
             let obligation_uid = obligation_uid.clone();
             async move {
                 alice_client
-                    .arbiters
+                    .extensions
+                    .arbiters()
                     .wait_for_trusted_oracle_arbitration(oracle, obligation_uid, None)
                     .await
             }
@@ -1509,7 +1517,8 @@ mod tests {
         // Make an arbitration decision
         let arbitrate_hash = test
             .bob_client
-            .arbiters
+            .extensions
+            .arbiters()
             .arbitrate_as_trusted_oracle(obligation_uid, true)
             .await?
             .transaction_hash;

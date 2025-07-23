@@ -7,35 +7,19 @@ use alloy::{
 };
 
 use crate::{
-    AddressConfig, AlkahestClient,
+    AlkahestClient,
     clients::{
         arbiters::ArbitersAddresses, attestation::AttestationAddresses, erc20::Erc20Addresses,
         erc721::Erc721Addresses, erc1155::Erc1155Addresses,
         string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses,
     },
     contracts::{
-        AllArbiter,
-        AnyArbiter,
-        AttestationBarterUtils,
-        AttestationEscrowObligation,
-        AttestationEscrowObligation2,
-        ERC20EscrowObligation,
-        ERC20PaymentObligation,
-        ERC721EscrowObligation,
-        ERC721PaymentObligation,
-        ERC1155EscrowObligation,
-        ERC1155PaymentObligation,
-        IntrinsicsArbiter,
-        IntrinsicsArbiter2,
-        NotArbiter,
-        RecipientArbiter,
-        SpecificAttestationArbiter,
-        StringObligation,
-        TokenBundleBarterUtils,
-        TrivialArbiter,
-        TrustedOracleArbiter,
-        TrustedPartyArbiter,
-        // New arbiters
+        AllArbiter, AnyArbiter, AttestationBarterUtils, AttestationEscrowObligation,
+        AttestationEscrowObligation2, ERC20EscrowObligation, ERC20PaymentObligation,
+        ERC721EscrowObligation, ERC721PaymentObligation, ERC1155EscrowObligation,
+        ERC1155PaymentObligation, IntrinsicsArbiter, IntrinsicsArbiter2, NotArbiter,
+        RecipientArbiter, SpecificAttestationArbiter, StringObligation, TokenBundleBarterUtils,
+        TrivialArbiter, TrustedOracleArbiter, TrustedPartyArbiter,
         attester_arbiters::{
             composing::AttesterArbiterComposing, non_composing::AttesterArbiterNonComposing,
         },
@@ -94,6 +78,7 @@ use crate::{
         },
         token_bundle::{TokenBundleEscrowObligation, TokenBundlePaymentObligation},
     },
+    extensions::{BaseExtensions, ExtensionAddresses},
     fixtures::{EAS, MockERC20Permit, MockERC721, MockERC1155, SchemaRegistry},
     types::{PublicProvider, WalletProvider},
 };
@@ -295,7 +280,7 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let alice: PrivateKeySigner = anvil.keys()[1].clone().into();
     let bob: PrivateKeySigner = anvil.keys()[2].clone().into();
 
-    let addresses = AddressConfig {
+    let addresses = ExtensionAddresses {
         arbiters_addresses: Some(ArbitersAddresses {
             eas: eas.address().clone(),
             specific_attestation_arbiter: specific_attestation_arbiter.address().clone(),
@@ -447,7 +432,7 @@ pub struct TestContext {
     pub god_provider: WalletProvider,
     pub alice_client: AlkahestClient,
     pub bob_client: AlkahestClient,
-    pub addresses: AddressConfig,
+    pub addresses: ExtensionAddresses,
     pub mock_addresses: MockAddresses,
 }
 
