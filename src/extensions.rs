@@ -139,7 +139,7 @@ impl AlkahestExtension for Erc20Module {
             "Searching for client: {} in Erc20Module",
             std::any::type_name::<T>()
         );
-        
+
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
             println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
@@ -173,7 +173,7 @@ impl AlkahestExtension for Erc721Module {
             "Searching for client: {} in Erc721Module",
             std::any::type_name::<T>()
         );
-        
+
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
             println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
@@ -207,7 +207,7 @@ impl AlkahestExtension for Erc1155Module {
             "Searching for client: {} in Erc1155Module",
             std::any::type_name::<T>()
         );
-        
+
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
             println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
@@ -241,7 +241,7 @@ impl AlkahestExtension for TokenBundleModule {
             "Searching for client: {} in TokenBundleModule",
             std::any::type_name::<T>()
         );
-        
+
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
             println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
@@ -275,7 +275,7 @@ impl AlkahestExtension for AttestationModule {
             "Searching for client: {} in AttestationModule",
             std::any::type_name::<T>()
         );
-        
+
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
             println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
@@ -309,7 +309,7 @@ impl AlkahestExtension for StringObligationModule {
             "Searching for client: {} in StringObligationModule",
             std::any::type_name::<T>()
         );
-        
+
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
             println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
@@ -343,7 +343,7 @@ impl AlkahestExtension for ArbitersModule {
             "Searching for client: {} in ArbitersModule",
             std::any::type_name::<T>()
         );
-        
+
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
             println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
@@ -378,7 +378,7 @@ impl AlkahestExtension for OracleModule {
             "Searching for client: {} in OracleModule",
             std::any::type_name::<T>()
         );
-        
+
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
             println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)

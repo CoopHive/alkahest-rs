@@ -72,44 +72,12 @@ pub struct AttestationFilter {
     pub ref_uid: Option<ValueOrArray<FixedBytes<32>>>,
 }
 
-#[derive(Clone)]
-pub struct AttestationFilterWithoutRefUid {
-    pub block_option: Option<FilterBlockOption>,
-    pub attester: Option<ValueOrArray<Address>>,
-    pub recipient: Option<ValueOrArray<Address>>,
-    pub schema_uid: Option<ValueOrArray<FixedBytes<32>>>,
-    pub uid: Option<ValueOrArray<FixedBytes<32>>>,
-}
-
-impl
-    From<(
-        AttestationFilterWithoutRefUid,
-        Option<ValueOrArray<FixedBytes<32>>>,
-    )> for AttestationFilter
-{
-    fn from(
-        filter_and_ref_uid: (
-            AttestationFilterWithoutRefUid,
-            Option<ValueOrArray<FixedBytes<32>>>,
-        ),
-    ) -> Self {
-        let (filter, ref_uid) = filter_and_ref_uid;
-
-        Self {
-            block_option: filter.block_option,
-            attester: filter.attester,
-            recipient: filter.recipient,
-            schema_uid: filter.schema_uid,
-            uid: filter.uid,
-            ref_uid,
-        }
-    }
-}
 #[derive(Debug, Clone)]
 pub struct ArbitrateOptions {
     pub require_oracle: bool,
     pub skip_arbitrated: bool,
     pub require_request: bool,
+    pub only_new: bool,
 }
 
 impl Default for ArbitrateOptions {
@@ -118,6 +86,7 @@ impl Default for ArbitrateOptions {
             require_oracle: false,
             skip_arbitrated: false,
             require_request: false,
+            only_new: false,
         }
     }
 }
@@ -125,11 +94,6 @@ impl Default for ArbitrateOptions {
 #[derive(Clone)]
 pub struct FulfillmentParams<T: SolType> {
     pub filter: AttestationFilter,
-    pub _obligation_data: PhantomData<T>,
-}
-
-pub struct FulfillmentParamsWithoutRefUid<T: SolType> {
-    pub filter: AttestationFilterWithoutRefUid,
     pub _obligation_data: PhantomData<T>,
 }
 
@@ -310,52 +274,6 @@ impl OracleClient {
             .into_iter()
             .filter_map(|(a, is_requested)| if is_requested { Some(a) } else { None })
             .collect())
-    }
-
-    fn make_filter_without_refuid(&self, p: &AttestationFilterWithoutRefUid) -> Filter {
-        let mut filter = Filter::new()
-            .address(self.addresses.eas)
-            .event_signature(IEAS::Attested::SIGNATURE_HASH)
-            .from_block(
-                p.block_option
-                    .as_ref()
-                    .and_then(|b| b.get_from_block())
-                    .cloned()
-                    .unwrap_or(BlockNumberOrTag::Earliest),
-            )
-            .to_block(
-                p.block_option
-                    .as_ref()
-                    .and_then(|b| b.get_to_block())
-                    .cloned()
-                    .unwrap_or(BlockNumberOrTag::Latest),
-            );
-
-        if let Some(ValueOrArray::Value(a)) = &p.recipient {
-            filter = filter.topic1(a.into_word());
-        }
-
-        if let Some(ValueOrArray::Array(ads)) = &p.recipient {
-            filter = filter.topic1(ads.into_iter().map(|a| a.into_word()).collect::<Vec<_>>());
-        }
-
-        if let Some(ValueOrArray::Value(a)) = &p.attester {
-            filter = filter.topic2(a.into_word());
-        }
-
-        if let Some(ValueOrArray::Array(ads)) = &p.attester {
-            filter = filter.topic2(ads.into_iter().map(|a| a.into_word()).collect::<Vec<_>>());
-        }
-
-        if let Some(ValueOrArray::Value(schema)) = &p.schema_uid {
-            filter = filter.topic3(*schema);
-        }
-
-        if let Some(ValueOrArray::Array(schemas)) = &p.schema_uid {
-            filter = filter.topic3(schemas.clone());
-        }
-
-        filter
     }
 
     async fn get_attestations_and_obligations<ObligationData: SolType>(
@@ -1327,7 +1245,7 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: Arbitrate,
         options: &ArbitrateOptions,
     ) -> eyre::Result<(
@@ -1341,7 +1259,7 @@ impl OracleClient {
         let escrow_filter = self.make_filter(&escrow.filter);
         let escrow_logs_fut = async move { self.public_provider.get_logs(&escrow_filter).await };
 
-        let fulfillment_filter: AttestationFilter = (fulfillment.filter.clone(), None).into();
+        let fulfillment_filter: AttestationFilter = fulfillment.filter.clone();
         let fulfillment_filter = if options.require_request {
             Self::make_arbitration_filter(
                 self.addresses.trusted_oracle_arbiter,
@@ -1604,7 +1522,7 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: Arbitrate,
         options: &ArbitrateOptions,
     ) -> eyre::Result<(
@@ -1618,7 +1536,7 @@ impl OracleClient {
         let escrow_filter = self.make_filter(&escrow.filter);
         let escrow_logs_fut = async move { self.public_provider.get_logs(&escrow_filter).await };
 
-        let fulfillment_filter: AttestationFilter = (fulfillment.filter.clone(), None).into();
+        let fulfillment_filter: AttestationFilter = fulfillment.filter.clone();
         let fulfillment_filter = if options.require_request {
             Self::make_arbitration_filter(
                 self.addresses.trusted_oracle_arbiter,
@@ -1824,7 +1742,7 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
@@ -1903,7 +1821,7 @@ impl OracleClient {
                     Some(self._signer.address()),
                 )
             } else {
-                self.make_filter_without_refuid(&fulfillment.filter)
+                self.make_filter(&fulfillment.filter)
             };
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             fulfillment_subscription_id = *sub.local_id();
@@ -2033,7 +1951,7 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
@@ -2058,7 +1976,7 @@ impl OracleClient {
             ));
 
         let escrow_filter = self.make_filter(&escrow.filter);
-        let fulfillment_filter = self.make_filter_without_refuid(&fulfillment.filter);
+        let fulfillment_filter = self.make_filter(&fulfillment.filter);
 
         let escrow_sub = self.public_provider.subscribe_logs(&escrow_filter).await?;
         let fulfillment_sub = self
@@ -2192,7 +2110,7 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
@@ -2271,7 +2189,7 @@ impl OracleClient {
                     Some(self._signer.address()),
                 )
             } else {
-                self.make_filter_without_refuid(&fulfillment.filter)
+                self.make_filter(&fulfillment.filter)
             };
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             fulfillment_subscription_id = *sub.local_id();
@@ -2410,7 +2328,7 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
@@ -2487,7 +2405,7 @@ impl OracleClient {
                     Some(self._signer.address()),
                 )
             } else {
-                self.make_filter_without_refuid(&fulfillment.filter)
+                self.make_filter(&fulfillment.filter)
             };
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             fulfillment_subscription_id = *sub.local_id();
@@ -2616,7 +2534,7 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: &Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
@@ -2647,7 +2565,7 @@ impl OracleClient {
                 Some(self._signer.address()),
             )
         } else {
-            self.make_filter_without_refuid(&fulfillment.filter)
+            self.make_filter(&fulfillment.filter)
         };
 
         let escrow_sub = self.public_provider.subscribe_logs(&escrow_filter).await?;
@@ -2780,7 +2698,7 @@ impl OracleClient {
     >(
         &self,
         escrow: &EscrowParams<DemandData>,
-        fulfillment: &FulfillmentParamsWithoutRefUid<ObligationData>,
+        fulfillment: &FulfillmentParams<ObligationData>,
         arbitrate: Arbitrate,
         on_after_arbitrate: OnAfterArbitrate,
         options: &ArbitrateOptions,
@@ -2857,7 +2775,7 @@ impl OracleClient {
                     Some(self._signer.address()),
                 )
             } else {
-                self.make_filter_without_refuid(&fulfillment.filter)
+                self.make_filter(&fulfillment.filter)
             };
             let sub = self.public_provider.subscribe_logs(&filter).await?;
             fulfillment_subscription_id = *sub.local_id();

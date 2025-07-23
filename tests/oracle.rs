@@ -1,10 +1,13 @@
 #[cfg(test)]
 mod tests {
     use alkahest_rs::{
-        clients::oracle::{
-            ArbitrateOptions, AttestationFilter, AttestationFilterWithoutRefUid, EscrowParams,
-            FulfillmentParams, FulfillmentParamsWithoutRefUid,
-        }, contracts::StringObligation, extensions::{HasErc20, HasOracle, HasStringObligation}, fixtures::MockERC20Permit, types::{ArbiterData, Erc20Data}, utils::TestContext, AlkahestClient, DefaultAlkahestClient
+        AlkahestClient, DefaultAlkahestClient,
+        clients::oracle::{ArbitrateOptions, AttestationFilter, EscrowParams, FulfillmentParams},
+        contracts::StringObligation,
+        extensions::{HasErc20, HasOracle, HasStringObligation},
+        fixtures::MockERC20Permit,
+        types::{ArbiterData, Erc20Data},
+        utils::TestContext,
     };
     use alloy::{
         eips::BlockNumberOrTag,
@@ -143,34 +146,6 @@ mod tests {
         }
     }
 
-    fn make_filter_without_refuid(test: &TestContext) -> AttestationFilterWithoutRefUid {
-        AttestationFilterWithoutRefUid {
-            attester: Some(ValueOrArray::Value(
-                test.addresses
-                    .string_obligation_addresses
-                    .as_ref()
-                    .unwrap()
-                    .obligation,
-            )),
-            recipient: Some(ValueOrArray::Value(test.bob.address())),
-            schema_uid: None,
-            uid: None,
-            block_option: Some(FilterBlockOption::Range {
-                from_block: Some(BlockNumberOrTag::Earliest),
-                to_block: Some(BlockNumberOrTag::Latest),
-            }),
-        }
-    }
-
-    fn make_fulfillment_params_without_refuid(
-        filter: AttestationFilterWithoutRefUid,
-    ) -> FulfillmentParamsWithoutRefUid<StringObligation::ObligationData> {
-        FulfillmentParamsWithoutRefUid {
-            filter,
-            _obligation_data: std::marker::PhantomData,
-        }
-    }
-
     #[tokio::test]
     async fn test_trivial_arbitrate_past() -> eyre::Result<()> {
         let test = setup_test_environment().await?;
@@ -191,6 +166,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -237,6 +213,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: true,
+                    only_new: false,
                 },
             )
             .await?;
@@ -298,6 +275,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: true,
+                    only_new: false,
                 },
             )
             .await?;
@@ -399,6 +377,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: true,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -419,6 +398,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: true,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -473,6 +453,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: true,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -494,6 +475,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: true,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -553,6 +535,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -605,6 +588,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: true,
+                    only_new: false,
                 },
             )
             .await?;
@@ -675,6 +659,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: true,
+                    only_new: false,
                 },
             )
             .await?;
@@ -754,6 +739,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: true,
+                    only_new: false,
                 },
             )
             .await?;
@@ -834,6 +820,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: true,
+                    only_new: false,
                 },
             )
             .await?;
@@ -911,6 +898,7 @@ mod tests {
                         require_oracle: true,
                         skip_arbitrated: false,
                         require_request: false,
+                        only_new: false,
                     },
                     Some(Duration::from_secs(10)),
                 )
@@ -973,6 +961,7 @@ mod tests {
                         require_oracle: true,
                         skip_arbitrated: false,
                         require_request: true,
+                        only_new: false,
                     },
                     Some(Duration::from_secs(10)),
                 )
@@ -1050,6 +1039,7 @@ mod tests {
                         require_oracle: true,
                         skip_arbitrated: false,
                         require_request: false,
+                        only_new: false,
                     },
                     Some(Duration::from_secs(10)),
                 )
@@ -1113,6 +1103,7 @@ mod tests {
                         require_oracle: true,
                         skip_arbitrated: false,
                         require_request: true,
+                        only_new: false,
                     },
                     Some(Duration::from_secs(10)),
                 )
@@ -1189,6 +1180,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1262,6 +1254,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1331,6 +1324,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1391,6 +1385,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1463,6 +1458,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1506,8 +1502,8 @@ mod tests {
 
         let fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -1534,6 +1530,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1557,8 +1554,8 @@ mod tests {
         let good_fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
         let bad_fulfillment_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -1585,6 +1582,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1621,8 +1619,8 @@ mod tests {
 
         let bad_fulfillment_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -1649,6 +1647,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1676,6 +1675,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: true,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1715,8 +1715,8 @@ mod tests {
         let good_fulfillment_uid = make_fulfillment(&test, "good", escrow_uid).await?;
         let bad_fulfillment_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -1743,6 +1743,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1779,8 +1780,8 @@ mod tests {
 
         let bad_fulfillment_uid = make_fulfillment(&test, "bad", escrow_uid).await?;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -1807,6 +1808,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1834,6 +1836,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: true,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1870,8 +1873,8 @@ mod tests {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
@@ -1905,6 +1908,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -1937,8 +1941,8 @@ mod tests {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
@@ -1973,6 +1977,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: true,
+                    only_new: false,
                 },
             )
             .await?;
@@ -2029,8 +2034,8 @@ mod tests {
         let test = setup_test_environment().await?;
         let (_, _, escrow_uid) = setup_escrow(&test).await?;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let escrow = EscrowParams {
             filter: make_filter_for_escrow(&test, None),
@@ -2064,6 +2069,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: true,
+                    only_new: false,
                 },
             )
             .await?;
@@ -2120,8 +2126,8 @@ mod tests {
         let test = setup_test_environment().await?;
         let (_, item, escrow_uid) = setup_escrow(&test).await?;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -2156,6 +2162,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -2191,8 +2198,8 @@ mod tests {
         let bad_fulfillment_uid1 = make_fulfillment(&test, "bad", escrow_uid).await?;
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -2228,6 +2235,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -2289,8 +2297,8 @@ mod tests {
         let bad_fulfillment_uid1 = make_fulfillment(&test, "bad1", escrow_uid).await?;
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -2327,6 +2335,7 @@ mod tests {
                         require_oracle: true,
                         skip_arbitrated: false,
                         require_request: false,
+                        only_new: false,
                     },
                     Some(Duration::from_secs(10)),
                 )
@@ -2385,8 +2394,8 @@ mod tests {
         let bad_fulfillment_uid1 = make_fulfillment(&test, "bad", escrow_uid).await?;
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -2420,6 +2429,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -2481,8 +2491,8 @@ mod tests {
         let bad_fulfillment_uid1 = make_fulfillment(&test, "bad", escrow_uid).await?;
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -2518,6 +2528,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -2580,8 +2591,8 @@ mod tests {
         let bad_fulfillment_uid1 = make_fulfillment(&test, "bad", escrow_uid).await?;
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -2615,6 +2626,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
+                    only_new: false,
                 },
             )
             .await?;
@@ -2676,8 +2688,8 @@ mod tests {
         let bad_fulfillment_uid1 = make_fulfillment(&test, "bad1", escrow_uid).await?;
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        let filter = make_filter_without_refuid(&test);
-        let fulfillment = make_fulfillment_params_without_refuid(filter);
+        let filter = make_filter(&test, Some(escrow_uid));
+        let fulfillment = make_fulfillment_params(filter);
 
         let demand_data = TrustedOracleArbiter::DemandData::abi_decode(&item.demand)?;
         let escrow = EscrowParams {
@@ -2714,6 +2726,7 @@ mod tests {
                         require_oracle: true,
                         skip_arbitrated: false,
                         require_request: false,
+                        only_new: false,
                     },
                     Some(Duration::from_secs(10)),
                 )
