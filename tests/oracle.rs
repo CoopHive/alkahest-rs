@@ -644,7 +644,7 @@ mod tests {
         let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
-            .listen_and_arbitrate_new_fulfillments(
+            .listen_and_arbitrate(
                 &fulfillment,
                 &|_statement: &StringObligation::ObligationData| -> Option<bool> { Some(true) },
                 |decision| {
@@ -659,7 +659,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: true,
-                    only_new: false,
+                    only_new: true,
                 },
             )
             .await?;
@@ -797,7 +797,7 @@ mod tests {
         let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
-            .listen_and_arbitrate_new_fulfillments_async(
+            .listen_and_arbitrate_async(
                 &fulfillment,
                 |_stmt: &StringObligation::ObligationData| {
                     let item = _stmt.item.clone();
@@ -820,7 +820,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: true,
-                    only_new: false,
+                    only_new: true,
                 },
             )
             .await?;
@@ -1023,7 +1023,7 @@ mod tests {
         // ⬇️ Spawn the listen_and_arbitrate_no_spawn as a background task
         let listen_handle = tokio::spawn(async move {
             oracle
-                .listen_and_arbitrate_new_fulfillments_no_spawn(
+                .listen_and_arbitrate_no_spawn(
                     &fulfillment,
                     &|_statement: &StringObligation::ObligationData| -> Option<bool> { Some(true) },
                     |decision| {
@@ -1039,7 +1039,7 @@ mod tests {
                         require_oracle: true,
                         skip_arbitrated: false,
                         require_request: false,
-                        only_new: false,
+                        only_new: true,
                     },
                     Some(Duration::from_secs(10)),
                 )
@@ -1084,7 +1084,7 @@ mod tests {
         // ⬇️ Spawn the listen_and_arbitrate_no_spawn as a background task
         let listen_handle = tokio::spawn(async move {
             oracle
-                .listen_and_arbitrate_new_fulfillments_no_spawn(
+                .listen_and_arbitrate_no_spawn(
                     &fulfillment,
                     &|_statement: &StringObligation::ObligationData| -> Option<bool> {
                         println!("Arbitrating for item: {}", _statement.item);
@@ -1103,7 +1103,7 @@ mod tests {
                         require_oracle: true,
                         skip_arbitrated: false,
                         require_request: true,
-                        only_new: false,
+                        only_new: true,
                     },
                     Some(Duration::from_secs(10)),
                 )
@@ -1232,7 +1232,7 @@ mod tests {
 
         let oracle = test.bob_client.oracle().clone();
         let listen_result = oracle
-            .listen_and_arbitrate_new_fulfillments(
+            .listen_and_arbitrate(
                 &fulfillment,
                 &|_statement: &StringObligation::ObligationData| -> Option<bool> {
                     Some(_statement.item == "good")
@@ -1254,7 +1254,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
-                    only_new: false,
+                    only_new: true,
                 },
             )
             .await?;
@@ -1435,7 +1435,7 @@ mod tests {
 
         let oracle = test.bob_client.oracle().clone();
         let listen_result = oracle
-            .listen_and_arbitrate_new_fulfillments_async(
+            .listen_and_arbitrate_async(
                 &fulfillment,
                 |_statement: &StringObligation::ObligationData| {
                     let result = _statement.item == "good";
@@ -1458,7 +1458,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
-                    only_new: false,
+                    only_new: true,
                 },
             )
             .await?;
@@ -2502,7 +2502,7 @@ mod tests {
         let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
-            .listen_and_arbitrate_new_fulfillments_for_escrow(
+            .listen_and_arbitrate_for_escrow(
                 &escrow,
                 &fulfillment,
                 |_statement, _demand| {
@@ -2528,7 +2528,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
-                    only_new: false,
+                    only_new: true,
                 },
             )
             .await?;
@@ -2602,7 +2602,7 @@ mod tests {
         let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
-            .listen_and_arbitrate_new_fulfillments_for_escrow_async(
+            .listen_and_arbitrate_for_escrow_async(
                 &escrow,
                 &fulfillment,
                 |_statement, _demand| {
@@ -2626,7 +2626,7 @@ mod tests {
                     require_oracle: true,
                     skip_arbitrated: false,
                     require_request: false,
-                    only_new: false,
+                    only_new: true,
                 },
             )
             .await?;
@@ -2700,7 +2700,7 @@ mod tests {
 
         let listen_handle = tokio::spawn(async move {
             oracle
-                .listen_and_arbitrate_new_fulfillments_for_escrow_no_spawn(
+                .listen_and_arbitrate_for_escrow_no_spawn(
                     &escrow,
                     &fulfillment,
                     &|_statement, _demand| {
@@ -2726,7 +2726,7 @@ mod tests {
                         require_oracle: true,
                         skip_arbitrated: false,
                         require_request: false,
-                        only_new: false,
+                        only_new: true,
                     },
                     Some(Duration::from_secs(10)),
                 )
