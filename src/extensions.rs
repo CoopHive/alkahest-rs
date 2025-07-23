@@ -85,10 +85,6 @@ impl<A: AlkahestExtension, B: AlkahestExtension> AlkahestExtension for JoinExten
 
     /// Recursive search through both sides
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
-        println!(
-            "Searching for client: {} in JoinExtension",
-            std::any::type_name::<T>()
-        );
         // First try left recursively
         if let Some(client) = self.left.find_client::<T>() {
             return Some(client);
@@ -135,13 +131,7 @@ impl AlkahestExtension for Erc20Module {
     }
 
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
-        println!(
-            "Searching for client: {} in Erc20Module",
-            std::any::type_name::<T>()
-        );
-
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
-            println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
         } else {
             None
@@ -169,13 +159,7 @@ impl AlkahestExtension for Erc721Module {
     }
 
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
-        println!(
-            "Searching for client: {} in Erc721Module",
-            std::any::type_name::<T>()
-        );
-
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
-            println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
         } else {
             None
@@ -203,13 +187,7 @@ impl AlkahestExtension for Erc1155Module {
     }
 
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
-        println!(
-            "Searching for client: {} in Erc1155Module",
-            std::any::type_name::<T>()
-        );
-
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
-            println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
         } else {
             None
@@ -237,13 +215,7 @@ impl AlkahestExtension for TokenBundleModule {
     }
 
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
-        println!(
-            "Searching for client: {} in TokenBundleModule",
-            std::any::type_name::<T>()
-        );
-
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
-            println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
         } else {
             None
@@ -271,13 +243,7 @@ impl AlkahestExtension for AttestationModule {
     }
 
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
-        println!(
-            "Searching for client: {} in AttestationModule",
-            std::any::type_name::<T>()
-        );
-
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
-            println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
         } else {
             None
@@ -305,13 +271,7 @@ impl AlkahestExtension for StringObligationModule {
     }
 
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
-        println!(
-            "Searching for client: {} in StringObligationModule",
-            std::any::type_name::<T>()
-        );
-
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
-            println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
         } else {
             None
@@ -339,13 +299,7 @@ impl AlkahestExtension for ArbitersModule {
     }
 
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
-        println!(
-            "Searching for client: {} in ArbitersModule",
-            std::any::type_name::<T>()
-        );
-
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
-            println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
         } else {
             None
@@ -374,13 +328,7 @@ impl AlkahestExtension for OracleModule {
     }
 
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
-        println!(
-            "Searching for client: {} in OracleModule",
-            std::any::type_name::<T>()
-        );
-
         if let Some(client) = (&self.client as &dyn std::any::Any).downcast_ref::<T>() {
-            println!("Found client of type: {}", std::any::type_name::<T>());
             Some(client)
         } else {
             None
