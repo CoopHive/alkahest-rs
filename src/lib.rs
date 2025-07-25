@@ -19,9 +19,6 @@ use crate::clients::{
 /// Type alias for the default AlkahestClient with BaseExtensions
 pub type DefaultAlkahestClient = AlkahestClient<BaseExtensions>;
 
-/// Type alias for an AlkahestClient with no extensions
-pub type NoExtensionClient = AlkahestClient<extensions::NoExtension>;
-
 pub mod addresses;
 pub mod clients;
 pub mod contracts;

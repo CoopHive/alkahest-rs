@@ -560,7 +560,7 @@ impl OracleClient {
         Ok(result)
     }
 
-    async fn arbitrate_past_generic<
+    async fn arbitrate_past<
         ObligationData: SolType,
         Strategy: ArbitrationStrategy<ObligationData>,
     >(
@@ -583,7 +583,7 @@ impl OracleClient {
             .await
     }
 
-    pub async fn arbitrate_past<
+    pub async fn arbitrate_past_sync<
         ObligationData: SolType,
         Arbitrate: Fn(&ObligationData::RustType) -> Option<bool> + Copy,
     >(
@@ -593,8 +593,7 @@ impl OracleClient {
         options: &ArbitrateOptions,
     ) -> eyre::Result<Vec<Decision<ObligationData, ()>>> {
         let strategy = SyncArbitration::new(*arbitrate);
-        self.arbitrate_past_generic(fulfillment, strategy, options)
-            .await
+        self.arbitrate_past(fulfillment, strategy, options).await
     }
 
     pub async fn arbitrate_past_async<
@@ -608,11 +607,10 @@ impl OracleClient {
         options: &ArbitrateOptions,
     ) -> eyre::Result<Vec<Decision<ObligationData, ()>>> {
         let strategy = AsyncArbitration::new(arbitrate);
-        self.arbitrate_past_generic(fulfillment, strategy, options)
-            .await
+        self.arbitrate_past(fulfillment, strategy, options).await
     }
 
-    async fn spawn_fulfillment_listener_generic<
+    async fn spawn_fulfillment_listener<
         ObligationData: SolType + Clone + Send + 'static,
         Strategy: ArbitrationStrategy<ObligationData> + Send + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
@@ -759,7 +757,7 @@ impl OracleClient {
         });
     }
 
-    async fn spawn_fulfillment_listener<
+    async fn spawn_fulfillment_listener_sync<
         ObligationData: SolType + Clone + Send + 'static,
         Arbitrate: Fn(&ObligationData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
@@ -775,14 +773,8 @@ impl OracleClient {
         <ObligationData as SolType>::RustType: Send,
     {
         let strategy = SyncArbitration::new(*arbitrate);
-        self.spawn_fulfillment_listener_generic(
-            stream,
-            fulfillment,
-            strategy,
-            on_after_arbitrate,
-            options,
-        )
-        .await;
+        self.spawn_fulfillment_listener(stream, fulfillment, strategy, on_after_arbitrate, options)
+            .await;
     }
 
     pub async fn spawn_fulfillment_listener_async<
@@ -802,14 +794,8 @@ impl OracleClient {
         <ObligationData as SolType>::RustType: Send,
     {
         let strategy = AsyncArbitration::new(arbitrate);
-        self.spawn_fulfillment_listener_generic(
-            stream,
-            fulfillment,
-            strategy,
-            on_after_arbitrate,
-            options,
-        )
-        .await;
+        self.spawn_fulfillment_listener(stream, fulfillment, strategy, on_after_arbitrate, options)
+            .await;
     }
 
     async fn handle_fulfillment_stream_no_spawn<
@@ -968,7 +954,7 @@ impl OracleClient {
         }
     }
 
-    pub async fn listen_and_arbitrate<
+    pub async fn listen_and_arbitrate_sync<
         ObligationData: SolType + Clone + Send + 'static,
         Arbitrate: Fn(&ObligationData::RustType) -> Option<bool> + Copy + Send + Sync + 'static,
         OnAfterArbitrateFut: Future<Output = ()> + Send + 'static,
@@ -986,7 +972,7 @@ impl OracleClient {
         let decisions = if options.only_new {
             Vec::new()
         } else {
-            self.arbitrate_past(&fulfillment, arbitrate, options)
+            self.arbitrate_past_sync(&fulfillment, arbitrate, options)
                 .await?
         };
         let filter = if options.require_request {
@@ -1003,7 +989,7 @@ impl OracleClient {
         let local_id = *sub.local_id();
         let stream: SubscriptionStream<Log> = sub.into_stream();
 
-        self.spawn_fulfillment_listener(
+        self.spawn_fulfillment_listener_sync(
             stream,
             fulfillment.clone(),
             arbitrate,
@@ -1090,7 +1076,7 @@ impl OracleClient {
         let decisions = if options.only_new {
             Vec::new()
         } else {
-            self.arbitrate_past(&fulfillment, &arbitrate, options)
+            self.arbitrate_past_sync(&fulfillment, &arbitrate, options)
                 .await?
         };
         let filter = if options.require_request {
@@ -1124,7 +1110,7 @@ impl OracleClient {
         })
     }
 
-    async fn arbitrate_past_for_escrow_generic<
+    async fn arbitrate_past_for_escrow<
         ObligationData: SolType,
         DemandData: SolType,
         Strategy: EscrowArbitrationStrategy<ObligationData, DemandData>,
@@ -1333,7 +1319,7 @@ impl OracleClient {
         Ok((result, escrow_attestations, escrow_demands))
     }
 
-    pub async fn arbitrate_past_for_escrow<
+    pub async fn arbitrate_past_for_escrow_sync<
         ObligationData: SolType,
         DemandData: SolType,
         Arbitrate: Fn(&ObligationData::RustType, &DemandData::RustType) -> Option<bool> + Copy,
@@ -1352,7 +1338,7 @@ impl OracleClient {
         DemandData::RustType: Clone,
     {
         let strategy = SyncEscrowArbitration::new(arbitrate);
-        self.arbitrate_past_for_escrow_generic(escrow, fulfillment, strategy, options)
+        self.arbitrate_past_for_escrow(escrow, fulfillment, strategy, options)
             .await
     }
 
@@ -1376,7 +1362,7 @@ impl OracleClient {
         DemandData::RustType: Clone,
     {
         let strategy = AsyncEscrowArbitration::new(arbitrate);
-        self.arbitrate_past_for_escrow_generic(escrow, fulfillment, strategy, options)
+        self.arbitrate_past_for_escrow(escrow, fulfillment, strategy, options)
             .await
     }
 
@@ -1449,7 +1435,7 @@ impl OracleClient {
         Ok((escrow_attestations, escrow_demands))
     }
 
-    async fn listen_and_arbitrate_for_escrow_generic<
+    async fn listen_and_arbitrate_for_escrow<
         ObligationData: SolType + Clone + Send + Sync + 'static,
         DemandData: SolType + Clone + Send + Sync + 'static,
         Strategy: EscrowArbitrationStrategy<ObligationData, DemandData> + Send + Sync + Copy + 'static,
@@ -1476,7 +1462,7 @@ impl OracleClient {
             let (escrow_attestations, escrow_demands) = self.get_escrows(&escrow).await?;
             (Vec::new(), escrow_attestations, escrow_demands)
         } else {
-            self.arbitrate_past_for_escrow_generic(escrow, fulfillment, strategy, options)
+            self.arbitrate_past_for_escrow(escrow, fulfillment, strategy, options)
                 .await?
         };
 
@@ -1668,7 +1654,7 @@ impl OracleClient {
         })
     }
 
-    pub async fn listen_and_arbitrate_for_escrow<
+    pub async fn listen_and_arbitrate_for_escrow_sync<
         ObligationData: SolType + Clone + Send + Sync + 'static,
         DemandData: SolType + Clone + Send + Sync + 'static,
         Arbitrate: Fn(&ObligationData::RustType, &DemandData::RustType) -> Option<bool>
@@ -1695,7 +1681,7 @@ impl OracleClient {
         <ObligationData as SolType>::RustType: Send + 'static,
     {
         let strategy = SyncEscrowArbitration::new(arbitrate);
-        self.listen_and_arbitrate_for_escrow_generic(
+        self.listen_and_arbitrate_for_escrow(
             escrow,
             fulfillment,
             strategy,
@@ -1733,7 +1719,7 @@ impl OracleClient {
         <ObligationData as SolType>::RustType: Send + 'static,
     {
         let strategy = AsyncEscrowArbitration::new(arbitrate);
-        self.listen_and_arbitrate_for_escrow_generic(
+        self.listen_and_arbitrate_for_escrow(
             escrow,
             fulfillment,
             strategy,
@@ -1767,7 +1753,7 @@ impl OracleClient {
             let (escrow_attestations, escrow_demands) = self.get_escrows(&escrow).await?;
             (Vec::new(), escrow_attestations, escrow_demands)
         } else {
-            self.arbitrate_past_for_escrow(&escrow, &fulfillment, arbitrate, &options)
+            self.arbitrate_past_for_escrow_sync(&escrow, &fulfillment, arbitrate, &options)
                 .await?
         };
 

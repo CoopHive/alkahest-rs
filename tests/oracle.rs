@@ -154,7 +154,7 @@ mod tests {
         let decisions = test
             .bob_client
             .oracle()
-            .arbitrate_past(
+            .arbitrate_past_sync(
                 &fulfillment,
                 &|s| Some(s.item == "good"),
                 &ArbitrateOptions {
@@ -201,7 +201,7 @@ mod tests {
         let decisions = test
             .bob_client
             .oracle()
-            .arbitrate_past(
+            .arbitrate_past_sync(
                 &fulfillment,
                 &|s| Some(s.item == "good"),
                 &ArbitrateOptions {
@@ -313,7 +313,7 @@ mod tests {
         let decisions = test
             .bob_client
             .oracle()
-            .arbitrate_past(
+            .arbitrate_past_sync(
                 &fulfillment,
                 &|s| Some(s.item == "good"),
                 &ArbitrateOptions::default(),
@@ -362,7 +362,7 @@ mod tests {
         let decisions = test
             .bob_client
             .oracle()
-            .arbitrate_past(
+            .arbitrate_past_sync(
                 &fulfillment,
                 &|s| {
                     println!("Arbitrating for item: {}", s.item);
@@ -383,7 +383,7 @@ mod tests {
         let decisions = test
             .bob_client
             .oracle()
-            .arbitrate_past(
+            .arbitrate_past_sync(
                 &fulfillment,
                 &|s| {
                     println!("Arbitrating for item: {}", s.item);
@@ -515,7 +515,7 @@ mod tests {
 
         // ⬇️ Directly call listen_and_arbitrate (no need to spawn)
         let listen_result = oracle
-            .listen_and_arbitrate(
+            .listen_and_arbitrate_sync(
                 &fulfillment,
                 &|_statement: &StringObligation::ObligationData| -> Option<bool> { Some(true) },
                 |decision| {
@@ -568,7 +568,7 @@ mod tests {
         let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
-            .listen_and_arbitrate(
+            .listen_and_arbitrate_sync(
                 &fulfillment,
                 &|_statement: &StringObligation::ObligationData| -> Option<bool> { Some(true) },
                 |decision| {
@@ -639,7 +639,7 @@ mod tests {
         let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
-            .listen_and_arbitrate(
+            .listen_and_arbitrate_sync(
                 &fulfillment,
                 &|_statement: &StringObligation::ObligationData| -> Option<bool> { Some(true) },
                 |decision| {
@@ -1159,7 +1159,7 @@ mod tests {
         let listen_result = test
             .bob_client
             .oracle()
-            .listen_and_arbitrate(
+            .listen_and_arbitrate_sync(
                 &fulfillment,
                 &|_statement: &StringObligation::ObligationData| -> Option<bool> {
                     Some(_statement.item == "good")
@@ -1227,7 +1227,7 @@ mod tests {
 
         let oracle = test.bob_client.oracle().clone();
         let listen_result = oracle
-            .listen_and_arbitrate(
+            .listen_and_arbitrate_sync(
                 &fulfillment,
                 &|_statement: &StringObligation::ObligationData| -> Option<bool> {
                     Some(_statement.item == "good")
@@ -1508,7 +1508,7 @@ mod tests {
         let (decisions, _, _) = test
             .bob_client
             .oracle()
-            .arbitrate_past_for_escrow(
+            .arbitrate_past_for_escrow_sync(
                 &escrow,
                 &fulfillment,
                 |_statement, _demand| {
@@ -1560,7 +1560,7 @@ mod tests {
         let (decisions, _, _) = test
             .bob_client
             .oracle()
-            .arbitrate_past_for_escrow(
+            .arbitrate_past_for_escrow_sync(
                 &escrow,
                 &fulfillment,
                 |_statement, _demand| {
@@ -1625,7 +1625,7 @@ mod tests {
         let (decisions, _, _) = test
             .bob_client
             .oracle()
-            .arbitrate_past_for_escrow(
+            .arbitrate_past_for_escrow_sync(
                 &escrow,
                 &fulfillment,
                 |_statement, _demand| {
@@ -1653,7 +1653,7 @@ mod tests {
         let (decisions, _, _) = test
             .bob_client
             .oracle()
-            .arbitrate_past_for_escrow(
+            .arbitrate_past_for_escrow_sync(
                 &escrow,
                 &fulfillment,
                 |_statement, _demand| {
@@ -1878,7 +1878,7 @@ mod tests {
         let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
-            .listen_and_arbitrate_for_escrow(
+            .listen_and_arbitrate_for_escrow_sync(
                 &escrow,
                 &fulfillment,
                 |_statement, _demand| {
@@ -1946,7 +1946,7 @@ mod tests {
         let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
-            .listen_and_arbitrate_for_escrow(
+            .listen_and_arbitrate_for_escrow_sync(
                 &escrow,
                 &fulfillment,
                 |_statement, _demand| {
@@ -2204,7 +2204,7 @@ mod tests {
         let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
-            .listen_and_arbitrate_for_escrow(
+            .listen_and_arbitrate_for_escrow_sync(
                 &escrow,
                 &fulfillment,
                 |_statement, _demand| {
@@ -2497,7 +2497,7 @@ mod tests {
         let oracle = test.bob_client.oracle().clone();
 
         let listen_result = oracle
-            .listen_and_arbitrate_for_escrow(
+            .listen_and_arbitrate_for_escrow_sync(
                 &escrow,
                 &fulfillment,
                 |_statement, _demand| {
