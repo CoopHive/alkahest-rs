@@ -5,10 +5,16 @@ use alloy::{
     signers::local::PrivateKeySigner,
     sol_types::SolEvent,
 };
-use extensions::{AlkahestExtension, BaseExtensions, ExtensionAddresses};
+use extensions::{AlkahestExtension, BaseExtensions};
 use futures_util::StreamExt;
 use sol_types::EscrowClaimed;
 use types::{PublicProvider, WalletProvider};
+
+use crate::clients::{
+    arbiters::ArbitersAddresses, attestation::AttestationAddresses, erc20::Erc20Addresses,
+    erc721::Erc721Addresses, erc1155::Erc1155Addresses,
+    string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses,
+};
 
 /// Type alias for the default AlkahestClient with BaseExtensions
 pub type DefaultAlkahestClient = AlkahestClient<BaseExtensions>;
@@ -22,6 +28,17 @@ pub mod sol_types;
 pub mod types;
 pub mod utils;
 
+#[derive(Debug, Clone)]
+pub struct DefaultExtensionAddresses {
+    pub arbiters_addresses: Option<ArbitersAddresses>,
+    pub erc20_addresses: Option<Erc20Addresses>,
+    pub erc721_addresses: Option<Erc721Addresses>,
+    pub erc1155_addresses: Option<Erc1155Addresses>,
+    pub token_bundle_addresses: Option<TokenBundleAddresses>,
+    pub attestation_addresses: Option<AttestationAddresses>,
+    pub string_obligation_addresses: Option<StringObligationAddresses>,
+}
+
 #[derive(Clone)]
 pub struct AlkahestClient<Extensions: AlkahestExtension = BaseExtensions> {
     pub wallet_provider: WalletProvider,
@@ -34,7 +51,7 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
     pub async fn new(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        addresses: Option<ExtensionAddresses>,
+        addresses: Option<DefaultExtensionAddresses>,
     ) -> eyre::Result<Self> {
         let wallet_provider =
             utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
@@ -48,6 +65,46 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
             address: private_key.address(),
             extensions,
         })
+    }
+
+    /// Add an extension to the current client, creating a new client with joined extensions
+    pub async fn with_extension<NewExt: AlkahestExtension>(
+        self,
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<DefaultExtensionAddresses>,
+    ) -> eyre::Result<AlkahestClient<extensions::JoinExtension<Extensions, NewExt>>> {
+        let new_extension = NewExt::init(private_key, rpc_url, addresses).await?;
+
+        let joined_extensions = extensions::JoinExtension {
+            left: self.extensions,
+            right: new_extension,
+        };
+
+        Ok(AlkahestClient {
+            wallet_provider: self.wallet_provider,
+            public_provider: self.public_provider,
+            address: self.address,
+            extensions: joined_extensions,
+        })
+    }
+
+    /// Add an already initialized extension to the current client
+    pub fn with_initialized_extension<NewExt: AlkahestExtension>(
+        self,
+        extension: NewExt,
+    ) -> AlkahestClient<extensions::JoinExtension<Extensions, NewExt>> {
+        let joined_extensions = extensions::JoinExtension {
+            left: self.extensions,
+            right: extension,
+        };
+
+        AlkahestClient {
+            wallet_provider: self.wallet_provider,
+            public_provider: self.public_provider,
+            address: self.address,
+            extensions: joined_extensions,
+        }
     }
 
     /// Extracts an Attested event from a transaction receipt.
