@@ -67,14 +67,14 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
         })
     }
 
-    /// Add an extension to the current client, creating a new client with joined extensions
-    pub async fn with_extension<NewExt: AlkahestExtension>(
+    /// Add an extension using a custom addresses type
+    pub async fn with_extension<NewExt: AlkahestExtension, A: Clone + Send + Sync + 'static>(
         self,
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        addresses: Option<DefaultExtensionAddresses>,
+        addresses: Option<A>,
     ) -> eyre::Result<AlkahestClient<extensions::JoinExtension<Extensions, NewExt>>> {
-        let new_extension = NewExt::init(private_key, rpc_url, addresses).await?;
+        let new_extension = NewExt::init_with_addresses(private_key, rpc_url, addresses).await?;
 
         let joined_extensions = extensions::JoinExtension {
             left: self.extensions,

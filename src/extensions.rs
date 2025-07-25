@@ -24,6 +24,21 @@ pub trait AlkahestExtension: Clone + Send + Sync {
         addresses: Option<DefaultExtensionAddresses>,
     ) -> impl std::future::Future<Output = eyre::Result<Self>> + Send;
 
+    /// Generic initialization method that can accept any addresses type
+    fn init_with_addresses<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<A>,
+    ) -> impl std::future::Future<Output = eyre::Result<Self>> + Send {
+        // Default implementation that throws an error - must be implemented by each module
+        async move {
+            Err(eyre::eyre!(
+                "init_with_addresses not implemented for {}. Please implement this method or use init() instead.",
+                std::any::type_name::<Self>()
+            ))
+        }
+    }
+
     /// Get the client directly - implement this for modules with a single client
     fn client(&self) -> Option<&Self::Client> {
         None
@@ -67,6 +82,14 @@ impl AlkahestExtension for NoExtension {
         Ok(NoExtension)
     }
 
+    async fn init_with_addresses<A: Clone + Send + Sync + 'static>(
+        _private_key: PrivateKeySigner,
+        _rpc_url: impl ToString + Clone + Send,
+        _addresses: Option<A>,
+    ) -> eyre::Result<Self> {
+        Ok(NoExtension)
+    }
+
     // Uses default implementation that returns None
 }
 
@@ -88,6 +111,18 @@ impl<A: AlkahestExtension, B: AlkahestExtension> AlkahestExtension for JoinExten
     ) -> eyre::Result<Self> {
         let left = A::init(private_key.clone(), rpc_url.clone(), addresses.clone()).await?;
         let right = B::init(private_key, rpc_url, addresses).await?;
+
+        Ok(JoinExtension { left, right })
+    }
+
+    async fn init_with_addresses<Addr: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<Addr>,
+    ) -> eyre::Result<Self> {
+        let left =
+            A::init_with_addresses(private_key.clone(), rpc_url.clone(), addresses.clone()).await?;
+        let right = B::init_with_addresses(private_key, rpc_url, addresses).await?;
 
         Ok(JoinExtension { left, right })
     }
@@ -146,6 +181,29 @@ impl AlkahestExtension for Erc20Module {
         Ok(Erc20Module { client })
     }
 
+    /// Custom implementation that can handle Erc20Addresses directly
+    async fn init_with_addresses<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to Erc20Addresses first
+        let erc20_addresses = if let Some(addr) = addresses {
+            // Use Any trait to attempt downcast
+            let addr_any: &dyn Any = &addr;
+            if let Some(erc20_addr) = addr_any.downcast_ref::<Erc20Addresses>() {
+                Some(erc20_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let client = Erc20Client::new(private_key, rpc_url, erc20_addresses).await?;
+        Ok(Erc20Module { client })
+    }
+
     fn client(&self) -> Option<&Self::Client> {
         Some(&self.client)
     }
@@ -169,6 +227,27 @@ impl AlkahestExtension for Erc721Module {
             addresses.and_then(|a| a.erc721_addresses),
         )
         .await?;
+        Ok(Erc721Module { client })
+    }
+
+    async fn init_with_addresses<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to Erc721Addresses first
+        let erc721_addresses = if let Some(addr) = addresses {
+            let addr_any: &dyn Any = &addr;
+            if let Some(erc721_addr) = addr_any.downcast_ref::<Erc721Addresses>() {
+                Some(erc721_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let client = Erc721Client::new(private_key, rpc_url, erc721_addresses).await?;
         Ok(Erc721Module { client })
     }
 
@@ -198,6 +277,27 @@ impl AlkahestExtension for Erc1155Module {
         Ok(Erc1155Module { client })
     }
 
+    async fn init_with_addresses<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to Erc1155Addresses first
+        let erc1155_addresses = if let Some(addr) = addresses {
+            let addr_any: &dyn Any = &addr;
+            if let Some(erc1155_addr) = addr_any.downcast_ref::<Erc1155Addresses>() {
+                Some(erc1155_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let client = Erc1155Client::new(private_key, rpc_url, erc1155_addresses).await?;
+        Ok(Erc1155Module { client })
+    }
+
     fn client(&self) -> Option<&Self::Client> {
         Some(&self.client)
     }
@@ -221,6 +321,27 @@ impl AlkahestExtension for TokenBundleModule {
             addresses.and_then(|a| a.token_bundle_addresses),
         )
         .await?;
+        Ok(TokenBundleModule { client })
+    }
+
+    async fn init_with_addresses<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to TokenBundleAddresses first
+        let token_bundle_addresses = if let Some(addr) = addresses {
+            let addr_any: &dyn Any = &addr;
+            if let Some(token_bundle_addr) = addr_any.downcast_ref::<TokenBundleAddresses>() {
+                Some(token_bundle_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let client = TokenBundleClient::new(private_key, rpc_url, token_bundle_addresses).await?;
         Ok(TokenBundleModule { client })
     }
 
@@ -250,6 +371,27 @@ impl AlkahestExtension for AttestationModule {
         Ok(AttestationModule { client })
     }
 
+    async fn init_with_addresses<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to AttestationAddresses first
+        let attestation_addresses = if let Some(addr) = addresses {
+            let addr_any: &dyn Any = &addr;
+            if let Some(attestation_addr) = addr_any.downcast_ref::<AttestationAddresses>() {
+                Some(attestation_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let client = AttestationClient::new(private_key, rpc_url, attestation_addresses).await?;
+        Ok(AttestationModule { client })
+    }
+
     fn client(&self) -> Option<&Self::Client> {
         Some(&self.client)
     }
@@ -276,6 +418,30 @@ impl AlkahestExtension for StringObligationModule {
         Ok(StringObligationModule { client })
     }
 
+    async fn init_with_addresses<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to StringObligationAddresses first
+        let string_obligation_addresses = if let Some(addr) = addresses {
+            let addr_any: &dyn Any = &addr;
+            if let Some(string_obligation_addr) =
+                addr_any.downcast_ref::<StringObligationAddresses>()
+            {
+                Some(string_obligation_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let client =
+            StringObligationClient::new(private_key, rpc_url, string_obligation_addresses).await?;
+        Ok(StringObligationModule { client })
+    }
+
     fn client(&self) -> Option<&Self::Client> {
         Some(&self.client)
     }
@@ -299,6 +465,27 @@ impl AlkahestExtension for ArbitersModule {
             addresses.and_then(|a| a.arbiters_addresses),
         )
         .await?;
+        Ok(ArbitersModule { client })
+    }
+
+    async fn init_with_addresses<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to ArbitersAddresses first
+        let arbiters_addresses = if let Some(addr) = addresses {
+            let addr_any: &dyn Any = &addr;
+            if let Some(arbiters_addr) = addr_any.downcast_ref::<ArbitersAddresses>() {
+                Some(arbiters_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let client = ArbitersClient::new(private_key, rpc_url, arbiters_addresses).await?;
         Ok(ArbitersModule { client })
     }
 
@@ -329,18 +516,39 @@ impl AlkahestExtension for OracleModule {
         Ok(OracleModule { client })
     }
 
+    async fn init_with_addresses<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to OracleAddresses first
+        let oracle_addresses = if let Some(addr) = addresses {
+            let addr_any: &dyn Any = &addr;
+            if let Some(oracle_addr) = addr_any.downcast_ref::<OracleAddresses>() {
+                Some(oracle_addr.clone())
+            } else {
+                // Try to downcast to ArbitersAddresses and convert to OracleAddresses
+                if let Some(arbiters_addr) = addr_any.downcast_ref::<ArbitersAddresses>() {
+                    Some(OracleAddresses {
+                        eas: arbiters_addr.eas,
+                        trusted_oracle_arbiter: arbiters_addr.trusted_oracle_arbiter,
+                    })
+                } else {
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        let client = OracleClient::new(private_key, rpc_url, oracle_addresses).await?;
+        Ok(OracleModule { client })
+    }
+
     fn client(&self) -> Option<&Self::Client> {
         Some(&self.client)
     }
 }
-
-/// === Type aliases ===
-
-/// Type alias for AlkahestClient with BaseExtensions
-pub type DefaultAlkahestClient = AlkahestClient<BaseExtensions>;
-
-/// Type alias for a flexible client that can be extended with individual modules
-pub type FlexibleAlkahestClient<T> = AlkahestClient<T>;
 
 /// === Helper Traits ===
 pub trait HasErc20 {
