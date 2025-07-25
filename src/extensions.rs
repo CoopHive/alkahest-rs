@@ -199,7 +199,8 @@ impl AlkahestExtension for Erc20Module {
         } else {
             None
         };
-
+        println!("Using RPC URL: {}", rpc_url.to_string());
+        println!("init_with_addresses Using addresses: {:?}", erc20_addresses);
         let client = Erc20Client::new(private_key, rpc_url, erc20_addresses).await?;
         Ok(Erc20Module { client })
     }

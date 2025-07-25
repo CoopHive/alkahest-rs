@@ -62,7 +62,8 @@ impl Erc20Client {
         addresses: Option<Erc20Addresses>,
     ) -> eyre::Result<Self> {
         let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
-
+        println!("Using RPC URL: {}", rpc_url.to_string());
+        println!("Using addresses: {:?}", addresses);
         Ok(Erc20Client {
             signer,
             wallet_provider,
@@ -1113,9 +1114,17 @@ mod tests {
     };
 
     use crate::{
-        clients::erc20::Erc20Client, contracts::ERC20PaymentObligation, extensions::{HasErc1155, HasErc20, HasErc721, HasTokenBundle, NoExtension}, fixtures::{MockERC1155, MockERC20Permit, MockERC721}, types::{
-            ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData
-        }, utils::setup_test_environment, AlkahestClient, DefaultAlkahestClient
+        AlkahestClient, DefaultAlkahestClient,
+        clients::erc20::Erc20Client,
+        contracts::ERC20PaymentObligation,
+        extensions::{
+            AlkahestExtension, HasErc20, HasErc721, HasErc1155, HasTokenBundle, NoExtension,
+        },
+        fixtures::{MockERC20Permit, MockERC721, MockERC1155},
+        types::{
+            ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
+        },
+        utils::setup_test_environment,
     };
 
     #[tokio::test]
@@ -1207,7 +1216,8 @@ mod tests {
         // Test approve for payment
         let _receipt = test
             .alice_client
-            .erc20()
+            .extensions
+            .get_client::<Erc20Client>()
             .approve(&token, ApprovalPurpose::Payment)
             .await?;
 
