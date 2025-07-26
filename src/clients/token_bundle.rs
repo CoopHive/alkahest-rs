@@ -420,14 +420,9 @@ mod tests {
     };
 
     use crate::{
-        AlkahestClient,
-        clients::token_bundle::TokenBundleClient,
-        contracts::token_bundle::{TokenBundleEscrowObligation, TokenBundlePaymentObligation},
-        fixtures::{MockERC20Permit, MockERC721, MockERC1155},
-        types::{
-            ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
-        },
-        utils::setup_test_environment,
+        clients::{erc721::Erc721Client, token_bundle::TokenBundleClient}, contracts::token_bundle::{TokenBundleEscrowObligation, TokenBundlePaymentObligation}, extensions::{HasErc1155, HasErc20, HasErc721, HasTokenBundle}, fixtures::{MockERC1155, MockERC20Permit, MockERC721}, types::{
+            ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData
+        }, utils::setup_test_environment, AlkahestClient, DefaultAlkahestClient
     };
 
     // Helper function to create a token bundle for Alice
@@ -565,7 +560,7 @@ mod tests {
 
         // Alice approves her tokens for escrow
         test.alice_client
-            .token_bundle
+            .token_bundle()
             .approve(&alice_bundle, ApprovalPurpose::Escrow)
             .await?;
 
@@ -575,12 +570,12 @@ mod tests {
         // Alice creates buy order for Bob's bundle
         let receipt = test
             .alice_client
-            .token_bundle
+            .token_bundle()
             .buy_bundle_for_bundle(&alice_bundle, &bob_bundle, expiration)
             .await?;
 
         // Verify attestation was created
-        let buy_attestation = AlkahestClient::get_attested_event(receipt)?;
+        let buy_attestation = DefaultAlkahestClient::get_attested_event(receipt)?;
         assert_ne!(
             buy_attestation.uid,
             FixedBytes::<32>::default(),
@@ -701,7 +696,7 @@ mod tests {
 
         // Bob approves his tokens for escrow
         test.bob_client
-            .token_bundle
+            .token_bundle()
             .approve(&bob_bundle, ApprovalPurpose::Escrow)
             .await?;
 
@@ -715,7 +710,7 @@ mod tests {
         // Bob creates a bundle escrow demanding Alice's bundle
         let buy_receipt = test
             .bob_client
-            .token_bundle
+            .token_bundle()
             .buy_with_bundle(
                 &bob_bundle,
                 &ArbiterData {
@@ -730,7 +725,7 @@ mod tests {
             )
             .await?;
 
-        let buy_attestation = AlkahestClient::get_attested_event(buy_receipt)?.uid;
+        let buy_attestation = DefaultAlkahestClient::get_attested_event(buy_receipt)?.uid;
 
         // Check balances before fulfillment
         let alice_initial_erc20_b_balance =
@@ -750,19 +745,19 @@ mod tests {
 
         // Alice approves her tokens for payment
         test.alice_client
-            .token_bundle
+            .token_bundle()
             .approve(&alice_bundle, ApprovalPurpose::Payment)
             .await?;
 
         // Alice fulfills Bob's order
         let pay_receipt = test
             .alice_client
-            .token_bundle
+            .token_bundle()
             .pay_bundle_for_bundle(buy_attestation)
             .await?;
 
         // Verify payment attestation was created
-        let pay_attestation = AlkahestClient::get_attested_event(pay_receipt)?;
+        let pay_attestation = DefaultAlkahestClient::get_attested_event(pay_receipt)?;
         assert_ne!(
             pay_attestation.uid,
             FixedBytes::<32>::default(),
@@ -873,18 +868,18 @@ mod tests {
 
         // Alice approves her tokens for escrow
         test.alice_client
-            .token_bundle
+            .token_bundle()
             .approve(&alice_bundle, ApprovalPurpose::Escrow)
             .await?;
 
         // Alice creates a buy order with a short expiration
         let buy_receipt = test
             .alice_client
-            .token_bundle
+            .token_bundle()
             .buy_bundle_for_bundle(&alice_bundle, &bob_bundle, short_expiration)
             .await?;
 
-        let buy_attestation = AlkahestClient::get_attested_event(buy_receipt)?.uid;
+        let buy_attestation = DefaultAlkahestClient::get_attested_event(buy_receipt)?.uid;
 
         // Advance blockchain time to after expiration
         test.god_provider.anvil_increase_time(120).await?; // Advance by 120 seconds
@@ -911,7 +906,7 @@ mod tests {
 
         // Alice collects her expired escrow
         test.alice_client
-            .token_bundle
+            .token_bundle()
             .reclaim_expired(buy_attestation)
             .await?;
 
@@ -1049,7 +1044,7 @@ mod tests {
         // Test approve for payment
         let _receipts = test
             .alice_client
-            .token_bundle
+            .token_bundle()
             .approve(&alice_bundle, ApprovalPurpose::Payment)
             .await?;
 
@@ -1110,7 +1105,7 @@ mod tests {
         // Test approve for escrow
         let _receipts = test
             .alice_client
-            .token_bundle
+            .token_bundle()
             .approve(&alice_bundle, ApprovalPurpose::Escrow)
             .await?;
 
@@ -1218,14 +1213,14 @@ mod tests {
 
         // Alice approves tokens for escrow
         test.alice_client
-            .token_bundle
+            .token_bundle()
             .approve(&alice_bundle, ApprovalPurpose::Escrow)
             .await?;
 
         // Alice creates escrow with custom demand
         let receipt = test
             .alice_client
-            .token_bundle
+            .token_bundle()
             .buy_with_bundle(&alice_bundle, &item, 0)
             .await?;
 
@@ -1277,7 +1272,7 @@ mod tests {
         );
 
         // Escrow obligation made
-        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        let attested_event = DefaultAlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
         Ok(())
@@ -1329,14 +1324,14 @@ mod tests {
 
         // Alice approves tokens for payment
         test.alice_client
-            .token_bundle
+            .token_bundle()
             .approve(&alice_bundle, ApprovalPurpose::Payment)
             .await?;
 
         // Alice makes direct payment to Bob
         let receipt = test
             .alice_client
-            .token_bundle
+            .token_bundle()
             .pay_with_bundle(&alice_bundle, test.bob.address())
             .await?;
 
@@ -1371,7 +1366,7 @@ mod tests {
         );
 
         // Payment obligation made
-        let attested_event = AlkahestClient::get_attested_event(receipt)?;
+        let attested_event = DefaultAlkahestClient::get_attested_event(receipt)?;
         assert_ne!(attested_event.uid, FixedBytes::<32>::default());
 
         Ok(())

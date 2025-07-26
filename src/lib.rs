@@ -5,32 +5,31 @@ use alloy::{
     signers::local::PrivateKeySigner,
     sol_types::SolEvent,
 };
-use clients::{
-    arbiters::{ArbitersAddresses, ArbitersClient},
-    attestation::{AttestationAddresses, AttestationClient},
-    erc20::{Erc20Addresses, Erc20Client},
-    erc721::{Erc721Addresses, Erc721Client},
-    erc1155::{Erc1155Addresses, Erc1155Client},
-    oracle::{OracleAddresses, OracleClient},
-    string_obligation::{StringObligationAddresses, StringObligationClient},
-    token_bundle::{TokenBundleAddresses, TokenBundleClient},
-};
+use extensions::{AlkahestExtension, BaseExtensions};
 use futures_util::StreamExt;
 use sol_types::EscrowClaimed;
 use types::{PublicProvider, WalletProvider};
 
+use crate::clients::{
+    arbiters::ArbitersAddresses, attestation::AttestationAddresses, erc20::Erc20Addresses,
+    erc721::Erc721Addresses, erc1155::Erc1155Addresses,
+    string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses,
+};
+
+/// Type alias for the default AlkahestClient with BaseExtensions
+pub type DefaultAlkahestClient = AlkahestClient<BaseExtensions>;
+
 pub mod addresses;
 pub mod clients;
 pub mod contracts;
+pub mod extensions;
 pub mod fixtures;
 pub mod sol_types;
 pub mod types;
 pub mod utils;
 
-/// Configuration for contract addresses used by the AlkahestClient.
-/// Each field is optional and will use default addresses if not provided.
 #[derive(Debug, Clone)]
-pub struct AddressConfig {
+pub struct DefaultExtensionAddresses {
     pub arbiters_addresses: Option<ArbitersAddresses>,
     pub erc20_addresses: Option<Erc20Addresses>,
     pub erc721_addresses: Option<Erc721Addresses>,
@@ -40,86 +39,72 @@ pub struct AddressConfig {
     pub string_obligation_addresses: Option<StringObligationAddresses>,
 }
 
-/// The main client for interacting with token trading and attestation functionality.
-///
-/// This client provides a unified interface for:
-/// - Trading ERC20, ERC721, and ERC1155 tokens
-/// - Managing token bundles
-/// - Creating and managing attestations
-/// - Setting up escrow arrangements
-/// - Handling trade fulfillment
 #[derive(Clone)]
-pub struct AlkahestClient {
+pub struct AlkahestClient<Extensions: AlkahestExtension = BaseExtensions> {
     pub wallet_provider: WalletProvider,
     pub public_provider: PublicProvider,
     pub address: Address,
-
-    pub arbiters: ArbitersClient,
-    pub erc20: Erc20Client,
-    pub erc721: Erc721Client,
-    pub erc1155: Erc1155Client,
-    pub token_bundle: TokenBundleClient,
-    pub attestation: AttestationClient,
-    pub string_obligation: StringObligationClient,
-    pub oracle: OracleClient,
+    pub extensions: Extensions,
 }
 
-impl AlkahestClient {
-    /// Creates a new AlkahestClient instance.
-    ///
-    /// # Arguments
-    /// * `private_key` - The private key for signing transactions
-    /// * `rpc_url` - The RPC endpoint URL
-    /// * `addresses` - Optional custom contract addresses, uses defaults if None
-    ///
-    /// # Returns
-    /// * `Result<Self>` - The initialized client instance with all sub-clients configured
+impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
     pub async fn new(
         private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone,
-        addresses: Option<AddressConfig>,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<DefaultExtensionAddresses>,
     ) -> eyre::Result<Self> {
         let wallet_provider =
             utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
         let public_provider = utils::get_public_provider(rpc_url.clone()).await?;
 
-        macro_rules! make_client {
-            ($client:ident, $addresses:ident) => {
-                $client::new(
-                    private_key.clone(),
-                    rpc_url.clone(),
-                    addresses.clone().and_then(|a| a.$addresses),
-                )
-            };
-        }
+        let extensions = Extensions::init(private_key.clone(), rpc_url, addresses).await?;
 
         Ok(AlkahestClient {
-            wallet_provider: wallet_provider.clone(),
-            public_provider: public_provider.clone(),
+            wallet_provider,
+            public_provider,
             address: private_key.address(),
-            arbiters: make_client!(ArbitersClient, arbiters_addresses).await?,
-            erc20: make_client!(Erc20Client, erc20_addresses).await?,
-            erc721: make_client!(Erc721Client, erc721_addresses).await?,
-            erc1155: make_client!(Erc1155Client, erc1155_addresses).await?,
-            token_bundle: make_client!(TokenBundleClient, token_bundle_addresses).await?,
-            attestation: make_client!(AttestationClient, attestation_addresses).await?,
-            string_obligation: make_client!(StringObligationClient, string_obligation_addresses)
-                .await?,
-            oracle: OracleClient::new(
-                private_key.clone(),
-                rpc_url.clone(),
-                addresses
-                    .clone()
-                    .and_then(|a| a.arbiters_addresses)
-                    .and_then(|a| {
-                        Some(OracleAddresses {
-                            eas: a.eas,
-                            trusted_oracle_arbiter: a.trusted_oracle_arbiter,
-                        })
-                    }),
-            )
-            .await?,
+            extensions,
         })
+    }
+
+    /// Add an extension using a custom addresses type
+    pub async fn with_extension<NewExt: AlkahestExtension, A: Clone + Send + Sync + 'static>(
+        self,
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        addresses: Option<A>,
+    ) -> eyre::Result<AlkahestClient<extensions::JoinExtension<Extensions, NewExt>>> {
+        let new_extension = NewExt::init_with_addresses(private_key, rpc_url, addresses).await?;
+
+        let joined_extensions = extensions::JoinExtension {
+            left: self.extensions,
+            right: new_extension,
+        };
+
+        Ok(AlkahestClient {
+            wallet_provider: self.wallet_provider,
+            public_provider: self.public_provider,
+            address: self.address,
+            extensions: joined_extensions,
+        })
+    }
+
+    /// Add an already initialized extension to the current client
+    pub fn with_initialized_extension<NewExt: AlkahestExtension>(
+        self,
+        extension: NewExt,
+    ) -> AlkahestClient<extensions::JoinExtension<Extensions, NewExt>> {
+        let joined_extensions = extensions::JoinExtension {
+            left: self.extensions,
+            right: extension,
+        };
+
+        AlkahestClient {
+            wallet_provider: self.wallet_provider,
+            public_provider: self.public_provider,
+            address: self.address,
+            extensions: joined_extensions,
+        }
     }
 
     /// Extracts an Attested event from a transaction receipt.

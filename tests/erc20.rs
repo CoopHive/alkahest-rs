@@ -1,12 +1,10 @@
 use std::env;
 
 use alkahest_rs::{
-    AlkahestClient,
     clients::{
         arbiters::{ArbitersClient, TrustedPartyArbiter},
         erc20::Erc20Client,
-    },
-    types::{ApprovalPurpose, ArbiterData, Erc20Data},
+    }, extensions::{HasArbiters, HasAttestation, HasErc20}, types::{ApprovalPurpose, ArbiterData, Erc20Data}, AlkahestClient, DefaultAlkahestClient
 };
 
 use alloy::{
@@ -20,10 +18,12 @@ use eyre::Result;
 #[tokio::test]
 async fn test_trade_erc20_for_erc20() -> Result<()> {
     let alice: PrivateKeySigner = env::var("PRIVKEY_ALICE")?.parse()?;
-    let client_buyer = AlkahestClient::new(alice, env::var("RPC_URL")?.as_str(), None).await?;
+    let client_buyer =
+        DefaultAlkahestClient::new(alice, env::var("RPC_URL")?.as_str(), None).await?;
 
     let bob = env::var("PRIVKEY_BOB")?.parse()?;
-    let client_seller = AlkahestClient::new(bob, env::var("RPC_URL")?.as_str(), None).await?;
+    let client_seller =
+        DefaultAlkahestClient::new(bob, env::var("RPC_URL")?.as_str(), None).await?;
 
     let usdc = address!("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
     let eurc = address!("0x808456652fdb597867f38412077A9182bf77359F");
@@ -38,26 +38,26 @@ async fn test_trade_erc20_for_erc20() -> Result<()> {
     };
 
     client_buyer
-        .erc20
+        .erc20()
         .approve(&bid, ApprovalPurpose::Escrow)
         .await?;
 
     // buy 10 eurc for 10 usdc
     let receipt = client_buyer
-        .erc20
+        .erc20()
         .buy_erc20_for_erc20(&bid, &ask, 0)
         .await?;
 
-    let attested = AlkahestClient::get_attested_event(receipt)?;
+    let attested = DefaultAlkahestClient::get_attested_event(receipt)?;
     println!("{:?}", attested);
 
     client_seller
-        .erc20
+        .erc20()
         .approve(&ask, ApprovalPurpose::Payment)
         .await?;
 
     let receipt = client_seller
-        .erc20
+        .erc20()
         .pay_erc20_for_erc20(attested.uid)
         .await?;
     println!("{:?}", receipt);
@@ -68,10 +68,10 @@ async fn test_trade_erc20_for_erc20() -> Result<()> {
 #[tokio::test]
 async fn test_trade_erc20_for_custom() -> Result<()> {
     let alice: PrivateKeySigner = env::var("PRIVKEY_ALICE")?.parse()?;
-    let client_buyer = AlkahestClient::new(alice, env::var("RPC_URL")?.as_str(), None).await?;
+    let client_buyer = DefaultAlkahestClient::new(alice, env::var("RPC_URL")?.as_str(), None).await?;
 
     let bob: PrivateKeySigner = env::var("PRIVKEY_BOB")?.parse()?;
-    let client_seller = AlkahestClient::new(bob, env::var("RPC_URL")?.as_str(), None).await?;
+    let client_seller = DefaultAlkahestClient::new(bob, env::var("RPC_URL")?.as_str(), None).await?;
     // the example will use JobResultObligation to demand a string to be capitalized
     // but JobResultObligation is generic enough to represent much more (a db query, a Dockerfile...)
     // see https://github.com/CoopHive/alkahest-mocks/blob/main/src/Statements/JobResultObligation.sol
@@ -107,11 +107,12 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
     // if using a custom Arbiter not supported by the SDK, you can use the sol! macro and abi_encode
     // directly, like we did for the base_demand
 
-    let demand = ArbitersClient::encode_trusted_party_arbiter_demand(&TrustedPartyArbiter::DemandData {
-        creator: client_seller.address,
-        baseArbiter: client_seller.arbiters.addresses.trivial_arbiter,
-        baseDemand: base_demand.into(),
-    });
+    let demand =
+        ArbitersClient::encode_trusted_party_arbiter_demand(&TrustedPartyArbiter::DemandData {
+            creator: client_seller.address,
+            baseArbiter: client_seller.arbiters().addresses.trivial_arbiter,
+            baseDemand: base_demand.into(),
+        });
 
     // approve escrow contract to spend tokens
     let usdc = address!("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
@@ -120,32 +121,33 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
         value: 10.try_into()?,
     };
     let ask = ArbiterData {
-        arbiter: client_seller.arbiters.addresses.trusted_party_arbiter,
+        arbiter: client_seller.arbiters().addresses.trusted_party_arbiter,
         demand,
     };
 
     client_buyer
-        .erc20
+        .erc20()
         .approve(&bid, ApprovalPurpose::Escrow)
         .await?;
 
     // make escrow with generic escrow function,
     // passing in TrustedPartyArbiter's address and our custom demand,
     // and no expiration
-    let escrow = client_buyer.erc20.buy_with_erc20(&bid, &ask, 0).await?;
-    let escrow = AlkahestClient::get_attested_event(escrow)?;
+    let escrow = client_buyer.erc20().buy_with_erc20(&bid, &ask, 0).await?;
+    let escrow = DefaultAlkahestClient::get_attested_event(escrow)?;
     println!("escrow: {escrow:?}");
 
     // now the seller manually decodes the obligation and demand
     // and creates a StringResultObligation
     // and manually collects payment
     let buy_obligation = client_seller
-        .attestation
+        .attestation()
         .get_attestation(escrow.uid)
         .await?;
     let buy_obligation = Erc20Client::decode_escrow_obligation(&buy_obligation.data)?;
 
-    let decoded_demand = ArbitersClient::decode_trusted_party_arbiter_demand(&buy_obligation.demand)?;
+    let decoded_demand =
+        ArbitersClient::decode_trusted_party_arbiter_demand(&buy_obligation.demand)?;
     let decoded_base_demand = ResultDemandData::abi_decode(decoded_demand.baseDemand.as_ref());
 
     // uppercase string for the example;
@@ -190,12 +192,12 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
         .await?
         .get_receipt()
         .await?;
-    let result = AlkahestClient::get_attested_event(result)?;
+    let result = DefaultAlkahestClient::get_attested_event(result)?;
     println!("result: {result:?}");
 
     // and collect the payment from escrow
     let collection = client_seller
-        .erc20
+        .erc20()
         .collect_escrow(escrow.uid, result.uid)
         .await?;
     println!("collection: {collection:?}");
@@ -205,7 +207,7 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
     // return the fulfilling obligation immediately
     let fulfillment = client_buyer
         .wait_for_fulfillment(
-            client_buyer.erc20.addresses.escrow_obligation,
+            client_buyer.erc20().addresses.escrow_obligation,
             escrow.uid,
             None,
         )
@@ -213,7 +215,7 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
 
     // and extract the result from the fulfillment obligation
     let fulfillment = client_buyer
-        .attestation
+        .attestation()
         .get_attestation(fulfillment.fulfillment)
         .await?;
 

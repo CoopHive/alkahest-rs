@@ -7,48 +7,14 @@ use alloy::{
 };
 
 use crate::{
-    AddressConfig, AlkahestClient,
     clients::{
-        arbiters::ArbitersAddresses, attestation::AttestationAddresses, erc20::Erc20Addresses,
-        erc721::Erc721Addresses, erc1155::Erc1155Addresses,
-        string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses,
-    },
-    contracts::{
-        AllArbiter,
-        AnyArbiter,
-        AttestationBarterUtils,
-        AttestationEscrowObligation,
-        AttestationEscrowObligation2,
-        ERC20EscrowObligation,
-        ERC20PaymentObligation,
-        ERC721EscrowObligation,
-        ERC721PaymentObligation,
-        ERC1155EscrowObligation,
-        ERC1155PaymentObligation,
-        IntrinsicsArbiter,
-        IntrinsicsArbiter2,
-        NotArbiter,
-        RecipientArbiter,
-        SpecificAttestationArbiter,
-        StringObligation,
-        TokenBundleBarterUtils,
-        TrivialArbiter,
-        TrustedOracleArbiter,
-        TrustedPartyArbiter,
-        // New arbiters
+        arbiters::ArbitersAddresses, attestation::AttestationAddresses, erc1155::Erc1155Addresses, erc20::Erc20Addresses, erc721::Erc721Addresses, string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses
+    }, contracts::{
         attester_arbiters::{
             composing::AttesterArbiterComposing, non_composing::AttesterArbiterNonComposing,
-        },
-        confirmation_arbiters::{
-            ConfirmationArbiter, composing::ConfirmationArbiterComposing,
-            revocable::RevocableConfirmationArbiter,
-            revocable_composing::RevocableConfirmationArbiterComposing,
-            unrevocable::UnrevocableConfirmationArbiter,
-        },
-        erc20_barter_cross_token::ERC20BarterCrossToken,
-        erc721_barter_cross_token::ERC721BarterCrossToken,
-        erc1155_barter_cross_token::ERC1155BarterCrossToken,
-        expiration_time_arbiters::{
+        }, confirmation_arbiters::{
+            composing::ConfirmationArbiterComposing, revocable::RevocableConfirmationArbiter, revocable_composing::RevocableConfirmationArbiterComposing, unrevocable::UnrevocableConfirmationArbiter, ConfirmationArbiter
+        }, erc1155_barter_cross_token::ERC1155BarterCrossToken, erc20_barter_cross_token::ERC20BarterCrossToken, erc721_barter_cross_token::ERC721BarterCrossToken, expiration_time_arbiters::{
             after::{
                 composing::ExpirationTimeAfterArbiterComposing,
                 non_composing::ExpirationTimeAfterArbiterNonComposing,
@@ -61,27 +27,19 @@ use crate::{
                 composing::ExpirationTimeEqualArbiterComposing,
                 non_composing::ExpirationTimeEqualArbiterNonComposing,
             },
-        },
-        extended_recipient_arbiters::{
+        }, extended_recipient_arbiters::{
             composing::RecipientArbiterComposing, non_composing::RecipientArbiterNonComposing,
-        },
-        extended_uid_arbiters::{
+        }, extended_uid_arbiters::{
             composing::UidArbiterComposing, non_composing::UidArbiterNonComposing,
-        },
-        payment_fulfillment_arbiters::{
-            ERC20PaymentFulfillmentArbiter, ERC721PaymentFulfillmentArbiter,
-            ERC1155PaymentFulfillmentArbiter, TokenBundlePaymentFulfillmentArbiter,
-        },
-        ref_uid_arbiters::{
+        }, payment_fulfillment_arbiters::{
+            ERC1155PaymentFulfillmentArbiter, ERC20PaymentFulfillmentArbiter, ERC721PaymentFulfillmentArbiter, TokenBundlePaymentFulfillmentArbiter
+        }, ref_uid_arbiters::{
             composing::RefUidArbiterComposing, non_composing::RefUidArbiterNonComposing,
-        },
-        revocable_arbiters::{
+        }, revocable_arbiters::{
             composing::RevocableArbiterComposing, non_composing::RevocableArbiterNonComposing,
-        },
-        schema_arbiters::{
+        }, schema_arbiters::{
             composing::SchemaArbiterComposing, non_composing::SchemaArbiterNonComposing,
-        },
-        time_arbiters::{
+        }, time_arbiters::{
             after::{
                 composing::TimeAfterArbiterComposing, non_composing::TimeAfterArbiterNonComposing,
             },
@@ -91,11 +49,8 @@ use crate::{
             equal::{
                 composing::TimeEqualArbiterComposing, non_composing::TimeEqualArbiterNonComposing,
             },
-        },
-        token_bundle::{TokenBundleEscrowObligation, TokenBundlePaymentObligation},
-    },
-    fixtures::{EAS, MockERC20Permit, MockERC721, MockERC1155, SchemaRegistry},
-    types::{PublicProvider, WalletProvider},
+        }, token_bundle::{TokenBundleEscrowObligation, TokenBundlePaymentObligation}, AllArbiter, AnyArbiter, AttestationBarterUtils, AttestationEscrowObligation, AttestationEscrowObligation2, ERC1155EscrowObligation, ERC1155PaymentObligation, ERC20EscrowObligation, ERC20PaymentObligation, ERC721EscrowObligation, ERC721PaymentObligation, IntrinsicsArbiter, IntrinsicsArbiter2, NotArbiter, RecipientArbiter, SpecificAttestationArbiter, StringObligation, TokenBundleBarterUtils, TrivialArbiter, TrustedOracleArbiter, TrustedPartyArbiter
+    }, extensions::BaseExtensions, fixtures::{MockERC1155, MockERC20Permit, MockERC721, SchemaRegistry, EAS}, types::{PublicProvider, WalletProvider}, AlkahestClient, DefaultExtensionAddresses
 };
 
 pub async fn get_wallet_provider<T: TxSigner<Signature> + Sync + Send + 'static>(
@@ -295,7 +250,7 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let alice: PrivateKeySigner = anvil.keys()[1].clone().into();
     let bob: PrivateKeySigner = anvil.keys()[2].clone().into();
 
-    let addresses = AddressConfig {
+    let addresses = DefaultExtensionAddresses {
         arbiters_addresses: Some(ArbitersAddresses {
             eas: eas.address().clone(),
             specific_attestation_arbiter: specific_attestation_arbiter.address().clone(),
@@ -447,7 +402,7 @@ pub struct TestContext {
     pub god_provider: WalletProvider,
     pub alice_client: AlkahestClient,
     pub bob_client: AlkahestClient,
-    pub addresses: AddressConfig,
+    pub addresses: DefaultExtensionAddresses,
     pub mock_addresses: MockAddresses,
 }
 
