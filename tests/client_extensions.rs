@@ -134,11 +134,7 @@ async fn test_custom_tracker_extension() -> Result<()> {
 
     // Add custom tracker extension with custom config
     let client_with_tracker = client
-        .with_extension::<CustomTrackerExtension, CustomTrackerConfig>(
-            private_key.clone(),
-            &rpc_url,
-            Some(custom_config.clone()),
-        )
+        .with_extension::<CustomTrackerExtension, CustomTrackerConfig>(Some(custom_config.clone()))
         .await?;
 
     // Test initial state
@@ -185,11 +181,7 @@ async fn test_client_with_extension() -> Result<()> {
 
     // Add ERC20 extension with custom addresses
     let client_with_erc20 = client
-        .with_extension::<Erc20Module, Erc20Addresses>(
-            private_key.clone(),
-            &rpc_url,
-            Some(custom_erc20_addresses.clone()),
-        )
+        .with_extension::<Erc20Module, Erc20Addresses>(Some(custom_erc20_addresses.clone()))
         .await?;
 
     // Verify the custom addresses are used

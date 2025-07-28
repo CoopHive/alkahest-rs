@@ -45,6 +45,8 @@ pub struct AlkahestClient<Extensions: AlkahestExtension = BaseExtensions> {
     pub public_provider: PublicProvider,
     pub address: Address,
     pub extensions: Extensions,
+    private_key: PrivateKeySigner,
+    rpc_url: String,
 }
 
 impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
@@ -57,24 +59,26 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
             utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
         let public_provider = utils::get_public_provider(rpc_url.clone()).await?;
 
-        let extensions = Extensions::init(private_key.clone(), rpc_url, addresses).await?;
+        let extensions = Extensions::init(private_key.clone(), rpc_url.clone(), addresses).await?;
 
         Ok(AlkahestClient {
             wallet_provider,
             public_provider,
             address: private_key.address(),
             extensions,
+            private_key,
+            rpc_url: rpc_url.to_string(),
         })
     }
 
     /// Add an extension using a custom addresses type
     pub async fn with_extension<NewExt: AlkahestExtension, A: Clone + Send + Sync + 'static>(
         self,
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
         addresses: Option<A>,
     ) -> eyre::Result<AlkahestClient<extensions::JoinExtension<Extensions, NewExt>>> {
-        let new_extension = NewExt::init_with_addresses(private_key, rpc_url, addresses).await?;
+        let new_extension =
+            NewExt::init_with_addresses(self.private_key.clone(), self.rpc_url.clone(), addresses)
+                .await?;
 
         let joined_extensions = extensions::JoinExtension {
             left: self.extensions,
@@ -86,6 +90,8 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
             public_provider: self.public_provider,
             address: self.address,
             extensions: joined_extensions,
+            private_key: self.private_key,
+            rpc_url: self.rpc_url,
         })
     }
 
@@ -104,6 +110,8 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
             public_provider: self.public_provider,
             address: self.address,
             extensions: joined_extensions,
+            private_key: self.private_key,
+            rpc_url: self.rpc_url,
         }
     }
 
