@@ -47,6 +47,8 @@ pub struct AlkahestClient<Extensions: AlkahestExtension = BaseExtensions> {
     pub extensions: Extensions,
     private_key: PrivateKeySigner,
     rpc_url: String,
+    extension_configs:
+        std::collections::HashMap<String, std::sync::Arc<dyn std::any::Any + Send + Sync>>,
 }
 
 impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
@@ -68,14 +70,22 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
             extensions,
             private_key,
             rpc_url: rpc_url.to_string(),
+            extension_configs: std::collections::HashMap::new(),
         })
     }
 
     /// Add an extension using a custom config type
     pub async fn with_extension<NewExt: AlkahestExtension, A: Clone + Send + Sync + 'static>(
-        self,
+        mut self,
         config: Option<A>,
     ) -> eyre::Result<AlkahestClient<extensions::JoinExtension<Extensions, NewExt>>> {
+        // Store the config for later use if provided
+        if let Some(ref cfg) = config {
+            let type_name = std::any::type_name::<NewExt>().to_string();
+            self.extension_configs
+                .insert(type_name, std::sync::Arc::new(cfg.clone()));
+        }
+
         let new_extension =
             NewExt::init_with_config(self.private_key.clone(), self.rpc_url.clone(), config)
                 .await?;
@@ -92,6 +102,7 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
             extensions: joined_extensions,
             private_key: self.private_key,
             rpc_url: self.rpc_url,
+            extension_configs: self.extension_configs,
         })
     }
 
@@ -112,7 +123,24 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
             extensions: joined_extensions,
             private_key: self.private_key,
             rpc_url: self.rpc_url,
+            extension_configs: self.extension_configs,
         }
+    }
+
+    /// Get the stored configuration for a specific extension type
+    pub fn get_extension_config<Ext: AlkahestExtension, A: Clone + Send + Sync + 'static>(
+        &self,
+    ) -> Option<&A> {
+        let type_name = std::any::type_name::<Ext>();
+        self.extension_configs
+            .get(type_name)
+            .and_then(|arc| arc.downcast_ref::<A>())
+    }
+
+    /// Check if a configuration exists for a specific extension type
+    pub fn has_extension_config<Ext: AlkahestExtension>(&self) -> bool {
+        let type_name = std::any::type_name::<Ext>();
+        self.extension_configs.contains_key(type_name)
     }
 
     /// Extracts an Attested event from a transaction receipt.

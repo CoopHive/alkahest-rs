@@ -110,6 +110,8 @@ impl AlkahestExtension for CustomTrackerExtension {
 //     }
 // }
 
+// run anvil --host 0.0.0.0 --port 8545 to start a local Ethereum node
+
 /// Test using custom tracker extension with mutating operations
 #[tokio::test]
 #[serial]
@@ -151,6 +153,61 @@ async fn test_custom_tracker_extension() -> Result<()> {
             .get_client::<CustomTrackerClient>()
             .metadata,
         None
+    );
+
+    Ok(())
+}
+
+/// Test retrieving stored extension config
+#[tokio::test]
+#[serial]
+async fn test_get_extension_config() -> Result<()> {
+    let private_key: PrivateKeySigner = env::var("PRIVKEY_ALICE")
+        .unwrap_or_else(|_| {
+            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string()
+        })
+        .parse()?;
+
+    let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "ws://localhost:8545".to_string());
+
+    // Create custom tracker config with initial values
+    let custom_config = CustomTrackerConfig {
+        name: "config_test_tracker".to_string(),
+        initial_counter: 42,
+        metadata: Some("test metadata".to_string()),
+    };
+
+    // Start with a client that has no extensions
+    let client = AlkahestClient::<NoExtension>::new(private_key.clone(), &rpc_url, None).await?;
+
+    // Add custom tracker extension with custom config
+    let client_with_tracker = client
+        .with_extension::<CustomTrackerExtension, CustomTrackerConfig>(Some(custom_config.clone()))
+        .await?;
+
+    // Test retrieving the stored config
+    let retrieved_config =
+        client_with_tracker.get_extension_config::<CustomTrackerExtension, CustomTrackerConfig>();
+
+    assert!(
+        retrieved_config.is_some(),
+        "Config should be stored and retrievable"
+    );
+
+    let config = retrieved_config.unwrap();
+    assert_eq!(config.name, "config_test_tracker");
+    assert_eq!(config.initial_counter, 42);
+    assert_eq!(config.metadata, Some("test metadata".to_string()));
+
+    // Test that has_extension_config works
+    assert!(client_with_tracker.has_extension_config::<CustomTrackerExtension>());
+
+    // Test that wrong type returns None
+    let wrong_config =
+        client_with_tracker.get_extension_config::<CustomTrackerExtension, Erc20Addresses>();
+    assert!(
+        wrong_config.is_none(),
+        "Wrong config type should return None"
     );
 
     Ok(())
@@ -199,6 +256,72 @@ async fn test_client_with_extension() -> Result<()> {
         erc20_client.addresses.barter_utils,
         custom_erc20_addresses.barter_utils
     );
+
+    // Test retrieving the stored ERC20 config
+    let retrieved_config = client_with_erc20.get_extension_config::<Erc20Module, Erc20Addresses>();
+
+    assert!(
+        retrieved_config.is_some(),
+        "ERC20 config should be stored and retrievable"
+    );
+
+    let config = retrieved_config.unwrap();
+    assert_eq!(config.eas, custom_erc20_addresses.eas);
+    assert_eq!(
+        config.payment_obligation,
+        custom_erc20_addresses.payment_obligation
+    );
+    assert_eq!(
+        config.escrow_obligation,
+        custom_erc20_addresses.escrow_obligation
+    );
+    assert_eq!(config.barter_utils, custom_erc20_addresses.barter_utils);
+
+    // Test that has_extension_config works for ERC20
+    assert!(client_with_erc20.has_extension_config::<Erc20Module>());
+
+    Ok(())
+}
+
+/// Test config retrieval when no config is provided
+#[tokio::test]
+#[serial]
+async fn test_no_config_provided() -> Result<()> {
+    let private_key: PrivateKeySigner = env::var("PRIVKEY_ALICE")
+        .unwrap_or_else(|_| {
+            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string()
+        })
+        .parse()?;
+
+    let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "ws://localhost:8545".to_string());
+
+    // Start with a client that has no extensions
+    let client = AlkahestClient::<NoExtension>::new(private_key.clone(), &rpc_url, None).await?;
+
+    // Add custom tracker extension WITHOUT config
+    let client_with_tracker = client
+        .with_extension::<CustomTrackerExtension, CustomTrackerConfig>(None)
+        .await?;
+
+    // Test that no config is stored when None is provided
+    let retrieved_config =
+        client_with_tracker.get_extension_config::<CustomTrackerExtension, CustomTrackerConfig>();
+
+    assert!(
+        retrieved_config.is_none(),
+        "No config should be stored when None is provided"
+    );
+
+    // Test that has_extension_config returns false
+    assert!(!client_with_tracker.has_extension_config::<CustomTrackerExtension>());
+
+    // But the extension should still work with default values
+    let tracker_client = client_with_tracker
+        .extensions
+        .get_client::<CustomTrackerClient>();
+    assert_eq!(tracker_client.name, "default_tracker");
+    assert_eq!(tracker_client.counter, 0);
+    assert_eq!(tracker_client.metadata, None);
 
     Ok(())
 }
