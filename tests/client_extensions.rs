@@ -1,7 +1,7 @@
 use std::env;
 
 use alkahest_rs::{
-    AlkahestClient, DefaultExtensionAddresses,
+    AlkahestClient, DefaultExtensionConfig,
     clients::erc20::{Erc20Addresses, Erc20Client},
     extensions::{AlkahestExtension, Erc20Module, HasErc20, NoExtension},
 };
@@ -63,19 +63,19 @@ impl AlkahestExtension for CustomTrackerExtension {
     async fn init(
         _private_key: PrivateKeySigner,
         _rpc_url: impl ToString + Clone + Send,
-        _addresses: Option<DefaultExtensionAddresses>,
+        _config: Option<DefaultExtensionConfig>,
     ) -> eyre::Result<Self> {
         let client = CustomTrackerClient::new(None);
         Ok(CustomTrackerExtension { client })
     }
 
-    async fn init_with_addresses<A: Clone + Send + Sync + 'static>(
+    async fn init_with_config<A: Clone + Send + Sync + 'static>(
         _private_key: PrivateKeySigner,
         _rpc_url: impl ToString + Clone + Send,
-        addresses: Option<A>,
+        config: Option<A>,
     ) -> eyre::Result<Self> {
         // Try to downcast to CustomTrackerConfig
-        let config = if let Some(addr) = addresses {
+        let config = if let Some(addr) = config {
             let addr_any: &dyn std::any::Any = &addr;
             if let Some(tracker_config) = addr_any.downcast_ref::<CustomTrackerConfig>() {
                 Some(tracker_config.clone())

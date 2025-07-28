@@ -1,7 +1,7 @@
 use alloy::primitives::{Address, address};
 
 use crate::{
-    DefaultExtensionAddresses,
+    DefaultExtensionConfig,
     clients::{
         arbiters::ArbitersAddresses, attestation::AttestationAddresses, erc20::Erc20Addresses,
         erc721::Erc721Addresses, erc1155::Erc1155Addresses,
@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-pub const BASE_SEPOLIA_ADDRESSES: DefaultExtensionAddresses = DefaultExtensionAddresses {
+pub const BASE_SEPOLIA_ADDRESSES: DefaultExtensionConfig = DefaultExtensionConfig {
     arbiters_addresses: Some(ArbitersAddresses {
         eas: address!("0x4200000000000000000000000000000000000021"),
         specific_attestation_arbiter: address!("0xdE5eCFC92E3da87865CD29C196aA5cebFdC4D9C6"),
@@ -97,7 +97,7 @@ pub const BASE_SEPOLIA_ADDRESSES: DefaultExtensionAddresses = DefaultExtensionAd
     }),
 };
 
-pub const FILECOIN_CALIBRATION_ADDRESSES: DefaultExtensionAddresses = DefaultExtensionAddresses {
+pub const FILECOIN_CALIBRATION_ADDRESSES: DefaultExtensionConfig = DefaultExtensionConfig {
     arbiters_addresses: Some(ArbitersAddresses {
         eas: address!("0x3c79a0225380fb6f3cb990ffc4e3d5af4546b524"),
         specific_attestation_arbiter: address!("0x10788ba2c4c65d1e97bc6005436b61c2c2e51572"),

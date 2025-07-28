@@ -29,7 +29,7 @@ pub mod types;
 pub mod utils;
 
 #[derive(Debug, Clone)]
-pub struct DefaultExtensionAddresses {
+pub struct DefaultExtensionConfig {
     pub arbiters_addresses: Option<ArbitersAddresses>,
     pub erc20_addresses: Option<Erc20Addresses>,
     pub erc721_addresses: Option<Erc721Addresses>,
@@ -53,7 +53,7 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
     pub async fn new(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        addresses: Option<DefaultExtensionAddresses>,
+        addresses: Option<DefaultExtensionConfig>,
     ) -> eyre::Result<Self> {
         let wallet_provider =
             utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
@@ -71,13 +71,13 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
         })
     }
 
-    /// Add an extension using a custom addresses type
+    /// Add an extension using a custom config type
     pub async fn with_extension<NewExt: AlkahestExtension, A: Clone + Send + Sync + 'static>(
         self,
-        addresses: Option<A>,
+        config: Option<A>,
     ) -> eyre::Result<AlkahestClient<extensions::JoinExtension<Extensions, NewExt>>> {
         let new_extension =
-            NewExt::init_with_addresses(self.private_key.clone(), self.rpc_url.clone(), addresses)
+            NewExt::init_with_config(self.private_key.clone(), self.rpc_url.clone(), config)
                 .await?;
 
         let joined_extensions = extensions::JoinExtension {
