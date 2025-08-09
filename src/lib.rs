@@ -28,15 +28,61 @@ pub mod sol_types;
 pub mod types;
 pub mod utils;
 
+/// Configuration struct containing all contract addresses for Alkahest protocol extensions.
+///
+/// This struct holds the addresses for all the smart contracts used by different
+/// protocol modules. Each field represents a different module's addresses.
+///
+/// # Default Behavior
+///
+/// When using `Default::default()` or passing `None` to client constructors,
+/// the Base Sepolia network addresses are used by default.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use alkahest_rs::{DefaultExtensionConfig, addresses::BASE_SEPOLIA_ADDRESSES};
+///
+/// // Use default (Base Sepolia) configuration
+/// let default_config = DefaultExtensionConfig::default();
+///
+/// // Use a predefined configuration
+/// let base_config = BASE_SEPOLIA_ADDRESSES;
+///
+/// // Create a custom configuration
+/// let custom_config = DefaultExtensionConfig {
+///     arbiters_addresses: my_custom_arbiters,
+///     erc20_addresses: my_custom_erc20,
+///     // ... other fields
+///     ..BASE_SEPOLIA_ADDRESSES
+/// };
+/// ```
 #[derive(Debug, Clone)]
 pub struct DefaultExtensionConfig {
-    pub arbiters_addresses: Option<ArbitersAddresses>,
-    pub erc20_addresses: Option<Erc20Addresses>,
-    pub erc721_addresses: Option<Erc721Addresses>,
-    pub erc1155_addresses: Option<Erc1155Addresses>,
-    pub token_bundle_addresses: Option<TokenBundleAddresses>,
-    pub attestation_addresses: Option<AttestationAddresses>,
-    pub string_obligation_addresses: Option<StringObligationAddresses>,
+    /// Addresses for arbiter contracts that handle obligation verification
+    pub arbiters_addresses: ArbitersAddresses,
+    /// Addresses for ERC20 token-related contracts
+    pub erc20_addresses: Erc20Addresses,
+    /// Addresses for ERC721 NFT-related contracts
+    pub erc721_addresses: Erc721Addresses,
+    /// Addresses for ERC1155 multi-token contracts
+    pub erc1155_addresses: Erc1155Addresses,
+    /// Addresses for token bundle contracts that handle multiple token types
+    pub token_bundle_addresses: TokenBundleAddresses,
+    /// Addresses for attestation-related contracts
+    pub attestation_addresses: AttestationAddresses,
+    /// Addresses for string obligation contracts
+    pub string_obligation_addresses: StringObligationAddresses,
+}
+
+impl Default for DefaultExtensionConfig {
+    /// Returns the default configuration using Base Sepolia network addresses.
+    ///
+    /// This is equivalent to using `BASE_SEPOLIA_ADDRESSES` directly.
+    fn default() -> Self {
+        // Use Base Sepolia as the default network
+        crate::addresses::BASE_SEPOLIA_ADDRESSES
+    }
 }
 
 #[derive(Clone)]
@@ -211,5 +257,80 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
         }
 
         Err(eyre::eyre!("No EscrowClaimed event found"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::addresses::{BASE_SEPOLIA_ADDRESSES, FILECOIN_CALIBRATION_ADDRESSES};
+
+    #[test]
+    fn test_default_extension_config_uses_base_sepolia() {
+        let default_config = DefaultExtensionConfig::default();
+
+        // Verify that default configuration matches BASE_SEPOLIA_ADDRESSES
+        assert_eq!(
+            default_config.arbiters_addresses.eas,
+            BASE_SEPOLIA_ADDRESSES.arbiters_addresses.eas
+        );
+        assert_eq!(
+            default_config.erc20_addresses.barter_utils,
+            BASE_SEPOLIA_ADDRESSES.erc20_addresses.barter_utils
+        );
+        assert_eq!(
+            default_config.attestation_addresses.eas,
+            BASE_SEPOLIA_ADDRESSES.attestation_addresses.eas
+        );
+    }
+
+    #[test]
+    fn test_config_clone() {
+        let config = DefaultExtensionConfig::default();
+        let cloned = config.clone();
+
+        assert_eq!(config.arbiters_addresses.eas, cloned.arbiters_addresses.eas);
+        assert_eq!(
+            config.erc20_addresses.barter_utils,
+            cloned.erc20_addresses.barter_utils
+        );
+    }
+
+    #[test]
+    fn test_custom_config_with_struct_update_syntax() {
+        let custom_config = DefaultExtensionConfig {
+            arbiters_addresses: FILECOIN_CALIBRATION_ADDRESSES.arbiters_addresses,
+            ..BASE_SEPOLIA_ADDRESSES
+        };
+
+        // Verify arbiter addresses are from Filecoin
+        assert_eq!(
+            custom_config.arbiters_addresses.eas,
+            FILECOIN_CALIBRATION_ADDRESSES.arbiters_addresses.eas
+        );
+
+        // Verify other addresses are still from Base Sepolia
+        assert_eq!(
+            custom_config.erc20_addresses.eas,
+            BASE_SEPOLIA_ADDRESSES.erc20_addresses.eas
+        );
+    }
+
+    #[test]
+    fn test_all_address_fields_populated() {
+        let config = DefaultExtensionConfig::default();
+
+        // Test that no address is zero (all fields should be populated)
+        assert_ne!(config.arbiters_addresses.eas, Address::ZERO);
+        assert_ne!(config.erc20_addresses.eas, Address::ZERO);
+        assert_ne!(config.erc721_addresses.eas, Address::ZERO);
+        assert_ne!(config.erc1155_addresses.eas, Address::ZERO);
+        assert_ne!(config.token_bundle_addresses.eas, Address::ZERO);
+        assert_ne!(config.attestation_addresses.eas, Address::ZERO);
+
+        // Test specific contract addresses
+        assert_ne!(config.erc20_addresses.barter_utils, Address::ZERO);
+        assert_ne!(config.erc20_addresses.escrow_obligation, Address::ZERO);
+        assert_ne!(config.erc20_addresses.payment_obligation, Address::ZERO);
     }
 }

@@ -7,7 +7,7 @@ async fn test_arbiters_deployment() -> Result<()> {
     let test_context = setup_test_environment().await?;
 
     // Verify that arbiters addresses are properly set
-    let arbiters = test_context.addresses.arbiters_addresses.as_ref().unwrap();
+    let arbiters = &test_context.addresses.arbiters_addresses;
 
     // Basic arbiters
     assert_ne!(
@@ -204,7 +204,7 @@ async fn test_arbiters_deployment() -> Result<()> {
 #[tokio::test]
 async fn test_arbiter_basic_functionality() -> Result<()> {
     let test_context = setup_test_environment().await?;
-    let arbiters = test_context.addresses.arbiters_addresses.as_ref().unwrap();
+    let arbiters = &test_context.addresses.arbiters_addresses;
 
     let provider = &test_context.god_provider;
 

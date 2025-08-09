@@ -1,7 +1,4 @@
-use crate::extensions::{
-    HasArbiters, HasAttestation, HasErc20, HasErc721, HasErc1155, HasOracle, HasStringObligation,
-    HasTokenBundle,
-};
+
 
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
@@ -82,7 +79,7 @@ pub struct ArbitersClient {
 
 impl Default for ArbitersAddresses {
     fn default() -> Self {
-        BASE_SEPOLIA_ADDRESSES.arbiters_addresses.unwrap()
+        BASE_SEPOLIA_ADDRESSES.arbiters_addresses
     }
 }
 
@@ -696,10 +693,7 @@ mod tests {
 
         // Check that the arbiter returns true
         let trivial_arbiter = contracts::TrivialArbiter::new(
-            test.addresses
-                .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .trivial_arbiter,
+            test.addresses.arbiters_addresses.trivial_arbiter,
             &test.alice_client.wallet_provider,
         );
 
@@ -750,12 +744,7 @@ mod tests {
 
         // Create demand data with the correct creator
         let demand_data = TrustedPartyArbiter::DemandData {
-            baseArbiter: test
-                .addresses
-                .arbiters_addresses
-                .clone()
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .trivial_arbiter,
+            baseArbiter: test.addresses.arbiters_addresses.clone().trivial_arbiter,
             baseDemand: Bytes::from(vec![]),
             creator: test.alice.address(),
         };
@@ -766,10 +755,7 @@ mod tests {
 
         // Check obligation should revert with NotTrustedParty
         let trusted_party_arbiter = contracts::TrustedPartyArbiter::new(
-            test.addresses
-                .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .trusted_party_arbiter,
+            test.addresses.arbiters_addresses.trusted_party_arbiter,
             &test.bob_client.wallet_provider,
         );
 
@@ -800,12 +786,7 @@ mod tests {
         // Create demand data expecting Alice as recipient
         let alice_address = test.alice.address();
         let demand_data = RecipientArbiterComposing::DemandData {
-            baseArbiter: test
-                .addresses
-                .arbiters_addresses
-                .clone()
-                .unwrap()
-                .trivial_arbiter,
+            baseArbiter: test.addresses.arbiters_addresses.clone().trivial_arbiter,
             baseDemand: Bytes::from(vec![]),
             recipient: alice_address, // Different from attestation.recipient which is Bob
         };
@@ -816,7 +797,7 @@ mod tests {
 
         // Create RecipientArbiter contract instance
         let recipient_arbiter = contracts::RecipientArbiter::new(
-            test.addresses.arbiters_addresses.unwrap().recipient_arbiter,
+            test.addresses.arbiters_addresses.recipient_arbiter,
             &test.alice_client.public_provider,
         );
 
@@ -846,12 +827,7 @@ mod tests {
 
         // Create demand data with the correct recipient and TrivialArbiter as base arbiter
         let demand_data = RecipientArbiterComposing::DemandData {
-            baseArbiter: test
-                .addresses
-                .arbiters_addresses
-                .clone()
-                .unwrap()
-                .trivial_arbiter,
+            baseArbiter: test.addresses.arbiters_addresses.clone().trivial_arbiter,
             baseDemand: Bytes::from(vec![]),
             recipient,
         };
@@ -862,7 +838,7 @@ mod tests {
 
         // Check obligation should return true
         let recipient_arbiter = contracts::RecipientArbiter::new(
-            test.addresses.arbiters_addresses.unwrap().recipient_arbiter,
+            test.addresses.arbiters_addresses.recipient_arbiter,
             &test.alice_client.public_provider,
         );
 
@@ -894,12 +870,7 @@ mod tests {
 
         // Create demand data with the correct creator
         let demand_data = TrustedPartyArbiter::DemandData {
-            baseArbiter: test
-                .addresses
-                .clone()
-                .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .trivial_arbiter,
+            baseArbiter: test.addresses.clone().arbiters_addresses.trivial_arbiter,
             baseDemand: Bytes::default(),
             creator,
         };
@@ -910,10 +881,7 @@ mod tests {
 
         // Check obligation should revert with NotTrustedParty
         let trusted_party_arbiter = contracts::TrustedPartyArbiter::new(
-            test.addresses
-                .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .trusted_party_arbiter,
+            test.addresses.arbiters_addresses.trusted_party_arbiter,
             &test.alice_client.wallet_provider,
         );
 
@@ -950,10 +918,7 @@ mod tests {
 
         // Check obligation - should be false initially since no decision has been made
         let trusted_oracle_arbiter = contracts::TrustedOracleArbiter::new(
-            test.addresses
-                .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .trusted_oracle_arbiter,
+            test.addresses.arbiters_addresses.trusted_oracle_arbiter,
             &test.alice_client.wallet_provider,
         );
 
@@ -993,10 +958,7 @@ mod tests {
 
         // Check contract interface
         let trusted_oracle_arbiter = contracts::TrustedOracleArbiter::new(
-            test.addresses
-                .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .trusted_oracle_arbiter,
+            test.addresses.arbiters_addresses.trusted_oracle_arbiter,
             &test.alice_client.wallet_provider,
         );
 
@@ -1081,10 +1043,7 @@ mod tests {
         // Create the attestation
         let attestation = create_test_attestation(Some(obligation_uid), None);
         let trusted_oracle_arbiter = contracts::TrustedOracleArbiter::new(
-            test.addresses
-                .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .trusted_oracle_arbiter,
+            test.addresses.arbiters_addresses.trusted_oracle_arbiter,
             &test.alice_client.wallet_provider,
         );
 
@@ -1144,10 +1103,7 @@ mod tests {
 
         // Check with the new oracle - should be false (default value)
         let trusted_oracle_arbiter = contracts::TrustedOracleArbiter::new(
-            test.addresses
-                .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .trusted_oracle_arbiter,
+            test.addresses.arbiters_addresses.trusted_oracle_arbiter,
             &test.alice_client.wallet_provider,
         );
 
@@ -1184,7 +1140,6 @@ mod tests {
         let specific_attestation_arbiter = contracts::SpecificAttestationArbiter::new(
             test.addresses
                 .arbiters_addresses
-                .unwrap()
                 .specific_attestation_arbiter,
             &test.alice_client.public_provider,
         );
@@ -1213,12 +1168,7 @@ mod tests {
 
         // Create demand data with non-matching UID
         let different_uid = FixedBytes::<32>::from_slice(&[2u8; 32]);
-        let trivial_arbiter = test
-            .addresses
-            .arbiters_addresses
-            .clone()
-            .unwrap()
-            .trivial_arbiter;
+        let trivial_arbiter = test.addresses.arbiters_addresses.clone().trivial_arbiter;
         let demand_data = UidArbiterComposing::DemandData {
             baseArbiter: trivial_arbiter,
             baseDemand: Bytes::default(),
@@ -1229,12 +1179,7 @@ mod tests {
         let encoded = ArbitersClient::encode_uid_arbiter_composing_demand(&demand_data);
 
         // Check obligation should revert with UidMismatched
-        let uid_arbiter_address = test
-            .addresses
-            .arbiters_addresses
-            .clone()
-            .unwrap()
-            .uid_arbiter;
+        let uid_arbiter_address = test.addresses.arbiters_addresses.clone().uid_arbiter;
         let uid_arbiter = contracts::extended_uid_arbiters::composing::UidArbiterComposing::new(
             uid_arbiter_address,
             &test.alice_client.public_provider,
@@ -1263,12 +1208,7 @@ mod tests {
         let attestation = create_test_attestation(Some(uid), None);
 
         // Create demand data with matching UID and use trivialArbiter as the baseArbiter
-        let trivial_arbiter = test
-            .addresses
-            .arbiters_addresses
-            .clone()
-            .unwrap()
-            .trivial_arbiter;
+        let trivial_arbiter = test.addresses.arbiters_addresses.clone().trivial_arbiter;
         let demand_data = UidArbiterComposing::DemandData {
             baseArbiter: trivial_arbiter,
             baseDemand: Bytes::default(),
@@ -1279,12 +1219,7 @@ mod tests {
         let encoded = ArbitersClient::encode_uid_arbiter_composing_demand(&demand_data);
 
         // Check obligation - should return true
-        let uid_arbiter_address = test
-            .addresses
-            .arbiters_addresses
-            .clone()
-            .unwrap()
-            .uid_arbiter;
+        let uid_arbiter_address = test.addresses.arbiters_addresses.clone().uid_arbiter;
         let uid_arbiter = contracts::extended_uid_arbiters::composing::UidArbiterComposing::new(
             uid_arbiter_address,
             &test.alice_client.public_provider,
@@ -1320,7 +1255,6 @@ mod tests {
         let specific_attestation_arbiter = contracts::SpecificAttestationArbiter::new(
             test.addresses
                 .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
                 .specific_attestation_arbiter,
             &test.alice_client.wallet_provider,
         );
@@ -1343,11 +1277,7 @@ mod tests {
 
         // Create a test demand data
         let creator = Address::from_slice(&[0x01; 20]);
-        let base_arbiter = test
-            .addresses
-            .arbiters_addresses
-            .ok_or(eyre::eyre!("no arbiter addresses"))?
-            .trivial_arbiter;
+        let base_arbiter = test.addresses.arbiters_addresses.trivial_arbiter;
 
         let demand_data = TrustedPartyArbiter::DemandData {
             baseArbiter: base_arbiter,
@@ -1403,12 +1333,7 @@ mod tests {
 
         // Create a test demand data
         let uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
-        let trivial_arbiter = test
-            .addresses
-            .arbiters_addresses
-            .clone()
-            .unwrap()
-            .trivial_arbiter;
+        let trivial_arbiter = test.addresses.arbiters_addresses.clone().trivial_arbiter;
         let demand_data = UidArbiterComposing::DemandData {
             baseArbiter: trivial_arbiter,
             baseDemand: Bytes::default(),
@@ -1433,7 +1358,7 @@ mod tests {
         let test = setup_test_environment().await?;
 
         // Create a test demand data
-        let base_arbiter = test.addresses.arbiters_addresses.unwrap().trivial_arbiter;
+        let base_arbiter = test.addresses.arbiters_addresses.trivial_arbiter;
         let base_demand = Bytes::from(vec![1, 2, 3]);
         let recipient = test.alice.address();
 
@@ -1584,10 +1509,7 @@ mod tests {
 
         // Test with IntrinsicsArbiter
         let intrinsics_arbiter = contracts::IntrinsicsArbiter::new(
-            test.addresses
-                .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .intrinsics_arbiter,
+            test.addresses.arbiters_addresses.intrinsics_arbiter,
             &test.alice_client.wallet_provider,
         );
 
@@ -1668,10 +1590,7 @@ mod tests {
 
         // Test with IntrinsicsArbiter2
         let intrinsics_arbiter2 = contracts::IntrinsicsArbiter2::new(
-            test.addresses
-                .arbiters_addresses
-                .ok_or(eyre::eyre!("no arbiter addresses"))?
-                .intrinsics_arbiter_2,
+            test.addresses.arbiters_addresses.intrinsics_arbiter_2,
             &test.alice_client.wallet_provider,
         );
 
@@ -1723,10 +1642,7 @@ mod tests {
         let test = setup_test_environment().await?;
 
         // Get arbiter addresses
-        let addresses = test
-            .addresses
-            .arbiters_addresses
-            .ok_or(eyre::eyre!("no arbiter addresses"))?;
+        let addresses = test.addresses.arbiters_addresses;
 
         // Create a test attestation
         let uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
@@ -1838,10 +1754,7 @@ mod tests {
         let test = setup_test_environment().await?;
 
         // Get arbiter addresses
-        let addresses = test
-            .addresses
-            .arbiters_addresses
-            .ok_or(eyre::eyre!("no arbiter addresses"))?;
+        let addresses = test.addresses.arbiters_addresses;
 
         // Create a test attestation
         let uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
@@ -1965,10 +1878,7 @@ mod tests {
         let test = setup_test_environment().await?;
 
         // Get arbiter addresses
-        let addresses = test
-            .addresses
-            .arbiters_addresses
-            .ok_or(eyre::eyre!("no arbiter addresses"))?;
+        let addresses = test.addresses.arbiters_addresses;
 
         // Create a test demand data
         let arbiters = vec![

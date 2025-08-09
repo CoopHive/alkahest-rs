@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     marker::PhantomData,
-    option,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -11,8 +10,8 @@ use alloy::{
     eips::BlockNumberOrTag,
     primitives::{Address, FixedBytes},
     providers::Provider,
-    pubsub::{self, SubscriptionStream},
-    rpc::types::{Filter, FilterBlockOption, Log, TransactionReceipt, ValueOrArray, trace::filter},
+    pubsub::SubscriptionStream,
+    rpc::types::{Filter, FilterBlockOption, Log, TransactionReceipt, ValueOrArray},
     signers::local::PrivateKeySigner,
     sol,
     sol_types::SolEvent,
@@ -23,7 +22,7 @@ use futures::{
 };
 use itertools::izip;
 use tokio::{sync::RwLock, time::Duration};
-use tracing::{self, event};
+use tracing;
 
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
@@ -53,10 +52,9 @@ pub struct OracleClient {
 impl Default for OracleAddresses {
     fn default() -> Self {
         OracleAddresses {
-            eas: BASE_SEPOLIA_ADDRESSES.arbiters_addresses.unwrap().eas,
+            eas: BASE_SEPOLIA_ADDRESSES.arbiters_addresses.eas,
             trusted_oracle_arbiter: BASE_SEPOLIA_ADDRESSES
                 .arbiters_addresses
-                .unwrap()
                 .trusted_oracle_arbiter,
         }
     }

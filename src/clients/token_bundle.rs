@@ -420,9 +420,15 @@ mod tests {
     };
 
     use crate::{
-        clients::{erc721::Erc721Client, token_bundle::TokenBundleClient}, contracts::token_bundle::{TokenBundleEscrowObligation, TokenBundlePaymentObligation}, extensions::{HasErc1155, HasErc20, HasErc721, HasTokenBundle}, fixtures::{MockERC1155, MockERC20Permit, MockERC721}, types::{
-            ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData
-        }, utils::setup_test_environment, AlkahestClient, DefaultAlkahestClient
+        DefaultAlkahestClient,
+        clients::token_bundle::TokenBundleClient,
+        contracts::token_bundle::{TokenBundleEscrowObligation, TokenBundlePaymentObligation},
+        extensions::{HasErc20, HasErc721, HasErc1155, HasTokenBundle},
+        fixtures::{MockERC20Permit, MockERC721, MockERC1155},
+        types::{
+            ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
+        },
+        utils::setup_test_environment,
     };
 
     // Helper function to create a token bundle for Alice
@@ -538,7 +544,6 @@ mod tests {
                 test.addresses
                     .clone()
                     .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
                     .escrow_obligation,
             )
             .call()
@@ -551,7 +556,6 @@ mod tests {
                 test.addresses
                     .clone()
                     .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
                     .escrow_obligation,
                 U256::from(1),
             )
@@ -588,7 +592,6 @@ mod tests {
                 test.addresses
                     .clone()
                     .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
                     .escrow_obligation,
             )
             .call()
@@ -601,7 +604,6 @@ mod tests {
                 test.addresses
                     .clone()
                     .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
                     .escrow_obligation,
                 U256::from(1),
             )
@@ -616,11 +618,7 @@ mod tests {
         );
 
         assert_eq!(
-            final_erc721_a_owner,
-            test.addresses
-                .token_bundle_addresses
-                .ok_or(eyre::eyre!("no erc20-related addresses"))?
-                .escrow_obligation,
+            final_erc721_a_owner, test.addresses.token_bundle_addresses.escrow_obligation,
             "ERC721 token should be in escrow"
         );
 
@@ -714,11 +712,7 @@ mod tests {
             .buy_with_bundle(
                 &bob_bundle,
                 &ArbiterData {
-                    arbiter: test
-                        .addresses
-                        .token_bundle_addresses
-                        .ok_or(eyre::eyre!("no erc20-related addresses"))?
-                        .payment_obligation,
+                    arbiter: test.addresses.token_bundle_addresses.payment_obligation,
                     demand: payment_obligation.abi_encode().into(),
                 },
                 expiration,
@@ -896,11 +890,7 @@ mod tests {
 
         // Verify tokens are in escrow
         assert_eq!(
-            escrow_erc721_owner,
-            test.addresses
-                .token_bundle_addresses
-                .ok_or(eyre::eyre!("no erc20-related addresses"))?
-                .escrow_obligation,
+            escrow_erc721_owner, test.addresses.token_bundle_addresses.escrow_obligation,
             "ERC721 token should be in escrow before collection"
         );
 
@@ -951,11 +941,7 @@ mod tests {
         let alice_bundle = create_alice_bundle(&test)?;
 
         // Create sample arbiter data
-        let arbiter = test
-            .addresses
-            .token_bundle_addresses
-            .ok_or(eyre::eyre!("no erc20-related addresses"))?
-            .payment_obligation;
+        let arbiter = test.addresses.token_bundle_addresses.payment_obligation;
         let demand = alloy::primitives::Bytes::from(vec![1, 2, 3, 4]); // Sample demand data
 
         let arbiter_data = ArbiterData {
@@ -1055,7 +1041,6 @@ mod tests {
                 test.addresses
                     .clone()
                     .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
                     .payment_obligation,
             )
             .call()
@@ -1073,7 +1058,6 @@ mod tests {
                 test.addresses
                     .clone()
                     .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
                     .payment_obligation,
             )
             .call()
@@ -1091,7 +1075,6 @@ mod tests {
                 test.addresses
                     .clone()
                     .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
                     .payment_obligation,
             )
             .call()
@@ -1116,7 +1099,6 @@ mod tests {
                 test.addresses
                     .clone()
                     .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
                     .escrow_obligation,
             )
             .call()
@@ -1134,7 +1116,6 @@ mod tests {
                 test.addresses
                     .clone()
                     .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
                     .escrow_obligation,
             )
             .call()
@@ -1149,10 +1130,7 @@ mod tests {
         let erc1155_escrow_approved = mock_erc1155_a
             .isApprovedForAll(
                 test.alice.address(),
-                test.addresses
-                    .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
-                    .escrow_obligation,
+                test.addresses.token_bundle_addresses.escrow_obligation,
             )
             .call()
             .await?;
@@ -1206,7 +1184,6 @@ mod tests {
             .addresses
             .clone()
             .token_bundle_addresses
-            .ok_or(eyre::eyre!("no erc20-related addresses"))?
             .payment_obligation;
         let demand = alloy::primitives::Bytes::from(b"custom demand data");
         let item = ArbiterData { arbiter, demand };
@@ -1233,7 +1210,6 @@ mod tests {
                 test.addresses
                     .clone()
                     .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
                     .escrow_obligation,
             )
             .call()
@@ -1244,7 +1220,6 @@ mod tests {
                 test.addresses
                     .clone()
                     .token_bundle_addresses
-                    .ok_or(eyre::eyre!("no erc20-related addresses"))?
                     .escrow_obligation,
                 U256::from(1),
             )
@@ -1253,11 +1228,7 @@ mod tests {
 
         // Verify tokens are in escrow
         assert_eq!(
-            erc721_owner,
-            test.addresses
-                .token_bundle_addresses
-                .ok_or(eyre::eyre!("no erc20-related addresses"))?
-                .escrow_obligation,
+            erc721_owner, test.addresses.token_bundle_addresses.escrow_obligation,
             "ERC721 token should be owned by escrow contract"
         );
 

@@ -29,7 +29,7 @@ pub struct AttestationClient {
 
 impl Default for AttestationAddresses {
     fn default() -> Self {
-        BASE_SEPOLIA_ADDRESSES.attestation_addresses.unwrap()
+        BASE_SEPOLIA_ADDRESSES.attestation_addresses
     }
 }
 
@@ -349,15 +349,14 @@ mod tests {
     };
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use crate::{DefaultAlkahestClient, contracts::StringObligation};
     use crate::{
-        AlkahestClient,
         clients::attestation::AttestationClient,
         contracts::{self, IEAS},
         extensions::{HasAttestation, HasStringObligation},
         types::ArbiterData,
         utils::{TestContext, setup_test_environment},
     };
-    use crate::{DefaultAlkahestClient, contracts::StringObligation};
 
     // Helper function to register a schema for testing
     async fn register_test_schema(
@@ -368,7 +367,6 @@ mod tests {
             test.addresses
                 .clone()
                 .attestation_addresses
-                .ok_or(eyre::eyre!("no attestation-related addresses"))?
                 .eas_schema_registry,
             test.alice_client.wallet_provider.clone(),
         );
@@ -377,11 +375,7 @@ mod tests {
         let receipt = schema_registry
             .register(
                 schema,
-                test.addresses
-                    .clone()
-                    .attestation_addresses
-                    .ok_or(eyre::eyre!("no attestation-related addresses"))?
-                    .barter_utils,
+                test.addresses.clone().attestation_addresses.barter_utils,
                 true,
             )
             .send()
@@ -426,11 +420,7 @@ mod tests {
 
         // Attest
         let eas_contract = contracts::IEAS::new(
-            test.addresses
-                .clone()
-                .attestation_addresses
-                .ok_or(eyre::eyre!("no attestation-related addresses"))?
-                .eas,
+            test.addresses.clone().attestation_addresses.eas,
             &test.alice_client.wallet_provider,
         );
 
@@ -465,11 +455,7 @@ mod tests {
             },
         };
 
-        let arbiter = test
-            .addresses
-            .attestation_addresses
-            .ok_or(eyre::eyre!("no attestation-related addresses"))?
-            .barter_utils;
+        let arbiter = test.addresses.attestation_addresses.barter_utils;
         let demand = Bytes::from(vec![4, 5, 6]);
 
         let escrow_data = contracts::AttestationEscrowObligation::ObligationData {
@@ -506,11 +492,7 @@ mod tests {
 
         // Create sample obligation data
         let attestation_uid = FixedBytes::<32>::from_slice(&[1u8; 32]);
-        let arbiter = test
-            .addresses
-            .attestation_addresses
-            .ok_or(eyre::eyre!("no attestation-related addresses"))?
-            .barter_utils;
+        let arbiter = test.addresses.attestation_addresses.barter_utils;
         let demand = Bytes::from(vec![4, 5, 6]);
 
         let escrow_data = contracts::AttestationEscrowObligation2::ObligationData {
@@ -596,10 +578,7 @@ mod tests {
             .attestation()
             .register_schema(
                 schema.clone(),
-                test.addresses
-                    .attestation_addresses
-                    .ok_or(eyre::eyre!("no attestation-related addresses"))?
-                    .barter_utils,
+                test.addresses.attestation_addresses.barter_utils,
                 true,
             )
             .await?;
@@ -719,11 +698,7 @@ mod tests {
         };
 
         // Create demand data
-        let arbiter = test
-            .addresses
-            .attestation_addresses
-            .ok_or(eyre::eyre!("no attestation-related addresses"))?
-            .barter_utils;
+        let arbiter = test.addresses.attestation_addresses.barter_utils;
 
         let demand = TestStruct {
             value: "test demand".to_string(),
@@ -805,11 +780,7 @@ mod tests {
         .await?;
 
         // Create demand data
-        let arbiter = test
-            .addresses
-            .arbiters_addresses
-            .ok_or(eyre::eyre!("no attestation-related addresses"))?
-            .trivial_arbiter;
+        let arbiter = test.addresses.arbiters_addresses.trivial_arbiter;
 
         let demand = TestStruct {
             value: "test demand".to_string(),
@@ -848,10 +819,7 @@ mod tests {
 
         // Get the expected schema ID from the contract
         let escrow_contract = contracts::AttestationEscrowObligation2::new(
-            test.addresses
-                .attestation_addresses
-                .ok_or(eyre::eyre!("no attestation-related addresses"))?
-                .escrow_obligation_2,
+            test.addresses.attestation_addresses.escrow_obligation_2,
             &test.god_provider,
         );
 
@@ -914,11 +882,7 @@ mod tests {
         };
 
         // Create demand data with trivial arbiter (which approves all fulfillments)
-        let arbiter = test
-            .addresses
-            .arbiters_addresses
-            .ok_or(eyre::eyre!("no attestation-related addresses"))?
-            .trivial_arbiter;
+        let arbiter = test.addresses.arbiters_addresses.trivial_arbiter;
         let demand = TestStruct {
             value: "test demand".to_string(),
         }
@@ -1019,11 +983,7 @@ mod tests {
         .await?;
 
         // Create demand data
-        let arbiter = test
-            .addresses
-            .arbiters_addresses
-            .ok_or(eyre::eyre!("no attestation-related addresses"))?
-            .trivial_arbiter;
+        let arbiter = test.addresses.arbiters_addresses.trivial_arbiter;
         let demand = TestStruct {
             value: "test demand".to_string(),
         }
@@ -1047,10 +1007,7 @@ mod tests {
 
         // Bob creates a fulfillment using StringObligation
         let string_obligation = StringObligation::new(
-            test.addresses
-                .string_obligation_addresses
-                .ok_or(eyre::eyre!("no string obligation"))?
-                .obligation,
+            test.addresses.string_obligation_addresses.obligation,
             &test.bob_client.wallet_provider,
         );
 
@@ -1096,10 +1053,7 @@ mod tests {
 
         // Get the expected validation schema ID from the contract
         let escrow_contract = contracts::AttestationEscrowObligation2::new(
-            test.addresses
-                .attestation_addresses
-                .ok_or(eyre::eyre!("no attestation-related addresses"))?
-                .escrow_obligation_2,
+            test.addresses.attestation_addresses.escrow_obligation_2,
             &test.god_provider,
         );
 
@@ -1174,11 +1128,7 @@ mod tests {
         };
 
         // Create demand data
-        let arbiter = test
-            .addresses
-            .arbiters_addresses
-            .ok_or(eyre::eyre!("no arbiter addresses"))?
-            .trivial_arbiter;
+        let arbiter = test.addresses.arbiters_addresses.trivial_arbiter;
         let demand = TestStruct {
             value: "test demand".to_string(),
         }

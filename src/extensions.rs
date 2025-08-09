@@ -172,12 +172,8 @@ impl AlkahestExtension for Erc20Module {
         rpc_url: impl ToString + Clone + Send,
         config: Option<DefaultExtensionConfig>,
     ) -> eyre::Result<Self> {
-        let client = Erc20Client::new(
-            private_key,
-            rpc_url,
-            config.and_then(|c| c.erc20_addresses),
-        )
-        .await?;
+        let client =
+            Erc20Client::new(private_key, rpc_url, config.map(|c| c.erc20_addresses)).await?;
         Ok(Erc20Module { client })
     }
 
@@ -222,12 +218,8 @@ impl AlkahestExtension for Erc721Module {
         rpc_url: impl ToString + Clone + Send,
         config: Option<DefaultExtensionConfig>,
     ) -> eyre::Result<Self> {
-        let client = Erc721Client::new(
-            private_key,
-            rpc_url,
-            config.and_then(|c| c.erc721_addresses),
-        )
-        .await?;
+        let client =
+            Erc721Client::new(private_key, rpc_url, config.map(|c| c.erc721_addresses)).await?;
         Ok(Erc721Module { client })
     }
 
@@ -269,12 +261,8 @@ impl AlkahestExtension for Erc1155Module {
         rpc_url: impl ToString + Clone + Send,
         config: Option<DefaultExtensionConfig>,
     ) -> eyre::Result<Self> {
-        let client = Erc1155Client::new(
-            private_key,
-            rpc_url,
-            config.and_then(|c| c.erc1155_addresses),
-        )
-        .await?;
+        let client =
+            Erc1155Client::new(private_key, rpc_url, config.map(|c| c.erc1155_addresses)).await?;
         Ok(Erc1155Module { client })
     }
 
@@ -319,7 +307,7 @@ impl AlkahestExtension for TokenBundleModule {
         let client = TokenBundleClient::new(
             private_key,
             rpc_url,
-            config.and_then(|c| c.token_bundle_addresses),
+            config.map(|c| c.token_bundle_addresses),
         )
         .await?;
         Ok(TokenBundleModule { client })
@@ -366,7 +354,7 @@ impl AlkahestExtension for AttestationModule {
         let client = AttestationClient::new(
             private_key,
             rpc_url,
-            config.and_then(|c| c.attestation_addresses),
+            config.map(|c| c.attestation_addresses),
         )
         .await?;
         Ok(AttestationModule { client })
@@ -413,7 +401,7 @@ impl AlkahestExtension for StringObligationModule {
         let client = StringObligationClient::new(
             private_key,
             rpc_url,
-            config.and_then(|c| c.string_obligation_addresses),
+            config.map(|c| c.string_obligation_addresses),
         )
         .await?;
         Ok(StringObligationModule { client })
@@ -460,12 +448,8 @@ impl AlkahestExtension for ArbitersModule {
         rpc_url: impl ToString + Clone + Send,
         config: Option<DefaultExtensionConfig>,
     ) -> eyre::Result<Self> {
-        let client = ArbitersClient::new(
-            private_key,
-            rpc_url,
-            config.and_then(|c| c.arbiters_addresses),
-        )
-        .await?;
+        let client =
+            ArbitersClient::new(private_key, rpc_url, config.map(|c| c.arbiters_addresses)).await?;
         Ok(ArbitersModule { client })
     }
 
@@ -506,11 +490,10 @@ impl AlkahestExtension for OracleModule {
         rpc_url: impl ToString + Clone + Send,
         config: Option<DefaultExtensionConfig>,
     ) -> eyre::Result<Self> {
-        let oracle_addresses =
-            config.and_then(|c| c.arbiters_addresses).map(|a| OracleAddresses {
-                eas: a.eas,
-                trusted_oracle_arbiter: a.trusted_oracle_arbiter,
-            });
+        let oracle_addresses = config.map(|c| OracleAddresses {
+            eas: c.arbiters_addresses.eas,
+            trusted_oracle_arbiter: c.arbiters_addresses.trusted_oracle_arbiter,
+        });
         let client = OracleClient::new(private_key, rpc_url, oracle_addresses).await?;
         Ok(OracleModule { client })
     }

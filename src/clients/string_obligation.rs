@@ -4,7 +4,7 @@ use crate::{
     types::{DecodedAttestation, WalletProvider},
 };
 use alloy::{
-    primitives::{Address, Bytes, FixedBytes, TxKind},
+    primitives::{Address, Bytes, FixedBytes},
     rpc::types::TransactionReceipt,
     signers::local::PrivateKeySigner,
     sol_types::SolValue as _,
@@ -28,7 +28,7 @@ pub struct StringObligationClient {
 
 impl Default for StringObligationAddresses {
     fn default() -> Self {
-        BASE_SEPOLIA_ADDRESSES.string_obligation_addresses.unwrap()
+        BASE_SEPOLIA_ADDRESSES.string_obligation_addresses
     }
 }
 

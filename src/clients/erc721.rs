@@ -36,7 +36,7 @@ pub struct Erc721Client {
 
 impl Default for Erc721Addresses {
     fn default() -> Self {
-        BASE_SEPOLIA_ADDRESSES.erc721_addresses.unwrap()
+        BASE_SEPOLIA_ADDRESSES.erc721_addresses
     }
 }
 
@@ -595,9 +595,14 @@ mod tests {
     };
 
     use crate::{
-        clients::erc721::Erc721Client, extensions::{HasErc1155, HasErc20, HasErc721, HasTokenBundle}, fixtures::{MockERC1155, MockERC20Permit, MockERC721}, types::{
-            ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData
-        }, utils::setup_test_environment, AlkahestClient, DefaultAlkahestClient
+        DefaultAlkahestClient,
+        clients::erc721::Erc721Client,
+        extensions::{HasErc20, HasErc721, HasErc1155, HasTokenBundle},
+        fixtures::{MockERC20Permit, MockERC721, MockERC1155},
+        types::{
+            ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
+        },
+        utils::setup_test_environment,
     };
 
     #[tokio::test]
@@ -608,11 +613,7 @@ mod tests {
         // Create sample obligation data
         let token_address = test.mock_addresses.erc721_a;
         let id: U256 = 1.try_into()?;
-        let arbiter = test
-            .addresses
-            .erc721_addresses
-            .ok_or(eyre::eyre!("no erc721-related addresses"))?
-            .payment_obligation;
+        let arbiter = test.addresses.erc721_addresses.payment_obligation;
         let demand = Bytes::from(vec![1, 2, 3, 4]); // sample demand data
 
         let escrow_data = crate::contracts::ERC721EscrowObligation::ObligationData {
@@ -698,11 +699,7 @@ mod tests {
 
         assert_eq!(
             payment_approved,
-            test.addresses
-                .erc721_addresses
-                .clone()
-                .ok_or(eyre::eyre!("no erc721-related addresses"))?
-                .payment_obligation,
+            test.addresses.erc721_addresses.clone().payment_obligation,
             "Payment approval should be set correctly"
         );
 
@@ -717,11 +714,7 @@ mod tests {
         let escrow_approved = mock_erc721_a.getApproved(1.try_into()?).call().await?;
 
         assert_eq!(
-            escrow_approved,
-            test.addresses
-                .erc721_addresses
-                .ok_or(eyre::eyre!("no erc721-related addresses"))?
-                .escrow_obligation,
+            escrow_approved, test.addresses.erc721_addresses.escrow_obligation,
             "Escrow approval should be set correctly"
         );
 
@@ -760,11 +753,7 @@ mod tests {
         let payment_approved = mock_erc721_a
             .isApprovedForAll(
                 test.alice.address(),
-                test.addresses
-                    .erc721_addresses
-                    .clone()
-                    .ok_or(eyre::eyre!("no erc721-related addresses"))?
-                    .payment_obligation,
+                test.addresses.erc721_addresses.clone().payment_obligation,
             )
             .call()
             .await?;
@@ -785,10 +774,7 @@ mod tests {
         let escrow_approved = mock_erc721_a
             .isApprovedForAll(
                 test.alice.address(),
-                test.addresses
-                    .erc721_addresses
-                    .ok_or(eyre::eyre!("no erc721-related addresses"))?
-                    .escrow_obligation,
+                test.addresses.erc721_addresses.escrow_obligation,
             )
             .call()
             .await?;
@@ -832,11 +818,7 @@ mod tests {
         let payment_approved = mock_erc721_a
             .isApprovedForAll(
                 test.alice.address(),
-                test.addresses
-                    .erc721_addresses
-                    .clone()
-                    .ok_or(eyre::eyre!("no erc721-related addresses"))?
-                    .payment_obligation,
+                test.addresses.erc721_addresses.clone().payment_obligation,
             )
             .call()
             .await?;
@@ -866,12 +848,7 @@ mod tests {
         };
 
         // Create custom arbiter data
-        let arbiter = test
-            .addresses
-            .erc721_addresses
-            .clone()
-            .ok_or(eyre::eyre!("no erc721-related addresses"))?
-            .payment_obligation;
+        let arbiter = test.addresses.erc721_addresses.clone().payment_obligation;
         let demand = Bytes::from(b"custom demand data");
         let item = ArbiterData { arbiter, demand };
 
@@ -893,11 +870,7 @@ mod tests {
 
         // token in escrow
         assert_eq!(
-            owner,
-            test.addresses
-                .erc721_addresses
-                .ok_or(eyre::eyre!("no erc721-related addresses"))?
-                .escrow_obligation,
+            owner, test.addresses.erc721_addresses.escrow_obligation,
             "Token should be owned by escrow contract"
         );
 
@@ -994,11 +967,7 @@ mod tests {
         let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         assert_eq!(
-            owner,
-            test.addresses
-                .erc721_addresses
-                .ok_or(eyre::eyre!("no erc721-related addresses"))?
-                .escrow_obligation,
+            owner, test.addresses.erc721_addresses.escrow_obligation,
             "Token should be in escrow"
         );
 
@@ -1190,11 +1159,7 @@ mod tests {
         let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         assert_eq!(
-            owner,
-            test.addresses
-                .erc721_addresses
-                .ok_or(eyre::eyre!("no erc721-related addresses"))?
-                .escrow_obligation,
+            owner, test.addresses.erc721_addresses.escrow_obligation,
             "Token should be in escrow"
         );
 
@@ -1247,11 +1212,7 @@ mod tests {
         let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         assert_eq!(
-            owner,
-            test.addresses
-                .erc721_addresses
-                .ok_or(eyre::eyre!("no erc721-related addresses"))?
-                .escrow_obligation,
+            owner, test.addresses.erc721_addresses.escrow_obligation,
             "Token should be in escrow"
         );
 
@@ -1316,11 +1277,7 @@ mod tests {
         let owner = mock_erc721_a.ownerOf(1.try_into()?).call().await?;
 
         assert_eq!(
-            owner,
-            test.addresses
-                .erc721_addresses
-                .ok_or(eyre::eyre!("no erc721-related addresses"))?
-                .escrow_obligation,
+            owner, test.addresses.erc721_addresses.escrow_obligation,
             "Token should be in escrow"
         );
 
@@ -1587,11 +1544,7 @@ mod tests {
             .buy_with_bundle(
                 &bundle,
                 &ArbiterData {
-                    arbiter: test
-                        .addresses
-                        .erc721_addresses
-                        .ok_or(eyre::eyre!("no erc721-related addresses"))?
-                        .payment_obligation,
+                    arbiter: test.addresses.erc721_addresses.payment_obligation,
                     demand: payment_obligation_data.abi_encode().into(),
                 },
                 0,

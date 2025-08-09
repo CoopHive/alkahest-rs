@@ -78,7 +78,6 @@ use crate::{
         },
         token_bundle::{TokenBundleEscrowObligation, TokenBundlePaymentObligation},
     },
-    extensions::BaseExtensions,
     fixtures::{EAS, MockERC20Permit, MockERC721, MockERC1155, SchemaRegistry},
     types::{PublicProvider, WalletProvider},
 };
@@ -281,7 +280,7 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
     let bob: PrivateKeySigner = anvil.keys()[2].clone().into();
 
     let addresses = DefaultExtensionConfig {
-        arbiters_addresses: Some(ArbitersAddresses {
+        arbiters_addresses: ArbitersAddresses {
             eas: eas.address().clone(),
             specific_attestation_arbiter: specific_attestation_arbiter.address().clone(),
             trivial_arbiter: trivial_arbiter.address().clone(),
@@ -353,42 +352,42 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
                 .address()
                 .clone(),
             unrevocable_confirmation_arbiter: unrevocable_confirmation_arbiter.address().clone(),
-        }),
-        string_obligation_addresses: Some(StringObligationAddresses {
+        },
+        string_obligation_addresses: StringObligationAddresses {
             eas: eas.address().clone(),
             obligation: string_obligation.address().clone(),
-        }),
-        erc20_addresses: Some(Erc20Addresses {
+        },
+        erc20_addresses: Erc20Addresses {
             eas: eas.address().clone(),
             barter_utils: erc20_barter_utils.address().clone(),
             escrow_obligation: erc20_escrow_obligation.address().clone(),
             payment_obligation: erc20_payment_obligation.address().clone(),
-        }),
-        erc721_addresses: Some(Erc721Addresses {
+        },
+        erc721_addresses: Erc721Addresses {
             eas: eas.address().clone(),
             barter_utils: erc721_barter_utils.address().clone(),
             escrow_obligation: erc721_escrow_obligation.address().clone(),
             payment_obligation: erc721_payment_obligation.address().clone(),
-        }),
-        erc1155_addresses: Some(Erc1155Addresses {
+        },
+        erc1155_addresses: Erc1155Addresses {
             eas: eas.address().clone(),
             barter_utils: erc1155_barter_utils.address().clone(),
             escrow_obligation: erc1155_escrow_obligation.address().clone(),
             payment_obligation: erc1155_payment_obligation.address().clone(),
-        }),
-        token_bundle_addresses: Some(TokenBundleAddresses {
+        },
+        token_bundle_addresses: TokenBundleAddresses {
             eas: eas.address().clone(),
             barter_utils: bundle_barter_utils.address().clone(),
             escrow_obligation: bundle_escrow_obligation.address().clone(),
             payment_obligation: bundle_payment_obligation.address().clone(),
-        }),
-        attestation_addresses: Some(AttestationAddresses {
+        },
+        attestation_addresses: AttestationAddresses {
             eas: eas.address().clone(),
             eas_schema_registry: schema_registry.address().clone(),
             barter_utils: attestation_barter_utils.address().clone(),
             escrow_obligation: attestation_escrow_obligation.address().clone(),
             escrow_obligation_2: attestation_escrow_obligation_2.address().clone(),
-        }),
+        },
     };
 
     let alice_client = AlkahestClient::new(

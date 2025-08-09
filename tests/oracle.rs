@@ -49,12 +49,7 @@ mod tests {
             value: 100u64.try_into()?,
         };
 
-        let arbiter = test
-            .addresses
-            .arbiters_addresses
-            .as_ref()
-            .ok_or(eyre::eyre!("Missing arbiter addresses"))?
-            .trusted_oracle_arbiter;
+        let arbiter = test.addresses.arbiters_addresses.trusted_oracle_arbiter;
 
         let demand_data = TrustedOracleArbiter::DemandData {
             oracle: test.bob.address(),
@@ -92,11 +87,7 @@ mod tests {
     fn make_filter(test: &TestContext, ref_uid: Option<FixedBytes<32>>) -> AttestationFilter {
         AttestationFilter {
             attester: Some(ValueOrArray::Value(
-                test.addresses
-                    .string_obligation_addresses
-                    .as_ref()
-                    .unwrap()
-                    .obligation,
+                test.addresses.string_obligation_addresses.obligation,
             )),
             recipient: Some(ValueOrArray::Value(test.bob.address())),
             schema_uid: None,
@@ -115,11 +106,7 @@ mod tests {
     ) -> AttestationFilter {
         AttestationFilter {
             attester: Some(ValueOrArray::Value(
-                test.addresses
-                    .erc20_addresses
-                    .as_ref()
-                    .unwrap()
-                    .escrow_obligation,
+                test.addresses.erc20_addresses.escrow_obligation,
             )),
             recipient: None,
             schema_uid: None,

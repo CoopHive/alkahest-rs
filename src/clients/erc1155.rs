@@ -36,7 +36,7 @@ pub struct Erc1155Client {
 
 impl Default for Erc1155Addresses {
     fn default() -> Self {
-        BASE_SEPOLIA_ADDRESSES.erc1155_addresses.unwrap()
+        BASE_SEPOLIA_ADDRESSES.erc1155_addresses
     }
 }
 
@@ -581,9 +581,14 @@ mod tests {
     };
 
     use crate::{
-        clients::{erc1155::Erc1155Client, erc721::Erc721Client}, extensions::{HasErc1155, HasErc20, HasErc721, HasTokenBundle}, fixtures::{MockERC1155, MockERC20Permit, MockERC721}, types::{
-            ApprovalPurpose, ArbiterData, Erc1155Data, Erc20Data, Erc721Data, TokenBundleData
-        }, utils::setup_test_environment, AlkahestClient, DefaultAlkahestClient
+        DefaultAlkahestClient,
+        clients::erc1155::Erc1155Client,
+        extensions::{HasErc20, HasErc721, HasErc1155, HasTokenBundle},
+        fixtures::{MockERC20Permit, MockERC721, MockERC1155},
+        types::{
+            ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,
+        },
+        utils::setup_test_environment,
     };
 
     #[tokio::test]
@@ -595,11 +600,7 @@ mod tests {
         let token_address = test.mock_addresses.erc1155_a;
         let id: U256 = 1.try_into()?;
         let amount: U256 = 10.try_into()?;
-        let arbiter = test
-            .addresses
-            .erc1155_addresses
-            .ok_or(eyre::eyre!("no erc1155-related addresses"))?
-            .payment_obligation;
+        let arbiter = test.addresses.erc1155_addresses.payment_obligation;
         let demand = Bytes::from(vec![1, 2, 3, 4]); // sample demand data
 
         let escrow_data = crate::contracts::ERC1155EscrowObligation::ObligationData {
@@ -684,11 +685,7 @@ mod tests {
         let payment_approved = mock_erc1155_a
             .isApprovedForAll(
                 test.alice.address(),
-                test.addresses
-                    .erc1155_addresses
-                    .clone()
-                    .ok_or(eyre::eyre!("no erc1155-related addresses"))?
-                    .payment_obligation,
+                test.addresses.erc1155_addresses.clone().payment_obligation,
             )
             .call()
             .await?;
@@ -709,10 +706,7 @@ mod tests {
         let escrow_approved = mock_erc1155_a
             .isApprovedForAll(
                 test.alice.address(),
-                test.addresses
-                    .erc1155_addresses
-                    .ok_or(eyre::eyre!("no erc1155-related addresses"))?
-                    .escrow_obligation,
+                test.addresses.erc1155_addresses.escrow_obligation,
             )
             .call()
             .await?;
@@ -756,11 +750,7 @@ mod tests {
         let payment_approved = mock_erc1155_a
             .isApprovedForAll(
                 test.alice.address(),
-                test.addresses
-                    .erc1155_addresses
-                    .clone()
-                    .ok_or(eyre::eyre!("no erc1155-related addresses"))?
-                    .payment_obligation,
+                test.addresses.erc1155_addresses.clone().payment_obligation,
             )
             .call()
             .await?;
@@ -791,12 +781,7 @@ mod tests {
         };
 
         // Create custom arbiter data
-        let arbiter = test
-            .addresses
-            .erc1155_addresses
-            .clone()
-            .ok_or(eyre::eyre!("no erc1155-related addresses"))?
-            .payment_obligation;
+        let arbiter = test.addresses.erc1155_addresses.clone().payment_obligation;
         let demand = Bytes::from(b"custom demand data");
         let item = ArbiterData { arbiter, demand };
 
@@ -822,10 +807,7 @@ mod tests {
         // Check escrow contract's balance increased
         let escrow_balance = mock_erc1155_a
             .balanceOf(
-                test.addresses
-                    .erc1155_addresses
-                    .ok_or(eyre::eyre!("no erc1155-related addresses"))?
-                    .escrow_obligation,
+                test.addresses.erc1155_addresses.escrow_obligation,
                 1.try_into()?,
             )
             .call()
@@ -947,10 +929,7 @@ mod tests {
         // verify escrow
         let escrow_balance = mock_erc1155_a
             .balanceOf(
-                test.addresses
-                    .erc1155_addresses
-                    .ok_or(eyre::eyre!("no erc1155-related addresses"))?
-                    .escrow_obligation,
+                test.addresses.erc1155_addresses.escrow_obligation,
                 1.try_into()?,
             )
             .call()
@@ -1178,10 +1157,7 @@ mod tests {
         // Verify escrow happened
         let escrow_balance = mock_erc1155_a
             .balanceOf(
-                test.addresses
-                    .erc1155_addresses
-                    .ok_or(eyre::eyre!("no erc1155-related addresses"))?
-                    .escrow_obligation,
+                test.addresses.erc1155_addresses.escrow_obligation,
                 1.try_into()?,
             )
             .call()
@@ -1241,10 +1217,7 @@ mod tests {
         // Verify escrow happened
         let escrow_balance = mock_erc1155_a
             .balanceOf(
-                test.addresses
-                    .erc1155_addresses
-                    .ok_or(eyre::eyre!("no erc1155-related addresses"))?
-                    .escrow_obligation,
+                test.addresses.erc1155_addresses.escrow_obligation,
                 1.try_into()?,
             )
             .call()
@@ -1317,10 +1290,7 @@ mod tests {
         // Verify escrow happened
         let escrow_balance = mock_erc1155_a
             .balanceOf(
-                test.addresses
-                    .erc1155_addresses
-                    .ok_or(eyre::eyre!("no erc1155-related addresses"))?
-                    .escrow_obligation,
+                test.addresses.erc1155_addresses.escrow_obligation,
                 1.try_into()?,
             )
             .call()
@@ -1618,11 +1588,7 @@ mod tests {
             .buy_with_bundle(
                 &bundle,
                 &ArbiterData {
-                    arbiter: test
-                        .addresses
-                        .erc1155_addresses
-                        .ok_or(eyre::eyre!("no erc1155-related addresses"))?
-                        .payment_obligation,
+                    arbiter: test.addresses.erc1155_addresses.payment_obligation,
                     demand: payment_obligation_data.abi_encode().into(),
                 },
                 0,
