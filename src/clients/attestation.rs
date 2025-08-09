@@ -3,6 +3,7 @@ use alloy::primitives::{Bytes, FixedBytes};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
+use serde::{Deserialize, Serialize};
 
 use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::IEAS::Attestation;
@@ -10,7 +11,7 @@ use crate::contracts::{self, IEAS};
 use crate::types::{ArbiterData, DecodedAttestation};
 use crate::{types::WalletProvider, utils};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationAddresses {
     pub eas: Address,
     pub eas_schema_registry: Address,

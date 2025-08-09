@@ -7,6 +7,7 @@ use alloy::{
 };
 use extensions::{AlkahestExtension, BaseExtensions};
 use futures_util::StreamExt;
+use serde::{Deserialize, Serialize};
 use sol_types::EscrowClaimed;
 use types::{PublicProvider, WalletProvider};
 
@@ -57,7 +58,7 @@ pub mod utils;
 ///     ..BASE_SEPOLIA_ADDRESSES
 /// };
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefaultExtensionConfig {
     /// Addresses for arbiter contracts that handle obligation verification
     pub arbiters_addresses: ArbitersAddresses,
@@ -332,5 +333,183 @@ mod tests {
         assert_ne!(config.erc20_addresses.barter_utils, Address::ZERO);
         assert_ne!(config.erc20_addresses.escrow_obligation, Address::ZERO);
         assert_ne!(config.erc20_addresses.payment_obligation, Address::ZERO);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_default_extension_config() {
+        let original_config = DefaultExtensionConfig::default();
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&original_config).expect("Failed to serialize");
+
+        // Deserialize from JSON
+        let deserialized_config: DefaultExtensionConfig =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+
+        // Verify all fields match
+        assert_eq!(
+            original_config.arbiters_addresses.eas,
+            deserialized_config.arbiters_addresses.eas
+        );
+        assert_eq!(
+            original_config.arbiters_addresses.trusted_party_arbiter,
+            deserialized_config.arbiters_addresses.trusted_party_arbiter
+        );
+        assert_eq!(
+            original_config.erc20_addresses.eas,
+            deserialized_config.erc20_addresses.eas
+        );
+        assert_eq!(
+            original_config.erc20_addresses.barter_utils,
+            deserialized_config.erc20_addresses.barter_utils
+        );
+        assert_eq!(
+            original_config.erc721_addresses.eas,
+            deserialized_config.erc721_addresses.eas
+        );
+        assert_eq!(
+            original_config.erc1155_addresses.eas,
+            deserialized_config.erc1155_addresses.eas
+        );
+        assert_eq!(
+            original_config.token_bundle_addresses.eas,
+            deserialized_config.token_bundle_addresses.eas
+        );
+        assert_eq!(
+            original_config.attestation_addresses.eas,
+            deserialized_config.attestation_addresses.eas
+        );
+        assert_eq!(
+            original_config.string_obligation_addresses.eas,
+            deserialized_config.string_obligation_addresses.eas
+        );
+    }
+
+    #[test]
+    fn test_serialize_custom_config() {
+        // Create a custom config mixing addresses from different networks
+        let custom_config = DefaultExtensionConfig {
+            arbiters_addresses: FILECOIN_CALIBRATION_ADDRESSES.arbiters_addresses,
+            erc20_addresses: BASE_SEPOLIA_ADDRESSES.erc20_addresses,
+            ..FILECOIN_CALIBRATION_ADDRESSES
+        };
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&custom_config).expect("Failed to serialize");
+
+        // Deserialize from JSON
+        let deserialized_config: DefaultExtensionConfig =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+
+        // Verify mixed addresses are preserved
+        assert_eq!(
+            custom_config.arbiters_addresses.eas,
+            deserialized_config.arbiters_addresses.eas
+        );
+        assert_eq!(
+            FILECOIN_CALIBRATION_ADDRESSES.arbiters_addresses.eas,
+            deserialized_config.arbiters_addresses.eas
+        );
+        assert_eq!(
+            custom_config.erc20_addresses.eas,
+            deserialized_config.erc20_addresses.eas
+        );
+        assert_eq!(
+            BASE_SEPOLIA_ADDRESSES.erc20_addresses.eas,
+            deserialized_config.erc20_addresses.eas
+        );
+    }
+
+    #[test]
+    fn test_json_roundtrip_preserves_all_fields() {
+        let config = BASE_SEPOLIA_ADDRESSES;
+
+        // Convert to JSON and back
+        let json = serde_json::to_value(&config).expect("Failed to serialize to value");
+        let roundtrip_config: DefaultExtensionConfig =
+            serde_json::from_value(json).expect("Failed to deserialize from value");
+
+        // Comprehensive field checks
+        // Arbiters addresses
+        assert_eq!(
+            config.arbiters_addresses.eas,
+            roundtrip_config.arbiters_addresses.eas
+        );
+        assert_eq!(
+            config.arbiters_addresses.trusted_party_arbiter,
+            roundtrip_config.arbiters_addresses.trusted_party_arbiter
+        );
+        assert_eq!(
+            config.arbiters_addresses.trivial_arbiter,
+            roundtrip_config.arbiters_addresses.trivial_arbiter
+        );
+
+        // ERC20 addresses
+        assert_eq!(
+            config.erc20_addresses.eas,
+            roundtrip_config.erc20_addresses.eas
+        );
+        assert_eq!(
+            config.erc20_addresses.barter_utils,
+            roundtrip_config.erc20_addresses.barter_utils
+        );
+        assert_eq!(
+            config.erc20_addresses.escrow_obligation,
+            roundtrip_config.erc20_addresses.escrow_obligation
+        );
+        assert_eq!(
+            config.erc20_addresses.payment_obligation,
+            roundtrip_config.erc20_addresses.payment_obligation
+        );
+
+        // ERC721 addresses
+        assert_eq!(
+            config.erc721_addresses.eas,
+            roundtrip_config.erc721_addresses.eas
+        );
+        assert_eq!(
+            config.erc721_addresses.barter_utils,
+            roundtrip_config.erc721_addresses.barter_utils
+        );
+
+        // ERC1155 addresses
+        assert_eq!(
+            config.erc1155_addresses.eas,
+            roundtrip_config.erc1155_addresses.eas
+        );
+        assert_eq!(
+            config.erc1155_addresses.barter_utils,
+            roundtrip_config.erc1155_addresses.barter_utils
+        );
+
+        // Token bundle addresses
+        assert_eq!(
+            config.token_bundle_addresses.eas,
+            roundtrip_config.token_bundle_addresses.eas
+        );
+        assert_eq!(
+            config.token_bundle_addresses.barter_utils,
+            roundtrip_config.token_bundle_addresses.barter_utils
+        );
+
+        // Attestation addresses
+        assert_eq!(
+            config.attestation_addresses.eas,
+            roundtrip_config.attestation_addresses.eas
+        );
+        assert_eq!(
+            config.attestation_addresses.eas_schema_registry,
+            roundtrip_config.attestation_addresses.eas_schema_registry
+        );
+
+        // String obligation addresses
+        assert_eq!(
+            config.string_obligation_addresses.eas,
+            roundtrip_config.string_obligation_addresses.eas
+        );
+        assert_eq!(
+            config.string_obligation_addresses.obligation,
+            roundtrip_config.string_obligation_addresses.obligation
+        );
     }
 }

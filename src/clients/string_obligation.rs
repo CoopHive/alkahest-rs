@@ -10,9 +10,9 @@ use alloy::{
     sol_types::SolValue as _,
 };
 use alloy::{providers::Provider, rpc::types::TransactionRequest};
-use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StringObligationAddresses {
     pub eas: Address,
     pub obligation: Address,

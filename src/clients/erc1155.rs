@@ -10,8 +10,9 @@ use crate::types::{
     TokenBundleData,
 };
 use crate::{types::WalletProvider, utils};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Erc1155Addresses {
     pub eas: Address,
     pub barter_utils: Address,

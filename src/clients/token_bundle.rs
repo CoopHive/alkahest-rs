@@ -11,8 +11,9 @@ use crate::{
     types::{ApprovalPurpose, WalletProvider},
     utils,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenBundleAddresses {
     pub eas: Address,
     pub barter_utils: Address,

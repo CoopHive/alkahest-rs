@@ -1,5 +1,3 @@
-
-
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
     contracts,
@@ -15,8 +13,9 @@ use alloy::{
     sol_types::{SolEvent as _, SolValue as _},
 };
 use futures_util::StreamExt as _;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArbitersAddresses {
     pub eas: Address,
     pub trusted_party_arbiter: Address,
