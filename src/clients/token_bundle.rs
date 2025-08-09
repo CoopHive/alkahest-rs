@@ -4,6 +4,7 @@ use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
 use std::collections::HashSet;
 
+use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::{self, IERC20, IERC721, IERC1155};
 use crate::types::{ArbiterData, DecodedAttestation, TokenBundleData};
 use crate::{
@@ -36,12 +37,7 @@ pub struct TokenBundleClient {
 
 impl Default for TokenBundleAddresses {
     fn default() -> Self {
-        Self {
-            eas: address!("0x4200000000000000000000000000000000000021"),
-            barter_utils: address!("0x013C2c98Be06b48f271BdF0469eFa6e89d37BA7A"),
-            escrow_obligation: address!("0xc282ec5E2585dc1696471adf4A9f5b3a151359c9"),
-            payment_obligation: address!("0x797C365B6A1300c13001a6D0FDF2ea0684b5BCcD"),
-        }
+        BASE_SEPOLIA_ADDRESSES.token_bundle_addresses
     }
 }
 
