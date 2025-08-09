@@ -61,11 +61,11 @@ pub mod utils;
 pub struct DefaultExtensionConfig {
     /// Addresses for arbiter contracts that handle obligation verification
     pub arbiters_addresses: ArbitersAddresses,
-    /// Addresses for ERC20 token-related contracts
+    /// Addresses for ERC20-related contracts
     pub erc20_addresses: Erc20Addresses,
-    /// Addresses for ERC721 NFT-related contracts
+    /// Addresses for ERC721-related contracts
     pub erc721_addresses: Erc721Addresses,
-    /// Addresses for ERC1155 multi-token contracts
+    /// Addresses for ERC1155-related contracts
     pub erc1155_addresses: Erc1155Addresses,
     /// Addresses for token bundle contracts that handle multiple token types
     pub token_bundle_addresses: TokenBundleAddresses,
