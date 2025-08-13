@@ -1,9 +1,8 @@
-use std::env;
-
 use alkahest_rs::{
     AlkahestClient, DefaultExtensionConfig,
     clients::erc20::{Erc20Addresses, Erc20Client},
     extensions::{AlkahestExtension, Erc20Module, HasErc20, NoExtension},
+    utils::setup_test_environment,
 };
 use alloy::{primitives::address, signers::local::PrivateKeySigner};
 use eyre::Result;
@@ -95,34 +94,14 @@ impl AlkahestExtension for CustomTrackerExtension {
     }
 }
 
-// // Trait for accessing the custom tracker
-// pub trait HasCustomTracker {
-//     fn custom_tracker(&self) -> &CustomTrackerClient;
-// }
-
-// impl<T: AlkahestExtension> HasCustomTracker for AlkahestClient<T>
-// where
-//     T: AlkahestExtension,
-//     T::Client: Clone + Send + Sync + 'static,
-// {
-//     fn custom_tracker(&self) -> &CustomTrackerClient {
-//         self.extensions.get_client::<CustomTrackerClient>()
-//     }
-// }
-
-// run anvil --host 0.0.0.0 --port 8545 to start a local Ethereum node
-
 /// Test using custom tracker extension with mutating operations
 #[tokio::test]
 #[serial]
 async fn test_custom_tracker_extension() -> Result<()> {
-    let private_key: PrivateKeySigner = env::var("PRIVKEY_ALICE")
-        .unwrap_or_else(|_| {
-            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string()
-        })
-        .parse()?;
+    let test_context = setup_test_environment().await?;
 
-    let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "ws://localhost:8545".to_string());
+    // Get the RPC URL from the anvil instance
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     // Create custom tracker config with initial values
     let custom_config = CustomTrackerConfig {
@@ -132,7 +111,8 @@ async fn test_custom_tracker_extension() -> Result<()> {
     };
 
     // Start with a client that has no extensions
-    let client = AlkahestClient::<NoExtension>::new(private_key.clone(), &rpc_url, None).await?;
+    let client =
+        AlkahestClient::<NoExtension>::new(test_context.alice.clone(), &rpc_url, None).await?;
 
     // Add custom tracker extension with custom config
     let client_with_tracker = client
@@ -162,13 +142,10 @@ async fn test_custom_tracker_extension() -> Result<()> {
 #[tokio::test]
 #[serial]
 async fn test_get_extension_config() -> Result<()> {
-    let private_key: PrivateKeySigner = env::var("PRIVKEY_ALICE")
-        .unwrap_or_else(|_| {
-            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string()
-        })
-        .parse()?;
+    let test_context = setup_test_environment().await?;
 
-    let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "ws://localhost:8545".to_string());
+    // Get the RPC URL from the anvil instance
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     // Create custom tracker config with initial values
     let custom_config = CustomTrackerConfig {
@@ -178,7 +155,8 @@ async fn test_get_extension_config() -> Result<()> {
     };
 
     // Start with a client that has no extensions
-    let client = AlkahestClient::<NoExtension>::new(private_key.clone(), &rpc_url, None).await?;
+    let client =
+        AlkahestClient::<NoExtension>::new(test_context.alice.clone(), &rpc_url, None).await?;
 
     // Add custom tracker extension with custom config
     let client_with_tracker = client
@@ -217,13 +195,10 @@ async fn test_get_extension_config() -> Result<()> {
 #[tokio::test]
 #[serial]
 async fn test_client_with_extension() -> Result<()> {
-    let private_key: PrivateKeySigner = env::var("PRIVKEY_ALICE")
-        .unwrap_or_else(|_| {
-            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string()
-        })
-        .parse()?;
+    let test_context = setup_test_environment().await?;
 
-    let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "ws://localhost:8545".to_string());
+    // Get the RPC URL from the anvil instance
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     // Create custom ERC20 addresses
     let custom_erc20_addresses = Erc20Addresses {
@@ -234,7 +209,8 @@ async fn test_client_with_extension() -> Result<()> {
     };
 
     // Start with a client that has no extensions
-    let client = AlkahestClient::<NoExtension>::new(private_key.clone(), &rpc_url, None).await?;
+    let client =
+        AlkahestClient::<NoExtension>::new(test_context.alice.clone(), &rpc_url, None).await?;
 
     // Add ERC20 extension with custom addresses
     let client_with_erc20 = client
@@ -287,16 +263,14 @@ async fn test_client_with_extension() -> Result<()> {
 #[tokio::test]
 #[serial]
 async fn test_no_config_provided() -> Result<()> {
-    let private_key: PrivateKeySigner = env::var("PRIVKEY_ALICE")
-        .unwrap_or_else(|_| {
-            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string()
-        })
-        .parse()?;
+    let test_context = setup_test_environment().await?;
 
-    let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "ws://localhost:8545".to_string());
+    // Get the RPC URL from the anvil instance
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     // Start with a client that has no extensions
-    let client = AlkahestClient::<NoExtension>::new(private_key.clone(), &rpc_url, None).await?;
+    let client =
+        AlkahestClient::<NoExtension>::new(test_context.alice.clone(), &rpc_url, None).await?;
 
     // Add custom tracker extension WITHOUT config
     let client_with_tracker = client
@@ -330,19 +304,17 @@ async fn test_no_config_provided() -> Result<()> {
 #[tokio::test]
 #[serial]
 async fn test_client_with_initialized_extension() -> Result<()> {
-    let private_key: PrivateKeySigner = env::var("PRIVKEY_ALICE")
-        .unwrap_or_else(|_| {
-            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d".to_string()
-        })
-        .parse()?;
+    let test_context = setup_test_environment().await?;
 
-    let rpc_url = env::var("RPC_URL").unwrap_or_else(|_| "ws://localhost:8545".to_string());
+    // Get the RPC URL from the anvil instance
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     // Create client with no extensions
-    let client = AlkahestClient::<NoExtension>::new(private_key.clone(), &rpc_url, None).await?;
+    let client =
+        AlkahestClient::<NoExtension>::new(test_context.alice.clone(), &rpc_url, None).await?;
 
     // Initialize an extension separately
-    let erc20_extension = Erc20Module::init(private_key.clone(), &rpc_url, None).await?;
+    let erc20_extension = Erc20Module::init(test_context.alice.clone(), &rpc_url, None).await?;
 
     // Add the pre-initialized extension
     let client_with_erc20 = client.with_initialized_extension(erc20_extension);
