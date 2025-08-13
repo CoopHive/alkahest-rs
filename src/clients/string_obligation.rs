@@ -9,7 +9,7 @@ use alloy::{
     signers::local::PrivateKeySigner,
     sol_types::SolValue as _,
 };
-use alloy::{providers::Provider, rpc::types::TransactionRequest};
+use alloy::providers::Provider;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
