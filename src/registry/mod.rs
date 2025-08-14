@@ -1,6 +1,7 @@
-use crate::extensions::{
-    ArbitersModule, AttestationModule, Erc20Module, Erc721Module, Erc1155Module,
-    StringObligationModule, TokenBundleModule,
+use crate::clients::{
+    arbiters::ArbitersModule, attestation::AttestationModule, erc20::Erc20Module,
+    erc721::Erc721Module, erc1155::Erc1155Module, string_obligation::StringObligationModule,
+    token_bundle::TokenBundleModule,
 };
 use alloy::primitives::Address;
 
@@ -31,10 +32,10 @@ impl ContractModule for Erc20Module {
 
     fn address(&self, contract: Self::Contract) -> Address {
         match contract {
-            Erc20Contract::Eas => self.client.addresses.eas,
-            Erc20Contract::BarterUtils => self.client.addresses.barter_utils,
-            Erc20Contract::EscrowObligation => self.client.addresses.escrow_obligation,
-            Erc20Contract::PaymentObligation => self.client.addresses.payment_obligation,
+            Erc20Contract::Eas => self.addresses.eas,
+            Erc20Contract::BarterUtils => self.addresses.barter_utils,
+            Erc20Contract::EscrowObligation => self.addresses.escrow_obligation,
+            Erc20Contract::PaymentObligation => self.addresses.payment_obligation,
         }
     }
 }
@@ -57,10 +58,10 @@ impl ContractModule for Erc721Module {
 
     fn address(&self, contract: Self::Contract) -> Address {
         match contract {
-            Erc721Contract::Eas => self.client.addresses.eas,
-            Erc721Contract::BarterUtils => self.client.addresses.barter_utils,
-            Erc721Contract::EscrowObligation => self.client.addresses.escrow_obligation,
-            Erc721Contract::PaymentObligation => self.client.addresses.payment_obligation,
+            Erc721Contract::Eas => self.addresses.eas,
+            Erc721Contract::BarterUtils => self.addresses.barter_utils,
+            Erc721Contract::EscrowObligation => self.addresses.escrow_obligation,
+            Erc721Contract::PaymentObligation => self.addresses.payment_obligation,
         }
     }
 }
@@ -83,10 +84,10 @@ impl ContractModule for Erc1155Module {
 
     fn address(&self, contract: Self::Contract) -> Address {
         match contract {
-            Erc1155Contract::Eas => self.client.addresses.eas,
-            Erc1155Contract::BarterUtils => self.client.addresses.barter_utils,
-            Erc1155Contract::EscrowObligation => self.client.addresses.escrow_obligation,
-            Erc1155Contract::PaymentObligation => self.client.addresses.payment_obligation,
+            Erc1155Contract::Eas => self.addresses.eas,
+            Erc1155Contract::BarterUtils => self.addresses.barter_utils,
+            Erc1155Contract::EscrowObligation => self.addresses.escrow_obligation,
+            Erc1155Contract::PaymentObligation => self.addresses.payment_obligation,
         }
     }
 }
@@ -109,10 +110,10 @@ impl ContractModule for TokenBundleModule {
 
     fn address(&self, contract: Self::Contract) -> Address {
         match contract {
-            TokenBundleContract::Eas => self.client.addresses.eas,
-            TokenBundleContract::BarterUtils => self.client.addresses.barter_utils,
-            TokenBundleContract::EscrowObligation => self.client.addresses.escrow_obligation,
-            TokenBundleContract::PaymentObligation => self.client.addresses.payment_obligation,
+            TokenBundleContract::Eas => self.addresses.eas,
+            TokenBundleContract::BarterUtils => self.addresses.barter_utils,
+            TokenBundleContract::EscrowObligation => self.addresses.escrow_obligation,
+            TokenBundleContract::PaymentObligation => self.addresses.payment_obligation,
         }
     }
 }
@@ -137,11 +138,11 @@ impl ContractModule for AttestationModule {
 
     fn address(&self, contract: Self::Contract) -> Address {
         match contract {
-            AttestationContract::Eas => self.client.addresses.eas,
-            AttestationContract::EasSchemaRegistry => self.client.addresses.eas_schema_registry,
-            AttestationContract::BarterUtils => self.client.addresses.barter_utils,
-            AttestationContract::EscrowObligation => self.client.addresses.escrow_obligation,
-            AttestationContract::EscrowObligation2 => self.client.addresses.escrow_obligation_2,
+            AttestationContract::Eas => self.addresses.eas,
+            AttestationContract::EasSchemaRegistry => self.addresses.eas_schema_registry,
+            AttestationContract::BarterUtils => self.addresses.barter_utils,
+            AttestationContract::EscrowObligation => self.addresses.escrow_obligation,
+            AttestationContract::EscrowObligation2 => self.addresses.escrow_obligation_2,
         }
     }
 }
@@ -160,8 +161,8 @@ impl ContractModule for StringObligationModule {
 
     fn address(&self, contract: Self::Contract) -> Address {
         match contract {
-            StringObligationContract::Eas => self.client.addresses.eas,
-            StringObligationContract::Obligation => self.client.addresses.obligation,
+            StringObligationContract::Eas => self.addresses.eas,
+            StringObligationContract::Obligation => self.addresses.obligation,
         }
     }
 }
@@ -187,13 +188,13 @@ impl ContractModule for ArbitersModule {
 
     fn address(&self, contract: Self::Contract) -> Address {
         match contract {
-            ArbitersContract::Eas => self.client.addresses.eas,
+            ArbitersContract::Eas => self.addresses.eas,
             ArbitersContract::SpecificAttestationArbiter => {
-                self.client.addresses.specific_attestation_arbiter
+                self.addresses.specific_attestation_arbiter
             }
-            ArbitersContract::TrustedPartyArbiter => self.client.addresses.trusted_party_arbiter,
-            ArbitersContract::TrivialArbiter => self.client.addresses.trivial_arbiter,
-            ArbitersContract::TrustedOracleArbiter => self.client.addresses.trusted_oracle_arbiter,
+            ArbitersContract::TrustedPartyArbiter => self.addresses.trusted_party_arbiter,
+            ArbitersContract::TrivialArbiter => self.addresses.trivial_arbiter,
+            ArbitersContract::TrustedOracleArbiter => self.addresses.trusted_oracle_arbiter,
         }
     }
 }

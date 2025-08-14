@@ -1,18 +1,21 @@
-use crate::{
-    AlkahestClient, DefaultExtensionConfig,
-    clients::{
-        arbiters::{ArbitersAddresses, ArbitersClient},
-        attestation::{AttestationAddresses, AttestationClient},
-        erc20::{Erc20Addresses, Erc20Client},
-        erc721::{Erc721Addresses, Erc721Client},
-        erc1155::{Erc1155Addresses, Erc1155Client},
-        oracle::{OracleAddresses, OracleClient},
-        string_obligation::{StringObligationAddresses, StringObligationClient},
-        token_bundle::{TokenBundleAddresses, TokenBundleClient},
-    },
-};
 use alloy::signers::local::PrivateKeySigner;
 use std::any::Any;
+
+// Re-export modules from clients
+pub use crate::clients::{
+    arbiters::ArbitersModule, attestation::AttestationModule, erc20::Erc20Module,
+    erc721::Erc721Module, erc1155::Erc1155Module, oracle::OracleModule,
+    string_obligation::StringObligationModule, token_bundle::TokenBundleModule,
+};
+
+// Re-export address types for convenience
+pub use crate::clients::{
+    arbiters::ArbitersAddresses, attestation::AttestationAddresses, erc20::Erc20Addresses,
+    erc721::Erc721Addresses, erc1155::Erc1155Addresses, oracle::OracleAddresses,
+    string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses,
+};
+
+use crate::{AlkahestClient, DefaultExtensionConfig};
 
 pub trait AlkahestExtension: Clone + Send + Sync {
     /// Associated type for the client - can be () for extensions without a single client
@@ -26,9 +29,9 @@ pub trait AlkahestExtension: Clone + Send + Sync {
 
     /// Generic initialization method that can accept any config type
     fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
+        _private_key: PrivateKeySigner,
+        _rpc_url: impl ToString + Clone + Send,
+        _config: Option<A>,
     ) -> impl std::future::Future<Output = eyre::Result<Self>> + Send {
         // Default implementation that throws an error - must be implemented by each module
         async move {
@@ -101,7 +104,6 @@ pub struct JoinExtension<A: AlkahestExtension, B: AlkahestExtension> {
 }
 
 impl<A: AlkahestExtension, B: AlkahestExtension> AlkahestExtension for JoinExtension<A, B> {
-    // JoinExtension doesn't have a single client, so we use the default unit type
     type Client = ();
 
     async fn init(
@@ -111,503 +113,246 @@ impl<A: AlkahestExtension, B: AlkahestExtension> AlkahestExtension for JoinExten
     ) -> eyre::Result<Self> {
         let left = A::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
         let right = B::init(private_key, rpc_url, config).await?;
-
         Ok(JoinExtension { left, right })
     }
 
-    async fn init_with_config<Addr: Clone + Send + Sync + 'static>(
+    async fn init_with_config<C: Clone + Send + Sync + 'static>(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        config: Option<Addr>,
+        config: Option<C>,
     ) -> eyre::Result<Self> {
         let left =
             A::init_with_config(private_key.clone(), rpc_url.clone(), config.clone()).await?;
         let right = B::init_with_config(private_key, rpc_url, config).await?;
-
         Ok(JoinExtension { left, right })
     }
 
-    // JoinExtension doesn't have a single client, so return None
-    fn client(&self) -> Option<&Self::Client> {
-        None
-    }
-
-    /// Recursive search through both sides
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
-        // First try left recursively
+        // First try to find in left
         if let Some(client) = self.left.find_client::<T>() {
             return Some(client);
         }
-        // Then try right recursively
-        if let Some(client) = self.right.find_client::<T>() {
+        // Then try to find in right
+        self.right.find_client::<T>()
+    }
+}
+
+/// Base configuration combining all default module configurations
+#[derive(Clone)]
+pub struct BaseExtensions {
+    pub erc20: Erc20Module,
+    pub erc721: Erc721Module,
+    pub erc1155: Erc1155Module,
+    pub token_bundle: TokenBundleModule,
+    pub attestation: AttestationModule,
+    pub string_obligation: StringObligationModule,
+    pub arbiters: ArbitersModule,
+    pub oracle: OracleModule,
+}
+
+impl AlkahestExtension for BaseExtensions {
+    type Client = ();
+
+    async fn init(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<DefaultExtensionConfig>,
+    ) -> eyre::Result<Self> {
+        let erc20 = Erc20Module::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
+        let erc721 =
+            Erc721Module::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
+        let erc1155 =
+            Erc1155Module::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
+        let token_bundle =
+            TokenBundleModule::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
+        let attestation =
+            AttestationModule::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
+        let string_obligation =
+            StringObligationModule::init(private_key.clone(), rpc_url.clone(), config.clone())
+                .await?;
+        let arbiters =
+            ArbitersModule::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
+        let oracle = OracleModule::init(private_key.clone(), rpc_url.clone(), config).await?;
+
+        Ok(BaseExtensions {
+            erc20,
+            erc721,
+            erc1155,
+            token_bundle,
+            attestation,
+            string_obligation,
+            arbiters,
+            oracle,
+        })
+    }
+
+    fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
+        // Try each module in turn
+        if let Some(client) = self.erc20.find_client::<T>() {
             return Some(client);
         }
-        None
+        if let Some(client) = self.erc721.find_client::<T>() {
+            return Some(client);
+        }
+        if let Some(client) = self.erc1155.find_client::<T>() {
+            return Some(client);
+        }
+        if let Some(client) = self.token_bundle.find_client::<T>() {
+            return Some(client);
+        }
+        if let Some(client) = self.attestation.find_client::<T>() {
+            return Some(client);
+        }
+        if let Some(client) = self.string_obligation.find_client::<T>() {
+            return Some(client);
+        }
+        if let Some(client) = self.arbiters.find_client::<T>() {
+            return Some(client);
+        }
+        self.oracle.find_client::<T>()
     }
 }
 
-/// Base extension that includes all default modules using JoinExtension
-pub type BaseExtensions = JoinExtension<
-    JoinExtension<
-        JoinExtension<Erc20Module, Erc721Module>,
-        JoinExtension<Erc1155Module, TokenBundleModule>,
-    >,
-    JoinExtension<
-        JoinExtension<AttestationModule, StringObligationModule>,
-        JoinExtension<ArbitersModule, OracleModule>,
-    >,
->;
+// Has* traits for accessing specific modules
 
-/// === Modules ===
-
-#[derive(Clone)]
-pub struct Erc20Module {
-    pub client: Erc20Client,
-}
-impl AlkahestExtension for Erc20Module {
-    type Client = Erc20Client;
-
-    async fn init(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
-    ) -> eyre::Result<Self> {
-        let client =
-            Erc20Client::new(private_key, rpc_url, config.map(|c| c.erc20_addresses)).await?;
-        Ok(Erc20Module { client })
-    }
-
-    /// Custom implementation that can handle Erc20Addresses directly
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to Erc20Addresses first
-        let erc20_addresses = if let Some(addr) = config {
-            // Use Any trait to attempt downcast
-            let addr_any: &dyn Any = &addr;
-            if let Some(erc20_addr) = addr_any.downcast_ref::<Erc20Addresses>() {
-                Some(erc20_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        println!("Using RPC URL: {}", rpc_url.to_string());
-        println!("init_with_addresses Using addresses: {:?}", erc20_addresses);
-        let client = Erc20Client::new(private_key, rpc_url, erc20_addresses).await?;
-        Ok(Erc20Module { client })
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(&self.client)
-    }
-}
-
-#[derive(Clone)]
-pub struct Erc721Module {
-    pub client: Erc721Client,
-}
-impl AlkahestExtension for Erc721Module {
-    type Client = Erc721Client;
-
-    async fn init(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
-    ) -> eyre::Result<Self> {
-        let client =
-            Erc721Client::new(private_key, rpc_url, config.map(|c| c.erc721_addresses)).await?;
-        Ok(Erc721Module { client })
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to Erc721Addresses first
-        let erc721_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(erc721_addr) = addr_any.downcast_ref::<Erc721Addresses>() {
-                Some(erc721_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let client = Erc721Client::new(private_key, rpc_url, erc721_addresses).await?;
-        Ok(Erc721Module { client })
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(&self.client)
-    }
-}
-
-#[derive(Clone)]
-pub struct Erc1155Module {
-    pub client: Erc1155Client,
-}
-impl AlkahestExtension for Erc1155Module {
-    type Client = Erc1155Client;
-
-    async fn init(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
-    ) -> eyre::Result<Self> {
-        let client =
-            Erc1155Client::new(private_key, rpc_url, config.map(|c| c.erc1155_addresses)).await?;
-        Ok(Erc1155Module { client })
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to Erc1155Addresses first
-        let erc1155_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(erc1155_addr) = addr_any.downcast_ref::<Erc1155Addresses>() {
-                Some(erc1155_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let client = Erc1155Client::new(private_key, rpc_url, erc1155_addresses).await?;
-        Ok(Erc1155Module { client })
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(&self.client)
-    }
-}
-
-#[derive(Clone)]
-pub struct TokenBundleModule {
-    pub client: TokenBundleClient,
-}
-impl AlkahestExtension for TokenBundleModule {
-    type Client = TokenBundleClient;
-
-    async fn init(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
-    ) -> eyre::Result<Self> {
-        let client = TokenBundleClient::new(
-            private_key,
-            rpc_url,
-            config.map(|c| c.token_bundle_addresses),
-        )
-        .await?;
-        Ok(TokenBundleModule { client })
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to TokenBundleAddresses first
-        let token_bundle_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(token_bundle_addr) = addr_any.downcast_ref::<TokenBundleAddresses>() {
-                Some(token_bundle_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let client = TokenBundleClient::new(private_key, rpc_url, token_bundle_addresses).await?;
-        Ok(TokenBundleModule { client })
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(&self.client)
-    }
-}
-
-#[derive(Clone)]
-pub struct AttestationModule {
-    pub client: AttestationClient,
-}
-impl AlkahestExtension for AttestationModule {
-    type Client = AttestationClient;
-
-    async fn init(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
-    ) -> eyre::Result<Self> {
-        let client = AttestationClient::new(
-            private_key,
-            rpc_url,
-            config.map(|c| c.attestation_addresses),
-        )
-        .await?;
-        Ok(AttestationModule { client })
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to AttestationAddresses first
-        let attestation_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(attestation_addr) = addr_any.downcast_ref::<AttestationAddresses>() {
-                Some(attestation_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let client = AttestationClient::new(private_key, rpc_url, attestation_addresses).await?;
-        Ok(AttestationModule { client })
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(&self.client)
-    }
-}
-
-#[derive(Clone)]
-pub struct StringObligationModule {
-    pub client: StringObligationClient,
-}
-impl AlkahestExtension for StringObligationModule {
-    type Client = StringObligationClient;
-
-    async fn init(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
-    ) -> eyre::Result<Self> {
-        let client = StringObligationClient::new(
-            private_key,
-            rpc_url,
-            config.map(|c| c.string_obligation_addresses),
-        )
-        .await?;
-        Ok(StringObligationModule { client })
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to StringObligationAddresses first
-        let string_obligation_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(string_obligation_addr) =
-                addr_any.downcast_ref::<StringObligationAddresses>()
-            {
-                Some(string_obligation_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let client =
-            StringObligationClient::new(private_key, rpc_url, string_obligation_addresses).await?;
-        Ok(StringObligationModule { client })
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(&self.client)
-    }
-}
-
-#[derive(Clone)]
-pub struct ArbitersModule {
-    pub client: ArbitersClient,
-}
-impl AlkahestExtension for ArbitersModule {
-    type Client = ArbitersClient;
-
-    async fn init(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
-    ) -> eyre::Result<Self> {
-        let client =
-            ArbitersClient::new(private_key, rpc_url, config.map(|c| c.arbiters_addresses)).await?;
-        Ok(ArbitersModule { client })
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to ArbitersAddresses first
-        let arbiters_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(arbiters_addr) = addr_any.downcast_ref::<ArbitersAddresses>() {
-                Some(arbiters_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let client = ArbitersClient::new(private_key, rpc_url, arbiters_addresses).await?;
-        Ok(ArbitersModule { client })
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(&self.client)
-    }
-}
-#[derive(Clone)]
-pub struct OracleModule {
-    pub client: OracleClient,
-}
-impl AlkahestExtension for OracleModule {
-    type Client = OracleClient;
-
-    async fn init(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
-    ) -> eyre::Result<Self> {
-        let oracle_addresses = config.map(|c| OracleAddresses {
-            eas: c.arbiters_addresses.eas,
-            trusted_oracle_arbiter: c.arbiters_addresses.trusted_oracle_arbiter,
-        });
-        let client = OracleClient::new(private_key, rpc_url, oracle_addresses).await?;
-        Ok(OracleModule { client })
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to OracleAddresses first
-        let oracle_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(oracle_addr) = addr_any.downcast_ref::<OracleAddresses>() {
-                Some(oracle_addr.clone())
-            } else {
-                // Try to downcast to ArbitersAddresses and convert to OracleAddresses
-                if let Some(arbiters_addr) = addr_any.downcast_ref::<ArbitersAddresses>() {
-                    Some(OracleAddresses {
-                        eas: arbiters_addr.eas,
-                        trusted_oracle_arbiter: arbiters_addr.trusted_oracle_arbiter,
-                    })
-                } else {
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
-        let client = OracleClient::new(private_key, rpc_url, oracle_addresses).await?;
-        Ok(OracleModule { client })
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(&self.client)
-    }
-}
-
-/// === Helper Traits ===
 pub trait HasErc20 {
-    fn erc20(&self) -> &Erc20Client;
+    fn erc20(&self) -> &Erc20Module;
 }
+
 pub trait HasErc721 {
-    fn erc721(&self) -> &Erc721Client;
+    fn erc721(&self) -> &Erc721Module;
 }
+
 pub trait HasErc1155 {
-    fn erc1155(&self) -> &Erc1155Client;
+    fn erc1155(&self) -> &Erc1155Module;
 }
+
 pub trait HasTokenBundle {
-    fn token_bundle(&self) -> &TokenBundleClient;
+    fn token_bundle(&self) -> &TokenBundleModule;
 }
+
 pub trait HasAttestation {
-    fn attestation(&self) -> &AttestationClient;
+    fn attestation(&self) -> &AttestationModule;
 }
+
 pub trait HasStringObligation {
-    fn string_obligation(&self) -> &StringObligationClient;
+    fn string_obligation(&self) -> &StringObligationModule;
 }
+
 pub trait HasArbiters {
-    fn arbiters(&self) -> &ArbitersClient;
+    fn arbiters(&self) -> &ArbitersModule;
 }
+
 pub trait HasOracle {
-    fn oracle(&self) -> &OracleClient;
+    fn oracle(&self) -> &OracleModule;
 }
 
-/// === Direct Module Implementations ===
+// Implementations for BaseExtensions
+impl HasErc20 for BaseExtensions {
+    fn erc20(&self) -> &Erc20Module {
+        &self.erc20
+    }
+}
+
+impl HasErc721 for BaseExtensions {
+    fn erc721(&self) -> &Erc721Module {
+        &self.erc721
+    }
+}
+
+impl HasErc1155 for BaseExtensions {
+    fn erc1155(&self) -> &Erc1155Module {
+        &self.erc1155
+    }
+}
+
+impl HasTokenBundle for BaseExtensions {
+    fn token_bundle(&self) -> &TokenBundleModule {
+        &self.token_bundle
+    }
+}
+
+impl HasAttestation for BaseExtensions {
+    fn attestation(&self) -> &AttestationModule {
+        &self.attestation
+    }
+}
+
+impl HasStringObligation for BaseExtensions {
+    fn string_obligation(&self) -> &StringObligationModule {
+        &self.string_obligation
+    }
+}
+
+impl HasArbiters for BaseExtensions {
+    fn arbiters(&self) -> &ArbitersModule {
+        &self.arbiters
+    }
+}
+
+impl HasOracle for BaseExtensions {
+    fn oracle(&self) -> &OracleModule {
+        &self.oracle
+    }
+}
+
+// Implementations for individual modules
 impl HasErc20 for Erc20Module {
-    fn erc20(&self) -> &Erc20Client {
-        &self.client
-    }
-}
-impl HasErc721 for Erc721Module {
-    fn erc721(&self) -> &Erc721Client {
-        &self.client
-    }
-}
-impl HasErc1155 for Erc1155Module {
-    fn erc1155(&self) -> &Erc1155Client {
-        &self.client
-    }
-}
-impl HasTokenBundle for TokenBundleModule {
-    fn token_bundle(&self) -> &TokenBundleClient {
-        &self.client
-    }
-}
-impl HasAttestation for AttestationModule {
-    fn attestation(&self) -> &AttestationClient {
-        &self.client
-    }
-}
-impl HasStringObligation for StringObligationModule {
-    fn string_obligation(&self) -> &StringObligationClient {
-        &self.client
-    }
-}
-impl HasArbiters for ArbitersModule {
-    fn arbiters(&self) -> &ArbitersClient {
-        &self.client
-    }
-}
-impl HasOracle for OracleModule {
-    fn oracle(&self) -> &OracleClient {
-        &self.client
+    fn erc20(&self) -> &Erc20Module {
+        self
     }
 }
 
-/// === Has* Traits for JoinExtension - Search left and right ===
+impl HasErc721 for Erc721Module {
+    fn erc721(&self) -> &Erc721Module {
+        self
+    }
+}
+
+impl HasErc1155 for Erc1155Module {
+    fn erc1155(&self) -> &Erc1155Module {
+        self
+    }
+}
+
+impl HasTokenBundle for TokenBundleModule {
+    fn token_bundle(&self) -> &TokenBundleModule {
+        self
+    }
+}
+
+impl HasAttestation for AttestationModule {
+    fn attestation(&self) -> &AttestationModule {
+        self
+    }
+}
+
+impl HasStringObligation for StringObligationModule {
+    fn string_obligation(&self) -> &StringObligationModule {
+        self
+    }
+}
+
+impl HasArbiters for ArbitersModule {
+    fn arbiters(&self) -> &ArbitersModule {
+        self
+    }
+}
+
+impl HasOracle for OracleModule {
+    fn oracle(&self) -> &OracleModule {
+        self
+    }
+}
+
+// Implementations for JoinExtension - delegate to find_client
 impl<A: AlkahestExtension, B: AlkahestExtension> HasErc20 for JoinExtension<A, B>
 where
     Self: AlkahestExtension,
 {
-    fn erc20(&self) -> &Erc20Client {
-        self.find_client::<Erc20Client>()
-            .expect("ERC20 client not found in JoinExtension")
+    fn erc20(&self) -> &Erc20Module {
+        self.find_client::<Erc20Module>()
+            .expect("ERC20 module not found in JoinExtension")
     }
 }
 
@@ -615,9 +360,9 @@ impl<A: AlkahestExtension, B: AlkahestExtension> HasErc721 for JoinExtension<A, 
 where
     Self: AlkahestExtension,
 {
-    fn erc721(&self) -> &Erc721Client {
-        self.find_client::<Erc721Client>()
-            .expect("ERC721 client not found in JoinExtension")
+    fn erc721(&self) -> &Erc721Module {
+        self.find_client::<Erc721Module>()
+            .expect("ERC721 module not found in JoinExtension")
     }
 }
 
@@ -625,9 +370,9 @@ impl<A: AlkahestExtension, B: AlkahestExtension> HasErc1155 for JoinExtension<A,
 where
     Self: AlkahestExtension,
 {
-    fn erc1155(&self) -> &Erc1155Client {
-        self.find_client::<Erc1155Client>()
-            .expect("ERC1155 client not found in JoinExtension")
+    fn erc1155(&self) -> &Erc1155Module {
+        self.find_client::<Erc1155Module>()
+            .expect("ERC1155 module not found in JoinExtension")
     }
 }
 
@@ -635,9 +380,9 @@ impl<A: AlkahestExtension, B: AlkahestExtension> HasTokenBundle for JoinExtensio
 where
     Self: AlkahestExtension,
 {
-    fn token_bundle(&self) -> &TokenBundleClient {
-        self.find_client::<TokenBundleClient>()
-            .expect("TokenBundle client not found in JoinExtension")
+    fn token_bundle(&self) -> &TokenBundleModule {
+        self.find_client::<TokenBundleModule>()
+            .expect("TokenBundle module not found in JoinExtension")
     }
 }
 
@@ -645,9 +390,9 @@ impl<A: AlkahestExtension, B: AlkahestExtension> HasAttestation for JoinExtensio
 where
     Self: AlkahestExtension,
 {
-    fn attestation(&self) -> &AttestationClient {
-        self.find_client::<AttestationClient>()
-            .expect("Attestation client not found in JoinExtension")
+    fn attestation(&self) -> &AttestationModule {
+        self.find_client::<AttestationModule>()
+            .expect("Attestation module not found in JoinExtension")
     }
 }
 
@@ -655,9 +400,9 @@ impl<A: AlkahestExtension, B: AlkahestExtension> HasStringObligation for JoinExt
 where
     Self: AlkahestExtension,
 {
-    fn string_obligation(&self) -> &StringObligationClient {
-        self.find_client::<StringObligationClient>()
-            .expect("StringObligation client not found in JoinExtension")
+    fn string_obligation(&self) -> &StringObligationModule {
+        self.find_client::<StringObligationModule>()
+            .expect("StringObligation module not found in JoinExtension")
     }
 }
 
@@ -665,9 +410,9 @@ impl<A: AlkahestExtension, B: AlkahestExtension> HasArbiters for JoinExtension<A
 where
     Self: AlkahestExtension,
 {
-    fn arbiters(&self) -> &ArbitersClient {
-        self.find_client::<ArbitersClient>()
-            .expect("Arbiters client not found in JoinExtension")
+    fn arbiters(&self) -> &ArbitersModule {
+        self.find_client::<ArbitersModule>()
+            .expect("Arbiters module not found in JoinExtension")
     }
 }
 
@@ -675,50 +420,57 @@ impl<A: AlkahestExtension, B: AlkahestExtension> HasOracle for JoinExtension<A, 
 where
     Self: AlkahestExtension,
 {
-    fn oracle(&self) -> &OracleClient {
-        self.find_client::<OracleClient>()
-            .expect("Oracle client not found in JoinExtension")
+    fn oracle(&self) -> &OracleModule {
+        self.find_client::<OracleModule>()
+            .expect("Oracle module not found in JoinExtension")
     }
 }
 
-/// === Forward Has* Traits for AlkahestClient ===
+// Implementations for AlkahestClient - delegate to extensions
 impl<Ext: AlkahestExtension + HasErc20> HasErc20 for AlkahestClient<Ext> {
-    fn erc20(&self) -> &Erc20Client {
+    fn erc20(&self) -> &Erc20Module {
         self.extensions.erc20()
     }
 }
+
 impl<Ext: AlkahestExtension + HasErc721> HasErc721 for AlkahestClient<Ext> {
-    fn erc721(&self) -> &Erc721Client {
+    fn erc721(&self) -> &Erc721Module {
         self.extensions.erc721()
     }
 }
+
 impl<Ext: AlkahestExtension + HasErc1155> HasErc1155 for AlkahestClient<Ext> {
-    fn erc1155(&self) -> &Erc1155Client {
+    fn erc1155(&self) -> &Erc1155Module {
         self.extensions.erc1155()
     }
 }
+
 impl<Ext: AlkahestExtension + HasTokenBundle> HasTokenBundle for AlkahestClient<Ext> {
-    fn token_bundle(&self) -> &TokenBundleClient {
+    fn token_bundle(&self) -> &TokenBundleModule {
         self.extensions.token_bundle()
     }
 }
+
 impl<Ext: AlkahestExtension + HasAttestation> HasAttestation for AlkahestClient<Ext> {
-    fn attestation(&self) -> &AttestationClient {
+    fn attestation(&self) -> &AttestationModule {
         self.extensions.attestation()
     }
 }
+
 impl<Ext: AlkahestExtension + HasStringObligation> HasStringObligation for AlkahestClient<Ext> {
-    fn string_obligation(&self) -> &StringObligationClient {
+    fn string_obligation(&self) -> &StringObligationModule {
         self.extensions.string_obligation()
     }
 }
+
 impl<Ext: AlkahestExtension + HasArbiters> HasArbiters for AlkahestClient<Ext> {
-    fn arbiters(&self) -> &ArbitersClient {
+    fn arbiters(&self) -> &ArbitersModule {
         self.extensions.arbiters()
     }
 }
+
 impl<Ext: AlkahestExtension + HasOracle> HasOracle for AlkahestClient<Ext> {
-    fn oracle(&self) -> &OracleClient {
+    fn oracle(&self) -> &OracleModule {
         self.extensions.oracle()
     }
 }

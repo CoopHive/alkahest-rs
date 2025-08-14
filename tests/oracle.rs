@@ -24,11 +24,11 @@ mod tests {
 
     use {
         alkahest_rs::clients::arbiters::{
-            ArbitersClient, IntrinsicsArbiter2, MultiArbiter, RecipientArbiterNonComposing,
+            ArbitersModule, IntrinsicsArbiter2, MultiArbiter, RecipientArbiterNonComposing,
             SpecificAttestationArbiter, TrustedOracleArbiter, TrustedPartyArbiter,
             UidArbiterComposing,
         },
-        alkahest_rs::clients::oracle::OracleClient,
+        alkahest_rs::clients::oracle::OracleModule,
         alkahest_rs::contracts,
         alkahest_rs::utils::setup_test_environment,
     };
@@ -56,7 +56,7 @@ mod tests {
             data: bytes!(""),
         };
 
-        let demand = ArbitersClient::encode_trusted_oracle_arbiter_demand(&demand_data);
+        let demand = ArbitersModule::encode_trusted_oracle_arbiter_demand(&demand_data);
         let item = ArbiterData { arbiter, demand };
         let expiration = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + 3600;
 

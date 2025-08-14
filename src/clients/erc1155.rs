@@ -4,13 +4,15 @@ use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
 
 use crate::addresses::BASE_SEPOLIA_ADDRESSES;
-use crate::contracts::{self};
+use crate::contracts;
 use crate::types::{
     ApprovalPurpose, ArbiterData, DecodedAttestation, Erc20Data, Erc721Data, Erc1155Data,
     TokenBundleData,
 };
+use crate::{DefaultExtensionConfig, extensions::AlkahestExtension};
 use crate::{types::WalletProvider, utils};
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Erc1155Addresses {
@@ -28,7 +30,7 @@ pub struct Erc1155Addresses {
 /// - Managing token approvals
 /// - Collecting payments from fulfilled trades
 #[derive(Clone)]
-pub struct Erc1155Client {
+pub struct Erc1155Module {
     signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
 
@@ -41,8 +43,8 @@ impl Default for Erc1155Addresses {
     }
 }
 
-impl Erc1155Client {
-    /// Creates a new ERC1155Client instance.
+impl Erc1155Module {
+    /// Creates a new Erc1155Module instance.
     ///
     /// # Arguments
     /// * `private_key` - The private key for signing transactions
@@ -58,7 +60,7 @@ impl Erc1155Client {
     ) -> eyre::Result<Self> {
         let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
-        Ok(Erc1155Client {
+        Ok(Erc1155Module {
             signer,
             wallet_provider,
 
@@ -571,6 +573,42 @@ impl Erc1155Client {
     }
 }
 
+impl AlkahestExtension for Erc1155Module {
+    type Client = Self;
+
+    async fn init(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<DefaultExtensionConfig>,
+    ) -> eyre::Result<Self> {
+        Self::new(private_key, rpc_url, config.map(|c| c.erc1155_addresses)).await
+    }
+
+    async fn init_with_config<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to Erc1155Addresses first
+        let erc1155_addresses = if let Some(addr) = config {
+            let addr_any: &dyn Any = &addr;
+            if let Some(erc1155_addr) = addr_any.downcast_ref::<Erc1155Addresses>() {
+                Some(erc1155_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Self::new(private_key, rpc_url, erc1155_addresses).await
+    }
+
+    fn client(&self) -> Option<&Self::Client> {
+        Some(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -581,9 +619,9 @@ mod tests {
         sol_types::SolValue as _,
     };
 
+    use super::Erc1155Module;
     use crate::{
         DefaultAlkahestClient,
-        clients::erc1155::Erc1155Client,
         extensions::{HasErc20, HasErc721, HasErc1155, HasTokenBundle},
         fixtures::{MockERC20Permit, MockERC721, MockERC1155},
         types::{
@@ -616,7 +654,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = Erc1155Client::decode_escrow_obligation(&encoded.into())?;
+        let decoded = Erc1155Module::decode_escrow_obligation(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.token, token_address, "Token address should match");
@@ -650,7 +688,7 @@ mod tests {
         let encoded = payment_data.abi_encode();
 
         // Decode the data
-        let decoded = Erc1155Client::decode_payment_obligation(&encoded.into())?;
+        let decoded = Erc1155Module::decode_payment_obligation(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.token, token_address, "Token address should match");

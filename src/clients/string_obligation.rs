@@ -1,16 +1,19 @@
 use crate::{
+    DefaultExtensionConfig,
     addresses::BASE_SEPOLIA_ADDRESSES,
     contracts,
+    extensions::AlkahestExtension,
     types::{DecodedAttestation, WalletProvider},
 };
+use alloy::providers::Provider;
 use alloy::{
     primitives::{Address, Bytes, FixedBytes},
     rpc::types::TransactionReceipt,
     signers::local::PrivateKeySigner,
     sol_types::SolValue as _,
 };
-use alloy::providers::Provider;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StringObligationAddresses {
@@ -19,7 +22,7 @@ pub struct StringObligationAddresses {
 }
 
 #[derive(Clone)]
-pub struct StringObligationClient {
+pub struct StringObligationModule {
     _signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
 
@@ -32,8 +35,8 @@ impl Default for StringObligationAddresses {
     }
 }
 
-impl StringObligationClient {
-    /// Creates a new StringObligationClient instance.
+impl StringObligationModule {
+    /// Creates a new StringObligationModule instance.
     ///
     /// # Arguments
     /// * `private_key` - The private key for signing transactions
@@ -49,9 +52,10 @@ impl StringObligationClient {
     ) -> eyre::Result<Self> {
         let wallet_provider = crate::utils::get_wallet_provider(signer.clone(), rpc_url).await?;
 
-        Ok(StringObligationClient {
+        Ok(StringObligationModule {
             _signer: signer,
             wallet_provider,
+
             addresses: addresses.unwrap_or_default(),
         })
     }
@@ -145,5 +149,46 @@ impl StringObligationClient {
             .await?;
 
         Ok(receipt)
+    }
+}
+
+impl AlkahestExtension for StringObligationModule {
+    type Client = Self;
+
+    async fn init(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<DefaultExtensionConfig>,
+    ) -> eyre::Result<Self> {
+        Self::new(
+            private_key,
+            rpc_url,
+            config.map(|c| c.string_obligation_addresses),
+        )
+        .await
+    }
+
+    async fn init_with_config<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to StringObligationAddresses first
+        let string_obligation_addresses = if let Some(addr) = config {
+            let addr_any: &dyn Any = &addr;
+            if let Some(string_addr) = addr_any.downcast_ref::<StringObligationAddresses>() {
+                Some(string_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Self::new(private_key, rpc_url, string_obligation_addresses).await
+    }
+
+    fn client(&self) -> Option<&Self::Client> {
+        Some(self)
     }
 }

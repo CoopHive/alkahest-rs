@@ -1,10 +1,13 @@
 use std::env;
 
 use alkahest_rs::{
+    AlkahestClient, DefaultAlkahestClient,
     clients::{
-        arbiters::{ArbitersClient, TrustedPartyArbiter},
-        erc20::Erc20Client,
-    }, extensions::{HasArbiters, HasAttestation, HasErc20}, types::{ApprovalPurpose, ArbiterData, Erc20Data}, AlkahestClient, DefaultAlkahestClient
+        arbiters::{ArbitersModule, TrustedPartyArbiter},
+        erc20::Erc20Module,
+    },
+    extensions::{HasArbiters, HasAttestation, HasErc20},
+    types::{ApprovalPurpose, ArbiterData, Erc20Data},
 };
 
 use alloy::{
@@ -68,10 +71,12 @@ async fn test_trade_erc20_for_erc20() -> Result<()> {
 #[tokio::test]
 async fn test_trade_erc20_for_custom() -> Result<()> {
     let alice: PrivateKeySigner = env::var("PRIVKEY_ALICE")?.parse()?;
-    let client_buyer = DefaultAlkahestClient::new(alice, env::var("RPC_URL")?.as_str(), None).await?;
+    let client_buyer =
+        DefaultAlkahestClient::new(alice, env::var("RPC_URL")?.as_str(), None).await?;
 
     let bob: PrivateKeySigner = env::var("PRIVKEY_BOB")?.parse()?;
-    let client_seller = DefaultAlkahestClient::new(bob, env::var("RPC_URL")?.as_str(), None).await?;
+    let client_seller =
+        DefaultAlkahestClient::new(bob, env::var("RPC_URL")?.as_str(), None).await?;
     // the example will use JobResultObligation to demand a string to be capitalized
     // but JobResultObligation is generic enough to represent much more (a db query, a Dockerfile...)
     // see https://github.com/CoopHive/alkahest-mocks/blob/main/src/Statements/JobResultObligation.sol
@@ -108,7 +113,7 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
     // directly, like we did for the base_demand
 
     let demand =
-        ArbitersClient::encode_trusted_party_arbiter_demand(&TrustedPartyArbiter::DemandData {
+        ArbitersModule::encode_trusted_party_arbiter_demand(&TrustedPartyArbiter::DemandData {
             creator: client_seller.address,
             baseArbiter: client_seller.arbiters().addresses.trivial_arbiter,
             baseDemand: base_demand.into(),
@@ -144,10 +149,10 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
         .attestation()
         .get_attestation(escrow.uid)
         .await?;
-    let buy_obligation = Erc20Client::decode_escrow_obligation(&buy_obligation.data)?;
+    let buy_obligation = Erc20Module::decode_escrow_obligation(&buy_obligation.data)?;
 
     let decoded_demand =
-        ArbitersClient::decode_trusted_party_arbiter_demand(&buy_obligation.demand)?;
+        ArbitersModule::decode_trusted_party_arbiter_demand(&buy_obligation.demand)?;
     let decoded_base_demand = ResultDemandData::abi_decode(decoded_demand.baseDemand.as_ref());
 
     // uppercase string for the example;

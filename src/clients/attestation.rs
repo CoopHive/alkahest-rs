@@ -9,7 +9,9 @@ use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::IEAS::Attestation;
 use crate::contracts::{self, IEAS};
 use crate::types::{ArbiterData, DecodedAttestation};
+use crate::{DefaultExtensionConfig, extensions::AlkahestExtension};
 use crate::{types::WalletProvider, utils};
+use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationAddresses {
@@ -21,7 +23,7 @@ pub struct AttestationAddresses {
 }
 
 #[derive(Clone)]
-pub struct AttestationClient {
+pub struct AttestationModule {
     _signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
 
@@ -34,8 +36,8 @@ impl Default for AttestationAddresses {
     }
 }
 
-impl AttestationClient {
-    /// Creates a new AttestationClient instance.
+impl AttestationModule {
+    /// Creates a new AttestationModule instance.
     ///
     /// # Arguments
     /// * `private_key` - The private key for signing transactions
@@ -48,7 +50,7 @@ impl AttestationClient {
     ) -> eyre::Result<Self> {
         let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
-        Ok(AttestationClient {
+        Ok(AttestationModule {
             _signer: signer,
             wallet_provider,
 
@@ -340,6 +342,47 @@ impl AttestationClient {
     }
 }
 
+impl AlkahestExtension for AttestationModule {
+    type Client = Self;
+
+    async fn init(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<DefaultExtensionConfig>,
+    ) -> eyre::Result<Self> {
+        Self::new(
+            private_key,
+            rpc_url,
+            config.map(|c| c.attestation_addresses),
+        )
+        .await
+    }
+
+    async fn init_with_config<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to AttestationAddresses first
+        let attestation_addresses = if let Some(addr) = config {
+            let addr_any: &dyn Any = &addr;
+            if let Some(attestation_addr) = addr_any.downcast_ref::<AttestationAddresses>() {
+                Some(attestation_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Self::new(private_key, rpc_url, attestation_addresses).await
+    }
+
+    fn client(&self) -> Option<&Self::Client> {
+        Some(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloy::{
@@ -350,9 +393,9 @@ mod tests {
     };
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use super::AttestationModule;
     use crate::{DefaultAlkahestClient, contracts::StringObligation};
     use crate::{
-        clients::attestation::AttestationClient,
         contracts::{self, IEAS},
         extensions::{HasAttestation, HasStringObligation},
         types::ArbiterData,
@@ -469,7 +512,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = AttestationClient::decode_escrow_obligation(&encoded.into())?;
+        let decoded = AttestationModule::decode_escrow_obligation(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.arbiter, arbiter, "Arbiter should match");
@@ -506,7 +549,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = AttestationClient::decode_escrow_obligation_2(&encoded.into())?;
+        let decoded = AttestationModule::decode_escrow_obligation_2(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(

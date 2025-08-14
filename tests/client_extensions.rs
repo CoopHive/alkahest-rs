@@ -1,7 +1,7 @@
 use alkahest_rs::{
     AlkahestClient, DefaultExtensionConfig,
-    clients::erc20::{Erc20Addresses, Erc20Client},
-    extensions::{AlkahestExtension, Erc20Module, HasErc20, NoExtension},
+    clients::erc20::{Erc20Addresses, Erc20Module},
+    extensions::{AlkahestExtension, HasErc20, NoExtension},
     utils::setup_test_environment,
 };
 use alloy::{primitives::address, signers::local::PrivateKeySigner};
@@ -320,7 +320,7 @@ async fn test_client_with_initialized_extension() -> Result<()> {
     let client_with_erc20 = client.with_initialized_extension(erc20_extension);
 
     // Verify the extension was added
-    assert!(client_with_erc20.extensions.has_client::<Erc20Client>());
+    assert!(client_with_erc20.extensions.has_client::<Erc20Module>());
 
     // Test accessing the client
     let _erc20_client = client_with_erc20.erc20();

@@ -1,6 +1,8 @@
 use crate::{
+    DefaultExtensionConfig,
     addresses::BASE_SEPOLIA_ADDRESSES,
     contracts,
+    extensions::AlkahestExtension,
     types::{PublicProvider, WalletProvider},
     utils,
 };
@@ -14,6 +16,7 @@ use alloy::{
 };
 use futures_util::StreamExt as _;
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArbitersAddresses {
@@ -68,8 +71,8 @@ pub struct ArbitersAddresses {
 }
 
 #[derive(Clone)]
-pub struct ArbitersClient {
-    _signer: PrivateKeySigner,
+pub struct ArbitersModule {
+    signer: PrivateKeySigner,
     public_provider: PublicProvider,
     wallet_provider: WalletProvider,
 
@@ -199,6 +202,41 @@ sol! {
             bytes baseDemand;
             bytes32 uid;
         }
+    }
+}
+
+impl AlkahestExtension for ArbitersModule {
+    type Client = Self;
+
+    async fn init(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<DefaultExtensionConfig>,
+    ) -> eyre::Result<Self> {
+        Self::new(private_key, rpc_url, config.map(|c| c.arbiters_addresses)).await
+    }
+
+    async fn init_with_config<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to ArbitersAddresses first
+        let arbiters_addresses = if let Some(addr) = config {
+            let addr_any: &dyn Any = &addr;
+            if let Some(arbiters_addr) = addr_any.downcast_ref::<ArbitersAddresses>() {
+                Some(arbiters_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        Self::new(private_key, rpc_url, arbiters_addresses).await
+    }
+
+    fn client(&self) -> Option<&Self::Client> {
+        Some(self)
     }
 }
 
@@ -385,7 +423,7 @@ sol! {
 
 macro_rules! impl_encode_and_decode {
     ($contract:ident, $encode_fn:ident, $decode_fn:ident) => {
-        impl ArbitersClient {
+        impl ArbitersModule {
             pub fn $encode_fn(demand: &$contract::DemandData) -> Bytes {
                 demand.abi_encode().into()
             }
@@ -562,7 +600,7 @@ impl_encode_and_decode!(
     decode_not_arbiter_demand
 );
 
-impl ArbitersClient {
+impl ArbitersModule {
     pub async fn new(
         signer: PrivateKeySigner,
         rpc_url: impl ToString + Clone,
@@ -571,8 +609,8 @@ impl ArbitersClient {
         let public_provider = utils::get_public_provider(rpc_url.clone()).await?;
         let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
-        Ok(ArbitersClient {
-            _signer: signer,
+        Ok(ArbitersModule {
+            signer: signer,
             public_provider: public_provider.clone(),
             wallet_provider,
 
@@ -648,7 +686,7 @@ mod tests {
 
     use crate::{
         clients::arbiters::{
-            ArbitersClient, IntrinsicsArbiter2, MultiArbiter, RecipientArbiterComposing,
+            ArbitersModule, IntrinsicsArbiter2, MultiArbiter, RecipientArbiterComposing,
             SpecificAttestationArbiter, TrustedOracleArbiter, TrustedPartyArbiter,
             UidArbiterComposing,
         },
@@ -749,7 +787,7 @@ mod tests {
         };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_trusted_party_arbiter_demand(&demand_data);
+        let demand = ArbitersModule::encode_trusted_party_arbiter_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check obligation should revert with NotTrustedParty
@@ -791,7 +829,7 @@ mod tests {
         };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_recipient_arbiter_composing_demand(&demand_data);
+        let demand = ArbitersModule::encode_recipient_arbiter_composing_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Create RecipientArbiter contract instance
@@ -832,7 +870,7 @@ mod tests {
         };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_recipient_arbiter_composing_demand(&demand_data);
+        let demand = ArbitersModule::encode_recipient_arbiter_composing_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check obligation should return true
@@ -875,7 +913,7 @@ mod tests {
         };
 
         // Encode the demand data
-        let demand = ArbitersClient::encode_trusted_party_arbiter_demand(&demand_data);
+        let demand = ArbitersModule::encode_trusted_party_arbiter_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check obligation should revert with NotTrustedParty
@@ -912,7 +950,7 @@ mod tests {
         };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_trusted_oracle_arbiter_demand(&demand_data);
+        let demand = ArbitersModule::encode_trusted_oracle_arbiter_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check obligation - should be false initially since no decision has been made
@@ -952,7 +990,7 @@ mod tests {
         };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_trusted_oracle_arbiter_demand(&demand_data);
+        let demand = ArbitersModule::encode_trusted_oracle_arbiter_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check contract interface
@@ -1051,7 +1089,7 @@ mod tests {
             oracle: oracle1,
             data: bytes!(""),
         };
-        let demand1 = ArbitersClient::encode_trusted_oracle_arbiter_demand(&demand_data1);
+        let demand1 = ArbitersModule::encode_trusted_oracle_arbiter_demand(&demand_data1);
         let counteroffer = FixedBytes::<32>::default();
 
         let result1 = trusted_oracle_arbiter
@@ -1066,7 +1104,7 @@ mod tests {
             oracle: oracle2,
             data: bytes!(""),
         };
-        let demand2 = ArbitersClient::encode_trusted_oracle_arbiter_demand(&demand_data2);
+        let demand2 = ArbitersModule::encode_trusted_oracle_arbiter_demand(&demand_data2);
 
         let result2 = trusted_oracle_arbiter
             .checkObligation(attestation.into(), demand2, counteroffer)
@@ -1097,7 +1135,7 @@ mod tests {
         };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_trusted_oracle_arbiter_demand(&demand_data);
+        let demand = ArbitersModule::encode_trusted_oracle_arbiter_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check with the new oracle - should be false (default value)
@@ -1133,7 +1171,7 @@ mod tests {
         let demand_data = SpecificAttestationArbiter::DemandData { uid: different_uid };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_specific_attestation_arbiter_demand(&demand_data);
+        let encoded = ArbitersModule::encode_specific_attestation_arbiter_demand(&demand_data);
 
         // Check obligation should revert with NotDemandedAttestation
         let specific_attestation_arbiter = contracts::SpecificAttestationArbiter::new(
@@ -1175,7 +1213,7 @@ mod tests {
         };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_uid_arbiter_composing_demand(&demand_data);
+        let encoded = ArbitersModule::encode_uid_arbiter_composing_demand(&demand_data);
 
         // Check obligation should revert with UidMismatched
         let uid_arbiter_address = test.addresses.arbiters_addresses.clone().uid_arbiter;
@@ -1215,7 +1253,7 @@ mod tests {
         };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_uid_arbiter_composing_demand(&demand_data);
+        let encoded = ArbitersModule::encode_uid_arbiter_composing_demand(&demand_data);
 
         // Check obligation - should return true
         let uid_arbiter_address = test.addresses.arbiters_addresses.clone().uid_arbiter;
@@ -1247,7 +1285,7 @@ mod tests {
         let demand_data = SpecificAttestationArbiter::DemandData { uid: different_uid };
 
         // Encode demand data
-        let demand = ArbitersClient::encode_specific_attestation_arbiter_demand(&demand_data);
+        let demand = ArbitersModule::encode_specific_attestation_arbiter_demand(&demand_data);
         let counteroffer = FixedBytes::<32>::default();
 
         // Check obligation should revert with NotDemandedAttestation
@@ -1285,10 +1323,10 @@ mod tests {
         };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_trusted_party_arbiter_demand(&demand_data);
+        let encoded = ArbitersModule::encode_trusted_party_arbiter_demand(&demand_data);
 
         // Decode the demand data
-        let decoded = ArbitersClient::decode_trusted_party_arbiter_demand(&encoded)?;
+        let decoded = ArbitersModule::decode_trusted_party_arbiter_demand(&encoded)?;
 
         // Verify decoded data
         assert_eq!(
@@ -1314,10 +1352,10 @@ mod tests {
         let demand_data = SpecificAttestationArbiter::DemandData { uid };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_specific_attestation_arbiter_demand(&demand_data);
+        let encoded = ArbitersModule::encode_specific_attestation_arbiter_demand(&demand_data);
 
         // Decode the demand data
-        let decoded = ArbitersClient::decode_specific_attestation_arbiter_demand(&encoded)?;
+        let decoded = ArbitersModule::decode_specific_attestation_arbiter_demand(&encoded)?;
 
         // Verify the data was encoded and decoded correctly
         assert_eq!(decoded.uid, uid, "UID did not round-trip correctly");
@@ -1340,10 +1378,10 @@ mod tests {
         };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_uid_arbiter_composing_demand(&demand_data);
+        let encoded = ArbitersModule::encode_uid_arbiter_composing_demand(&demand_data);
 
         // Decode the demand data
-        let decoded = ArbitersClient::decode_uid_arbiter_composing_demand(&encoded)?;
+        let decoded = ArbitersModule::decode_uid_arbiter_composing_demand(&encoded)?;
 
         // Verify the data was encoded and decoded correctly
         assert_eq!(decoded.uid, uid, "UID did not round-trip correctly");
@@ -1368,10 +1406,10 @@ mod tests {
         };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_recipient_arbiter_composing_demand(&demand_data);
+        let encoded = ArbitersModule::encode_recipient_arbiter_composing_demand(&demand_data);
 
         // Decode the demand data
-        let decoded = ArbitersClient::decode_recipient_arbiter_composing_demand(&encoded)?;
+        let decoded = ArbitersModule::decode_recipient_arbiter_composing_demand(&encoded)?;
 
         // Verify the data was encoded and decoded correctly
         assert_eq!(
@@ -1403,10 +1441,10 @@ mod tests {
         };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_trusted_oracle_arbiter_demand(&demand_data);
+        let encoded = ArbitersModule::encode_trusted_oracle_arbiter_demand(&demand_data);
 
         // Decode the demand data
-        let decoded = ArbitersClient::decode_trusted_oracle_arbiter_demand(&encoded)?;
+        let decoded = ArbitersModule::decode_trusted_oracle_arbiter_demand(&encoded)?;
 
         // Verify decoded data
         assert_eq!(decoded.oracle, oracle, "Oracle should match");
@@ -1596,12 +1634,12 @@ mod tests {
         // Create demand with matching schema
         let matching_demand = IntrinsicsArbiter2::DemandData { schema: schema1 };
         let encoded_matching_demand =
-            ArbitersClient::encode_intrinsics_arbiter2_demand(&matching_demand);
+            ArbitersModule::encode_intrinsics_arbiter2_demand(&matching_demand);
 
         // Create demand with non-matching schema
         let non_matching_demand = IntrinsicsArbiter2::DemandData { schema: schema2 };
         let encoded_non_matching_demand =
-            ArbitersClient::encode_intrinsics_arbiter2_demand(&non_matching_demand);
+            ArbitersModule::encode_intrinsics_arbiter2_demand(&non_matching_demand);
 
         // Test with matching schema - should pass
         let result_matching = intrinsics_arbiter2
@@ -1652,7 +1690,7 @@ mod tests {
         // SpecificAttestationArbiter with matching UID (will return true)
         let specific_matching = SpecificAttestationArbiter::DemandData { uid };
         let specific_matching_encoded =
-            ArbitersClient::encode_specific_attestation_arbiter_demand(&specific_matching);
+            ArbitersModule::encode_specific_attestation_arbiter_demand(&specific_matching);
 
         // SpecificAttestationArbiter with non-matching UID (will return false/error)
         let non_matching_uid = FixedBytes::<32>::from_slice(&[2u8; 32]);
@@ -1660,7 +1698,7 @@ mod tests {
             uid: non_matching_uid,
         };
         let specific_non_matching_encoded =
-            ArbitersClient::encode_specific_attestation_arbiter_demand(&specific_non_matching);
+            ArbitersModule::encode_specific_attestation_arbiter_demand(&specific_non_matching);
 
         // Set up AnyArbiter with two arbiters
         let any_arbiter =
@@ -1678,7 +1716,7 @@ mod tests {
             ],
         };
 
-        let any_demand1 = ArbitersClient::encode_multi_arbiter_demand(&any_demand_data1);
+        let any_demand1 = ArbitersModule::encode_multi_arbiter_demand(&any_demand_data1);
         let result_any1 = any_arbiter
             .checkObligation(
                 attestation.clone().into(),
@@ -1705,7 +1743,7 @@ mod tests {
             ],
         };
 
-        let any_demand2 = ArbitersClient::encode_multi_arbiter_demand(&any_demand_data2);
+        let any_demand2 = ArbitersModule::encode_multi_arbiter_demand(&any_demand_data2);
         let result_any2 = any_arbiter
             .checkObligation(
                 attestation.clone().into(),
@@ -1733,7 +1771,7 @@ mod tests {
             ],
         };
 
-        let any_demand3 = ArbitersClient::encode_multi_arbiter_demand(&any_demand_data3);
+        let any_demand3 = ArbitersModule::encode_multi_arbiter_demand(&any_demand_data3);
         let result_any3 = any_arbiter
             .checkObligation(attestation.into(), any_demand3, FixedBytes::<32>::default())
             .call()
@@ -1764,7 +1802,7 @@ mod tests {
         // SpecificAttestationArbiter with matching UID (will return true)
         let specific_matching = SpecificAttestationArbiter::DemandData { uid };
         let specific_matching_encoded =
-            ArbitersClient::encode_specific_attestation_arbiter_demand(&specific_matching);
+            ArbitersModule::encode_specific_attestation_arbiter_demand(&specific_matching);
 
         // SpecificAttestationArbiter with non-matching UID (will return false/error)
         let non_matching_uid = FixedBytes::<32>::from_slice(&[2u8; 32]);
@@ -1772,7 +1810,7 @@ mod tests {
             uid: non_matching_uid,
         };
         let specific_non_matching_encoded =
-            ArbitersClient::encode_specific_attestation_arbiter_demand(&specific_non_matching);
+            ArbitersModule::encode_specific_attestation_arbiter_demand(&specific_non_matching);
 
         // Set up AllArbiter
         let all_arbiter =
@@ -1790,7 +1828,7 @@ mod tests {
             ],
         };
 
-        let all_demand1 = ArbitersClient::encode_multi_arbiter_demand(&all_demand_data1);
+        let all_demand1 = ArbitersModule::encode_multi_arbiter_demand(&all_demand_data1);
         let result_all1 = all_arbiter
             .checkObligation(
                 attestation.clone().into(),
@@ -1818,7 +1856,7 @@ mod tests {
             ],
         };
 
-        let all_demand2 = ArbitersClient::encode_multi_arbiter_demand(&all_demand_data2);
+        let all_demand2 = ArbitersModule::encode_multi_arbiter_demand(&all_demand_data2);
         let result_all2 = all_arbiter
             .checkObligation(
                 attestation.clone().into(),
@@ -1839,7 +1877,7 @@ mod tests {
             demands: vec![],
         };
 
-        let all_demand3 = ArbitersClient::encode_multi_arbiter_demand(&all_demand_data3);
+        let all_demand3 = ArbitersModule::encode_multi_arbiter_demand(&all_demand_data3);
         let result_all3 = all_arbiter
             .checkObligation(attestation.into(), all_demand3, FixedBytes::<32>::default())
             .call()
@@ -1860,10 +1898,10 @@ mod tests {
         let demand_data = IntrinsicsArbiter2::DemandData { schema };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_intrinsics_arbiter2_demand(&demand_data);
+        let encoded = ArbitersModule::encode_intrinsics_arbiter2_demand(&demand_data);
 
         // Decode the demand data
-        let decoded = ArbitersClient::decode_intrinsics_arbiter2_demand(&encoded)?;
+        let decoded = ArbitersModule::decode_intrinsics_arbiter2_demand(&encoded)?;
 
         // Verify decoded data
         assert_eq!(decoded.schema, schema, "Schema should match");
@@ -1889,10 +1927,10 @@ mod tests {
         let demand_data = MultiArbiter::DemandData { arbiters, demands };
 
         // Encode the demand data
-        let encoded = ArbitersClient::encode_multi_arbiter_demand(&demand_data);
+        let encoded = ArbitersModule::encode_multi_arbiter_demand(&demand_data);
 
         // Decode the demand data
-        let decoded = ArbitersClient::decode_multi_arbiter_demand(&encoded)?;
+        let decoded = ArbitersModule::decode_multi_arbiter_demand(&encoded)?;
 
         // Verify decoded data
         assert_eq!(

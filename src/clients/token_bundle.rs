@@ -8,10 +8,13 @@ use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::{self, IERC20, IERC721, IERC1155};
 use crate::types::{ArbiterData, DecodedAttestation, TokenBundleData};
 use crate::{
+    DefaultExtensionConfig,
+    extensions::AlkahestExtension,
     types::{ApprovalPurpose, WalletProvider},
     utils,
 };
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenBundleAddresses {
@@ -29,7 +32,7 @@ pub struct TokenBundleAddresses {
 /// - Managing token bundle payments
 /// - Collecting payments from fulfilled trades
 #[derive(Clone)]
-pub struct TokenBundleClient {
+pub struct TokenBundleModule {
     signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
 
@@ -42,8 +45,8 @@ impl Default for TokenBundleAddresses {
     }
 }
 
-impl TokenBundleClient {
-    /// Creates a new TokenBundleClient instance.
+impl TokenBundleModule {
+    /// Creates a new TokenBundleModule instance.
     ///
     /// # Arguments
     /// * `private_key` - The private key for signing transactions
@@ -59,7 +62,7 @@ impl TokenBundleClient {
     ) -> eyre::Result<Self> {
         let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
-        Ok(TokenBundleClient {
+        Ok(TokenBundleModule {
             signer,
             wallet_provider,
 
@@ -406,6 +409,47 @@ impl TokenBundleClient {
     }
 }
 
+impl AlkahestExtension for TokenBundleModule {
+    type Client = Self;
+
+    async fn init(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<DefaultExtensionConfig>,
+    ) -> eyre::Result<Self> {
+        Self::new(
+            private_key,
+            rpc_url,
+            config.map(|c| c.token_bundle_addresses),
+        )
+        .await
+    }
+
+    async fn init_with_config<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to TokenBundleAddresses first
+        let token_bundle_addresses = if let Some(addr) = config {
+            let addr_any: &dyn Any = &addr;
+            if let Some(bundle_addr) = addr_any.downcast_ref::<TokenBundleAddresses>() {
+                Some(bundle_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Self::new(private_key, rpc_url, token_bundle_addresses).await
+    }
+
+    fn client(&self) -> Option<&Self::Client> {
+        Some(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -416,9 +460,9 @@ mod tests {
         sol_types::SolValue as _,
     };
 
+    use super::TokenBundleModule;
     use crate::{
         DefaultAlkahestClient,
-        clients::token_bundle::TokenBundleClient,
         contracts::token_bundle::{TokenBundleEscrowObligation, TokenBundlePaymentObligation},
         extensions::{HasErc20, HasErc721, HasErc1155, HasTokenBundle},
         fixtures::{MockERC20Permit, MockERC721, MockERC1155},
@@ -954,7 +998,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = TokenBundleClient::decode_escrow_obligation(encoded.into())?;
+        let decoded = TokenBundleModule::decode_escrow_obligation(encoded.into())?;
 
         // Verify decoded data - note that the bundle verification would need more complex comparison
         assert_eq!(decoded.arbiter, arbiter, "Arbiter should match");
@@ -980,7 +1024,7 @@ mod tests {
         let encoded = payment_data.abi_encode();
 
         // Decode the data
-        let decoded = TokenBundleClient::decode_payment_obligation(encoded.into())?;
+        let decoded = TokenBundleModule::decode_payment_obligation(encoded.into())?;
 
         // Verify decoded data - note that the bundle verification would need more complex comparison
         assert_eq!(decoded.payee, payee, "Payee should match");

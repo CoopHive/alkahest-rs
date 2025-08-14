@@ -15,8 +15,10 @@ use crate::types::{
     ApprovalPurpose, ArbiterData, DecodedAttestation, Erc20Data, Erc721Data, Erc1155Data,
     TokenBundleData,
 };
+use crate::{DefaultExtensionConfig, extensions::AlkahestExtension};
 use crate::{types::WalletProvider, utils};
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Erc20Addresses {
@@ -34,7 +36,7 @@ pub struct Erc20Addresses {
 /// - Managing token approvals and permits
 /// - Collecting payments from fulfilled trades
 #[derive(Clone)]
-pub struct Erc20Client {
+pub struct Erc20Module {
     signer: PrivateKeySigner,
     wallet_provider: WalletProvider,
 
@@ -47,8 +49,8 @@ impl Default for Erc20Addresses {
     }
 }
 
-impl Erc20Client {
-    /// Creates a new ERC20Client instance.
+impl Erc20Module {
+    /// Creates a new Erc20Module instance.
     ///
     /// # Arguments
     /// * `private_key` - The private key for signing transactions
@@ -65,7 +67,7 @@ impl Erc20Client {
         let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
         println!("Using RPC URL: {}", rpc_url.to_string());
         println!("Using addresses: {:?}", addresses);
-        Ok(Erc20Client {
+        Ok(Erc20Module {
             signer,
             wallet_provider,
 
@@ -1104,6 +1106,45 @@ impl Erc20Client {
     }
 }
 
+impl AlkahestExtension for Erc20Module {
+    type Client = Self;
+
+    async fn init(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<DefaultExtensionConfig>,
+    ) -> eyre::Result<Self> {
+        Self::new(private_key, rpc_url, config.map(|c| c.erc20_addresses)).await
+    }
+
+    /// Custom implementation that can handle Erc20Addresses directly
+    async fn init_with_config<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to Erc20Addresses first
+        let erc20_addresses = if let Some(addr) = config {
+            // Use Any trait to attempt downcast
+            let addr_any: &dyn Any = &addr;
+            if let Some(erc20_addr) = addr_any.downcast_ref::<Erc20Addresses>() {
+                Some(erc20_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        println!("Using RPC URL: {}", rpc_url.to_string());
+        println!("init_with_addresses Using addresses: {:?}", erc20_addresses);
+        Self::new(private_key, rpc_url, erc20_addresses).await
+    }
+
+    fn client(&self) -> Option<&Self::Client> {
+        Some(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1114,9 +1155,9 @@ mod tests {
         sol_types::SolValue,
     };
 
+    use super::Erc20Module;
     use crate::{
         DefaultAlkahestClient,
-        clients::erc20::Erc20Client,
         contracts::ERC20PaymentObligation,
         extensions::{AlkahestExtension, HasErc20, HasErc721, HasErc1155, HasTokenBundle},
         fixtures::{MockERC20Permit, MockERC721, MockERC1155},
@@ -1148,7 +1189,7 @@ mod tests {
         let encoded = escrow_data.abi_encode();
 
         // Decode the data
-        let decoded = Erc20Client::decode_escrow_obligation(&encoded.into())?;
+        let decoded = Erc20Module::decode_escrow_obligation(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.token, token_address, "Token address should match");
@@ -1179,7 +1220,7 @@ mod tests {
         let encoded = payment_data.abi_encode();
 
         // Decode the data
-        let decoded = Erc20Client::decode_payment_obligation(&encoded.into())?;
+        let decoded = Erc20Module::decode_payment_obligation(&encoded.into())?;
 
         // Verify decoded data
         assert_eq!(decoded.token, token_address, "Token address should match");
@@ -1212,7 +1253,7 @@ mod tests {
         let _receipt = test
             .alice_client
             .extensions
-            .get_client::<Erc20Client>()
+            .get_client::<Erc20Module>()
             .approve(&token, ApprovalPurpose::Payment)
             .await?;
 

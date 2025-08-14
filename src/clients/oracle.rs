@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     collections::HashMap,
     marker::PhantomData,
     sync::Arc,
@@ -25,11 +26,13 @@ use tokio::{sync::RwLock, time::Duration};
 use tracing;
 
 use crate::{
+    DefaultExtensionConfig,
     addresses::BASE_SEPOLIA_ADDRESSES,
     contracts::{
         IEAS::{self, Attestation},
         TrustedOracleArbiter,
     },
+    extensions::AlkahestExtension,
     types::{PublicProvider, WalletProvider},
     utils,
 };
@@ -41,7 +44,7 @@ pub struct OracleAddresses {
 }
 
 #[derive(Clone)]
-pub struct OracleClient {
+pub struct OracleModule {
     _signer: PrivateKeySigner,
     public_provider: PublicProvider,
     wallet_provider: WalletProvider,
@@ -200,6 +203,50 @@ impl<F> AsyncEscrowArbitration<F> {
     }
 }
 
+impl AlkahestExtension for OracleModule {
+    type Client = Self;
+
+    async fn init(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<DefaultExtensionConfig>,
+    ) -> eyre::Result<Self> {
+        Self::new(
+            private_key,
+            rpc_url,
+            config.map(|c| OracleAddresses {
+                eas: c.arbiters_addresses.eas,
+                trusted_oracle_arbiter: c.arbiters_addresses.trusted_oracle_arbiter,
+            }),
+        )
+        .await
+    }
+
+    async fn init_with_config<A: Clone + Send + Sync + 'static>(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<A>,
+    ) -> eyre::Result<Self> {
+        // Try to downcast to OracleAddresses first
+        let oracle_addresses = if let Some(addr) = config {
+            let addr_any: &dyn Any = &addr;
+            if let Some(oracle_addr) = addr_any.downcast_ref::<OracleAddresses>() {
+                Some(oracle_addr.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Self::new(private_key, rpc_url, oracle_addresses).await
+    }
+
+    fn client(&self) -> Option<&Self::Client> {
+        Some(self)
+    }
+}
+
 impl<ObligationData, DemandData, F, Fut> EscrowArbitrationStrategy<ObligationData, DemandData>
     for AsyncEscrowArbitration<F>
 where
@@ -257,7 +304,7 @@ pub struct ListenAndArbitrateForEscrowResult<ObligationData: SolType, DemandData
     pub fulfillment_subscription_id: FixedBytes<32>,
 }
 
-impl OracleClient {
+impl OracleModule {
     pub async fn new(
         signer: PrivateKeySigner,
         rpc_url: impl ToString + Clone,
@@ -266,14 +313,14 @@ impl OracleClient {
         let public_provider = utils::get_public_provider(rpc_url.clone()).await?;
         let wallet_provider = utils::get_wallet_provider(signer.clone(), rpc_url.clone()).await?;
 
-        Ok(OracleClient {
+        Ok(OracleModule {
             _signer: signer,
             public_provider: public_provider.clone(),
             wallet_provider,
-
             addresses: addresses.unwrap_or_default(),
         })
     }
+
     pub async fn unsubscribe(&self, local_id: FixedBytes<32>) -> eyre::Result<()> {
         self.public_provider
             .unsubscribe(local_id)
