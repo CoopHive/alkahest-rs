@@ -5,7 +5,10 @@ use alloy::{
     signers::local::PrivateKeySigner,
     sol_types::SolEvent,
 };
-use extensions::{AlkahestExtension, BaseExtensions};
+use extensions::{
+    AlkahestExtension, BaseExtensions, HasArbiters, HasAttestation, HasErc20, HasErc721,
+    HasErc1155, HasStringObligation, HasTokenBundle,
+};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use sol_types::EscrowClaimed;
@@ -25,9 +28,16 @@ pub mod clients;
 pub mod contracts;
 pub mod extensions;
 pub mod fixtures;
+pub mod registry;
 pub mod sol_types;
 pub mod types;
 pub mod utils;
+
+// Re-export registry types for convenience
+pub use registry::{
+    ArbitersContract, AttestationContract, ContractModule, Erc20Contract, Erc721Contract,
+    Erc1155Contract, StringObligationContract, TokenBundleContract,
+};
 
 /// Configuration struct containing all contract addresses for Alkahest protocol extensions.
 ///
@@ -119,6 +129,130 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
             rpc_url: rpc_url.to_string(),
             extension_configs: std::collections::HashMap::new(),
         })
+    }
+
+    /// Get the address of a specific ERC20 contract
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// use alkahest_rs::registry::Erc20Contract;
+    ///
+    /// let escrow_addr = client.erc20_address(Erc20Contract::EscrowObligation);
+    /// ```
+    pub fn erc20_address(&self, contract: registry::Erc20Contract) -> Address
+    where
+        Extensions: extensions::HasErc20,
+    {
+        match contract {
+            registry::Erc20Contract::Eas => self.erc20().addresses.eas,
+            registry::Erc20Contract::BarterUtils => self.erc20().addresses.barter_utils,
+            registry::Erc20Contract::EscrowObligation => self.erc20().addresses.escrow_obligation,
+            registry::Erc20Contract::PaymentObligation => self.erc20().addresses.payment_obligation,
+        }
+    }
+
+    /// Get the address of a specific ERC721 contract
+    pub fn erc721_address(&self, contract: registry::Erc721Contract) -> Address
+    where
+        Extensions: extensions::HasErc721,
+    {
+        match contract {
+            registry::Erc721Contract::Eas => self.erc721().addresses.eas,
+            registry::Erc721Contract::BarterUtils => self.erc721().addresses.barter_utils,
+            registry::Erc721Contract::EscrowObligation => self.erc721().addresses.escrow_obligation,
+            registry::Erc721Contract::PaymentObligation => {
+                self.erc721().addresses.payment_obligation
+            }
+        }
+    }
+
+    /// Get the address of a specific ERC1155 contract
+    pub fn erc1155_address(&self, contract: registry::Erc1155Contract) -> Address
+    where
+        Extensions: extensions::HasErc1155,
+    {
+        match contract {
+            registry::Erc1155Contract::Eas => self.erc1155().addresses.eas,
+            registry::Erc1155Contract::BarterUtils => self.erc1155().addresses.barter_utils,
+            registry::Erc1155Contract::EscrowObligation => {
+                self.erc1155().addresses.escrow_obligation
+            }
+            registry::Erc1155Contract::PaymentObligation => {
+                self.erc1155().addresses.payment_obligation
+            }
+        }
+    }
+
+    /// Get the address of a specific TokenBundle contract
+    pub fn token_bundle_address(&self, contract: registry::TokenBundleContract) -> Address
+    where
+        Extensions: extensions::HasTokenBundle,
+    {
+        match contract {
+            registry::TokenBundleContract::Eas => self.token_bundle().addresses.eas,
+            registry::TokenBundleContract::BarterUtils => {
+                self.token_bundle().addresses.barter_utils
+            }
+            registry::TokenBundleContract::EscrowObligation => {
+                self.token_bundle().addresses.escrow_obligation
+            }
+            registry::TokenBundleContract::PaymentObligation => {
+                self.token_bundle().addresses.payment_obligation
+            }
+        }
+    }
+
+    /// Get the address of a specific Attestation contract
+    pub fn attestation_address(&self, contract: registry::AttestationContract) -> Address
+    where
+        Extensions: extensions::HasAttestation,
+    {
+        match contract {
+            registry::AttestationContract::Eas => self.attestation().addresses.eas,
+            registry::AttestationContract::EasSchemaRegistry => {
+                self.attestation().addresses.eas_schema_registry
+            }
+            registry::AttestationContract::BarterUtils => self.attestation().addresses.barter_utils,
+            registry::AttestationContract::EscrowObligation => {
+                self.attestation().addresses.escrow_obligation
+            }
+            registry::AttestationContract::EscrowObligation2 => {
+                self.attestation().addresses.escrow_obligation_2
+            }
+        }
+    }
+
+    /// Get the address of a specific StringObligation contract
+    pub fn string_obligation_address(&self, contract: registry::StringObligationContract) -> Address
+    where
+        Extensions: extensions::HasStringObligation,
+    {
+        match contract {
+            registry::StringObligationContract::Eas => self.string_obligation().addresses.eas,
+            registry::StringObligationContract::Obligation => {
+                self.string_obligation().addresses.obligation
+            }
+        }
+    }
+
+    /// Get the address of a specific Arbiters contract
+    pub fn arbiters_address(&self, contract: registry::ArbitersContract) -> Address
+    where
+        Extensions: extensions::HasArbiters,
+    {
+        match contract {
+            registry::ArbitersContract::Eas => self.arbiters().addresses.eas,
+            registry::ArbitersContract::SpecificAttestationArbiter => {
+                self.arbiters().addresses.specific_attestation_arbiter
+            }
+            registry::ArbitersContract::TrustedPartyArbiter => {
+                self.arbiters().addresses.trusted_party_arbiter
+            }
+            registry::ArbitersContract::TrivialArbiter => self.arbiters().addresses.trivial_arbiter,
+            registry::ArbitersContract::TrustedOracleArbiter => {
+                self.arbiters().addresses.trusted_oracle_arbiter
+            }
+        }
     }
 
     /// Add an extension using a custom config type
