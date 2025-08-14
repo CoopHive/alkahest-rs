@@ -15,7 +15,12 @@ pub use crate::clients::{
     string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses,
 };
 
+use crate::registry::{
+    ArbitersContract, AttestationContract, ContractModule, Erc20Contract, Erc721Contract,
+    Erc1155Contract, StringObligationContract, TokenBundleContract,
+};
 use crate::{AlkahestClient, DefaultExtensionConfig};
+use alloy::primitives::Address;
 
 pub trait AlkahestExtension: Clone + Send + Sync + 'static {
     fn init(
@@ -198,30 +203,65 @@ impl AlkahestExtension for BaseExtensions {
 
 pub trait HasErc20 {
     fn erc20(&self) -> &Erc20Module;
+
+    /// Get the address of a specific ERC20 contract
+    fn erc20_address(&self, contract: Erc20Contract) -> Address {
+        self.erc20().address(contract)
+    }
 }
 
 pub trait HasErc721 {
     fn erc721(&self) -> &Erc721Module;
+
+    /// Get the address of a specific ERC721 contract
+    fn erc721_address(&self, contract: Erc721Contract) -> Address {
+        self.erc721().address(contract)
+    }
 }
 
 pub trait HasErc1155 {
     fn erc1155(&self) -> &Erc1155Module;
+
+    /// Get the address of a specific ERC1155 contract
+    fn erc1155_address(&self, contract: Erc1155Contract) -> Address {
+        self.erc1155().address(contract)
+    }
 }
 
 pub trait HasTokenBundle {
     fn token_bundle(&self) -> &TokenBundleModule;
+
+    /// Get the address of a specific TokenBundle contract
+    fn token_bundle_address(&self, contract: TokenBundleContract) -> Address {
+        self.token_bundle().address(contract)
+    }
 }
 
 pub trait HasAttestation {
     fn attestation(&self) -> &AttestationModule;
+
+    /// Get the address of a specific Attestation contract
+    fn attestation_address(&self, contract: AttestationContract) -> Address {
+        self.attestation().address(contract)
+    }
 }
 
 pub trait HasStringObligation {
     fn string_obligation(&self) -> &StringObligationModule;
+
+    /// Get the address of a specific StringObligation contract
+    fn string_obligation_address(&self, contract: StringObligationContract) -> Address {
+        self.string_obligation().address(contract)
+    }
 }
 
 pub trait HasArbiters {
     fn arbiters(&self) -> &ArbitersModule;
+
+    /// Get the address of a specific Arbiters contract
+    fn arbiters_address(&self, contract: ArbitersContract) -> Address {
+        self.arbiters().address(contract)
+    }
 }
 
 pub trait HasOracle {
