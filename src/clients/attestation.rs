@@ -343,8 +343,6 @@ impl AttestationModule {
 }
 
 impl AlkahestExtension for AttestationModule {
-    type Client = Self;
-
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
@@ -376,10 +374,6 @@ impl AlkahestExtension for AttestationModule {
         };
 
         Self::new(private_key, rpc_url, attestation_addresses).await
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(self)
     }
 }
 

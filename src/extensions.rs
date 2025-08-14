@@ -17,10 +17,7 @@ pub use crate::clients::{
 
 use crate::{AlkahestClient, DefaultExtensionConfig};
 
-pub trait AlkahestExtension: Clone + Send + Sync {
-    /// Associated type for the client - can be () for extensions without a single client
-    type Client: Clone + Send + Sync + 'static;
-
+pub trait AlkahestExtension: Clone + Send + Sync + 'static {
     fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
@@ -42,21 +39,11 @@ pub trait AlkahestExtension: Clone + Send + Sync {
         }
     }
 
-    /// Get the client directly - implement this for modules with a single client
-    fn client(&self) -> Option<&Self::Client> {
-        None
-    }
-
     /// Recursively search for a client by type - this is the main method
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
-        // Default implementation for modules with a single client
-        if let Some(client) = self.client() {
-            let client_any: &dyn Any = client;
-            if let Some(downcasted) = client_any.downcast_ref::<T>() {
-                return Some(downcasted);
-            }
-        }
-        None
+        // Default implementation - try to downcast self
+        let self_any: &dyn Any = self;
+        self_any.downcast_ref::<T>()
     }
 
     /// Get a reference to a client by type, panicking if not found
@@ -75,8 +62,6 @@ pub trait AlkahestExtension: Clone + Send + Sync {
 pub struct NoExtension;
 
 impl AlkahestExtension for NoExtension {
-    type Client = ();
-
     async fn init(
         _private_key: PrivateKeySigner,
         _rpc_url: impl ToString + Clone + Send,
@@ -93,7 +78,7 @@ impl AlkahestExtension for NoExtension {
         Ok(NoExtension)
     }
 
-    // Uses default implementation that returns None
+    // Uses default implementation for find_client
 }
 
 /// Joins two extensions together into a single extension type
@@ -104,8 +89,6 @@ pub struct JoinExtension<A: AlkahestExtension, B: AlkahestExtension> {
 }
 
 impl<A: AlkahestExtension, B: AlkahestExtension> AlkahestExtension for JoinExtension<A, B> {
-    type Client = ();
-
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
@@ -151,8 +134,6 @@ pub struct BaseExtensions {
 }
 
 impl AlkahestExtension for BaseExtensions {
-    type Client = ();
-
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,

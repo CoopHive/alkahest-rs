@@ -153,8 +153,6 @@ impl StringObligationModule {
 }
 
 impl AlkahestExtension for StringObligationModule {
-    type Client = Self;
-
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
@@ -186,9 +184,5 @@ impl AlkahestExtension for StringObligationModule {
         };
 
         Self::new(private_key, rpc_url, string_obligation_addresses).await
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(self)
     }
 }

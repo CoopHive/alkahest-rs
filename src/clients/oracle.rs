@@ -204,8 +204,6 @@ impl<F> AsyncEscrowArbitration<F> {
 }
 
 impl AlkahestExtension for OracleModule {
-    type Client = Self;
-
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
@@ -240,10 +238,6 @@ impl AlkahestExtension for OracleModule {
         };
 
         Self::new(private_key, rpc_url, oracle_addresses).await
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(self)
     }
 }
 

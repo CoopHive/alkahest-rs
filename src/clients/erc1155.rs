@@ -574,8 +574,6 @@ impl Erc1155Module {
 }
 
 impl AlkahestExtension for Erc1155Module {
-    type Client = Self;
-
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
@@ -602,10 +600,6 @@ impl AlkahestExtension for Erc1155Module {
         };
 
         Self::new(private_key, rpc_url, erc1155_addresses).await
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(self)
     }
 }
 

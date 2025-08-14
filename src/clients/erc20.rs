@@ -1107,8 +1107,6 @@ impl Erc20Module {
 }
 
 impl AlkahestExtension for Erc20Module {
-    type Client = Self;
-
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
@@ -1138,10 +1136,6 @@ impl AlkahestExtension for Erc20Module {
         println!("Using RPC URL: {}", rpc_url.to_string());
         println!("init_with_addresses Using addresses: {:?}", erc20_addresses);
         Self::new(private_key, rpc_url, erc20_addresses).await
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(self)
     }
 }
 

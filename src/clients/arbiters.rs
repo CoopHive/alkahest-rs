@@ -206,8 +206,6 @@ sol! {
 }
 
 impl AlkahestExtension for ArbitersModule {
-    type Client = Self;
-
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
@@ -233,10 +231,6 @@ impl AlkahestExtension for ArbitersModule {
             None
         };
         Self::new(private_key, rpc_url, arbiters_addresses).await
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(self)
     }
 }
 

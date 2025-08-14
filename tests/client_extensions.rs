@@ -8,14 +8,9 @@ use alloy::{primitives::address, signers::local::PrivateKeySigner};
 use eyre::Result;
 use serial_test::serial;
 
-// Custom extension for testing
+/// Custom extension for testing
 #[derive(Clone)]
 pub struct CustomTrackerExtension {
-    pub client: CustomTrackerClient,
-}
-
-#[derive(Clone)]
-pub struct CustomTrackerClient {
     pub name: String,
     pub counter: u64,
     pub metadata: Option<String>,
@@ -28,7 +23,7 @@ pub struct CustomTrackerConfig {
     pub metadata: Option<String>,
 }
 
-impl CustomTrackerClient {
+impl CustomTrackerExtension {
     pub fn new(config: Option<CustomTrackerConfig>) -> Self {
         let config = config.unwrap_or_else(|| CustomTrackerConfig {
             name: "default_tracker".to_string(),
@@ -57,15 +52,12 @@ impl CustomTrackerClient {
 }
 
 impl AlkahestExtension for CustomTrackerExtension {
-    type Client = CustomTrackerClient;
-
     async fn init(
         _private_key: PrivateKeySigner,
         _rpc_url: impl ToString + Clone + Send,
         _config: Option<DefaultExtensionConfig>,
     ) -> eyre::Result<Self> {
-        let client = CustomTrackerClient::new(None);
-        Ok(CustomTrackerExtension { client })
+        Ok(CustomTrackerExtension::new(None))
     }
 
     async fn init_with_config<A: Clone + Send + Sync + 'static>(
@@ -85,12 +77,7 @@ impl AlkahestExtension for CustomTrackerExtension {
             None
         };
 
-        let client = CustomTrackerClient::new(config);
-        Ok(CustomTrackerExtension { client })
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(&self.client)
+        Ok(CustomTrackerExtension::new(config))
     }
 }
 
@@ -123,14 +110,14 @@ async fn test_custom_tracker_extension() -> Result<()> {
     assert_eq!(
         client_with_tracker
             .extensions
-            .get_client::<CustomTrackerClient>()
+            .get_client::<CustomTrackerExtension>()
             .get_counter(),
         10
     );
     assert_eq!(
         client_with_tracker
             .extensions
-            .get_client::<CustomTrackerClient>()
+            .get_client::<CustomTrackerExtension>()
             .metadata,
         None
     );
@@ -292,7 +279,7 @@ async fn test_no_config_provided() -> Result<()> {
     // But the extension should still work with default values
     let tracker_client = client_with_tracker
         .extensions
-        .get_client::<CustomTrackerClient>();
+        .get_client::<CustomTrackerExtension>();
     assert_eq!(tracker_client.name, "default_tracker");
     assert_eq!(tracker_client.counter, 0);
     assert_eq!(tracker_client.metadata, None);
@@ -322,8 +309,8 @@ async fn test_client_with_initialized_extension() -> Result<()> {
     // Verify the extension was added
     assert!(client_with_erc20.extensions.has_client::<Erc20Module>());
 
-    // Test accessing the client
-    let _erc20_client = client_with_erc20.erc20();
+    // Test accessing the module
+    let _erc20_module = client_with_erc20.erc20();
 
     Ok(())
 }

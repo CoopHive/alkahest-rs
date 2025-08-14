@@ -588,8 +588,6 @@ impl Erc721Module {
 }
 
 impl AlkahestExtension for Erc721Module {
-    type Client = Self;
-
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
@@ -616,10 +614,6 @@ impl AlkahestExtension for Erc721Module {
         };
 
         Self::new(private_key, rpc_url, erc721_addresses).await
-    }
-
-    fn client(&self) -> Option<&Self::Client> {
-        Some(self)
     }
 }
 
