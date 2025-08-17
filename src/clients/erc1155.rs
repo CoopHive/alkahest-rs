@@ -5,14 +5,13 @@ use alloy::sol_types::SolValue as _;
 
 use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts;
+use crate::extensions::AlkahestExtension;
 use crate::types::{
     ApprovalPurpose, ArbiterData, DecodedAttestation, Erc20Data, Erc721Data, Erc1155Data,
     TokenBundleData,
 };
-use crate::{DefaultExtensionConfig, extensions::AlkahestExtension};
 use crate::{types::WalletProvider, utils};
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Erc1155Addresses {
@@ -574,32 +573,14 @@ impl Erc1155Module {
 }
 
 impl AlkahestExtension for Erc1155Module {
+    type Config = Erc1155Addresses;
+
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
+        config: Option<Self::Config>,
     ) -> eyre::Result<Self> {
-        Self::new(private_key, rpc_url, config.map(|c| c.erc1155_addresses)).await
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to Erc1155Addresses first
-        let erc1155_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(erc1155_addr) = addr_any.downcast_ref::<Erc1155Addresses>() {
-                Some(erc1155_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        Self::new(private_key, rpc_url, erc1155_addresses).await
+        Self::new(private_key, rpc_url, config).await
     }
 }
 

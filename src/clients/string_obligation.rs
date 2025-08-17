@@ -1,5 +1,4 @@
 use crate::{
-    DefaultExtensionConfig,
     addresses::BASE_SEPOLIA_ADDRESSES,
     contracts,
     extensions::AlkahestExtension,
@@ -13,7 +12,6 @@ use alloy::{
     sol_types::SolValue as _,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StringObligationAddresses {
@@ -153,36 +151,13 @@ impl StringObligationModule {
 }
 
 impl AlkahestExtension for StringObligationModule {
+    type Config = StringObligationAddresses;
+
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
+        config: Option<Self::Config>,
     ) -> eyre::Result<Self> {
-        Self::new(
-            private_key,
-            rpc_url,
-            config.map(|c| c.string_obligation_addresses),
-        )
-        .await
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to StringObligationAddresses first
-        let string_obligation_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(string_addr) = addr_any.downcast_ref::<StringObligationAddresses>() {
-                Some(string_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        Self::new(private_key, rpc_url, string_obligation_addresses).await
+        Self::new(private_key, rpc_url, config).await
     }
 }

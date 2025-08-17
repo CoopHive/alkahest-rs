@@ -8,10 +8,9 @@ use serde::{Deserialize, Serialize};
 use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::IEAS::Attestation;
 use crate::contracts::{self, IEAS};
+use crate::extensions::AlkahestExtension;
 use crate::types::{ArbiterData, DecodedAttestation};
-use crate::{DefaultExtensionConfig, extensions::AlkahestExtension};
 use crate::{types::WalletProvider, utils};
-use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationAddresses {
@@ -343,37 +342,14 @@ impl AttestationModule {
 }
 
 impl AlkahestExtension for AttestationModule {
+    type Config = AttestationAddresses;
+
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
+        config: Option<Self::Config>,
     ) -> eyre::Result<Self> {
-        Self::new(
-            private_key,
-            rpc_url,
-            config.map(|c| c.attestation_addresses),
-        )
-        .await
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to AttestationAddresses first
-        let attestation_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(attestation_addr) = addr_any.downcast_ref::<AttestationAddresses>() {
-                Some(attestation_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        Self::new(private_key, rpc_url, attestation_addresses).await
+        Self::new(private_key, rpc_url, config).await
     }
 }
 

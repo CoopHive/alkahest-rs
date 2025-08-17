@@ -8,13 +8,11 @@ use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::{self, IERC20, IERC721, IERC1155};
 use crate::types::{ArbiterData, DecodedAttestation, TokenBundleData};
 use crate::{
-    DefaultExtensionConfig,
     extensions::AlkahestExtension,
     types::{ApprovalPurpose, WalletProvider},
     utils,
 };
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenBundleAddresses {
@@ -410,37 +408,14 @@ impl TokenBundleModule {
 }
 
 impl AlkahestExtension for TokenBundleModule {
+    type Config = TokenBundleAddresses;
+
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
+        config: Option<Self::Config>,
     ) -> eyre::Result<Self> {
-        Self::new(
-            private_key,
-            rpc_url,
-            config.map(|c| c.token_bundle_addresses),
-        )
-        .await
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to TokenBundleAddresses first
-        let token_bundle_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(bundle_addr) = addr_any.downcast_ref::<TokenBundleAddresses>() {
-                Some(bundle_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        Self::new(private_key, rpc_url, token_bundle_addresses).await
+        Self::new(private_key, rpc_url, config).await
     }
 }
 

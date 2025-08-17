@@ -11,14 +11,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::{self, ERC20Permit};
+use crate::extensions::AlkahestExtension;
 use crate::types::{
     ApprovalPurpose, ArbiterData, DecodedAttestation, Erc20Data, Erc721Data, Erc1155Data,
     TokenBundleData,
 };
-use crate::{DefaultExtensionConfig, extensions::AlkahestExtension};
 use crate::{types::WalletProvider, utils};
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Erc20Addresses {
@@ -1107,35 +1106,14 @@ impl Erc20Module {
 }
 
 impl AlkahestExtension for Erc20Module {
+    type Config = Erc20Addresses;
+
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
+        config: Option<Self::Config>,
     ) -> eyre::Result<Self> {
-        Self::new(private_key, rpc_url, config.map(|c| c.erc20_addresses)).await
-    }
-
-    /// Custom implementation that can handle Erc20Addresses directly
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to Erc20Addresses first
-        let erc20_addresses = if let Some(addr) = config {
-            // Use Any trait to attempt downcast
-            let addr_any: &dyn Any = &addr;
-            if let Some(erc20_addr) = addr_any.downcast_ref::<Erc20Addresses>() {
-                Some(erc20_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        println!("Using RPC URL: {}", rpc_url.to_string());
-        println!("init_with_addresses Using addresses: {:?}", erc20_addresses);
-        Self::new(private_key, rpc_url, erc20_addresses).await
+        Self::new(private_key, rpc_url, config).await
     }
 }
 

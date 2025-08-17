@@ -1,5 +1,4 @@
 use crate::{
-    DefaultExtensionConfig,
     addresses::BASE_SEPOLIA_ADDRESSES,
     contracts,
     extensions::AlkahestExtension,
@@ -16,7 +15,6 @@ use alloy::{
 };
 use futures_util::StreamExt as _;
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArbitersAddresses {
@@ -206,31 +204,14 @@ sol! {
 }
 
 impl AlkahestExtension for ArbitersModule {
+    type Config = ArbitersAddresses;
+
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
+        config: Option<Self::Config>,
     ) -> eyre::Result<Self> {
-        Self::new(private_key, rpc_url, config.map(|c| c.arbiters_addresses)).await
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to ArbitersAddresses first
-        let arbiters_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(arbiters_addr) = addr_any.downcast_ref::<ArbitersAddresses>() {
-                Some(arbiters_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        Self::new(private_key, rpc_url, arbiters_addresses).await
+        Self::new(private_key, rpc_url, config).await
     }
 }
 

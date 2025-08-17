@@ -18,26 +18,15 @@ pub use crate::clients::{
 use crate::{AlkahestClient, DefaultExtensionConfig};
 
 pub trait AlkahestExtension: Clone + Send + Sync + 'static {
+    /// The configuration type for this extension
+    type Config: Clone + Send + Sync + 'static;
+
+    /// Initialize the extension with its specific configuration
     fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
+        config: Option<Self::Config>,
     ) -> impl std::future::Future<Output = eyre::Result<Self>> + Send;
-
-    /// Generic initialization method that can accept any config type
-    fn init_with_config<A: Clone + Send + Sync + 'static>(
-        _private_key: PrivateKeySigner,
-        _rpc_url: impl ToString + Clone + Send,
-        _config: Option<A>,
-    ) -> impl std::future::Future<Output = eyre::Result<Self>> + Send {
-        // Default implementation that throws an error - must be implemented by each module
-        async move {
-            Err(eyre::eyre!(
-                "init_with_config not implemented for {}. Please implement this method or use init() instead.",
-                std::any::type_name::<Self>()
-            ))
-        }
-    }
 
     /// Recursively search for a client by type - this is the main method
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
@@ -61,19 +50,17 @@ pub trait AlkahestExtension: Clone + Send + Sync + 'static {
 #[derive(Clone)]
 pub struct NoExtension;
 
+/// Empty configuration for NoExtension
+#[derive(Clone)]
+pub struct NoConfig;
+
 impl AlkahestExtension for NoExtension {
+    type Config = NoConfig;
+
     async fn init(
         _private_key: PrivateKeySigner,
         _rpc_url: impl ToString + Clone + Send,
-        _config: Option<DefaultExtensionConfig>,
-    ) -> eyre::Result<Self> {
-        Ok(NoExtension)
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        _private_key: PrivateKeySigner,
-        _rpc_url: impl ToString + Clone + Send,
-        _config: Option<A>,
+        _config: Option<Self::Config>,
     ) -> eyre::Result<Self> {
         Ok(NoExtension)
     }
@@ -88,25 +75,28 @@ pub struct JoinExtension<A: AlkahestExtension, B: AlkahestExtension> {
     pub right: B,
 }
 
+/// Configuration for JoinExtension combines both extension configs
+#[derive(Clone)]
+pub struct JoinConfig<AC: Clone + Send + Sync + 'static, BC: Clone + Send + Sync + 'static> {
+    pub left_config: Option<AC>,
+    pub right_config: Option<BC>,
+}
+
 impl<A: AlkahestExtension, B: AlkahestExtension> AlkahestExtension for JoinExtension<A, B> {
+    type Config = JoinConfig<A::Config, B::Config>;
+
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
+        config: Option<Self::Config>,
     ) -> eyre::Result<Self> {
-        let left = A::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
-        let right = B::init(private_key, rpc_url, config).await?;
-        Ok(JoinExtension { left, right })
-    }
+        let (left_config, right_config) = match config {
+            Some(c) => (c.left_config, c.right_config),
+            None => (None, None),
+        };
 
-    async fn init_with_config<C: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<C>,
-    ) -> eyre::Result<Self> {
-        let left =
-            A::init_with_config(private_key.clone(), rpc_url.clone(), config.clone()).await?;
-        let right = B::init_with_config(private_key, rpc_url, config).await?;
+        let left = A::init(private_key.clone(), rpc_url.clone(), left_config).await?;
+        let right = B::init(private_key, rpc_url, right_config).await?;
         Ok(JoinExtension { left, right })
     }
 
@@ -134,26 +124,50 @@ pub struct BaseExtensions {
 }
 
 impl AlkahestExtension for BaseExtensions {
+    type Config = DefaultExtensionConfig;
+
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
         config: Option<DefaultExtensionConfig>,
     ) -> eyre::Result<Self> {
-        let erc20 = Erc20Module::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
+        // Extract individual configs from the combined config
+        let erc20_config = config.as_ref().map(|c| c.erc20_addresses.clone());
+        let erc721_config = config.as_ref().map(|c| c.erc721_addresses.clone());
+        let erc1155_config = config.as_ref().map(|c| c.erc1155_addresses.clone());
+        let token_bundle_config = config.as_ref().map(|c| c.token_bundle_addresses.clone());
+        let attestation_config = config.as_ref().map(|c| c.attestation_addresses.clone());
+        let string_obligation_config = config
+            .as_ref()
+            .map(|c| c.string_obligation_addresses.clone());
+        let arbiters_config = config.as_ref().map(|c| c.arbiters_addresses.clone());
+        let oracle_config = config.as_ref().map(|c| OracleAddresses {
+            eas: c.arbiters_addresses.eas.clone(),
+            trusted_oracle_arbiter: c.arbiters_addresses.trusted_oracle_arbiter.clone(),
+        });
+
+        // Initialize each module with its specific configuration
+        let erc20 = Erc20Module::init(private_key.clone(), rpc_url.clone(), erc20_config).await?;
         let erc721 =
-            Erc721Module::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
+            Erc721Module::init(private_key.clone(), rpc_url.clone(), erc721_config).await?;
         let erc1155 =
-            Erc1155Module::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
+            Erc1155Module::init(private_key.clone(), rpc_url.clone(), erc1155_config).await?;
         let token_bundle =
-            TokenBundleModule::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
-        let attestation =
-            AttestationModule::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
-        let string_obligation =
-            StringObligationModule::init(private_key.clone(), rpc_url.clone(), config.clone())
+            TokenBundleModule::init(private_key.clone(), rpc_url.clone(), token_bundle_config)
                 .await?;
+        let attestation =
+            AttestationModule::init(private_key.clone(), rpc_url.clone(), attestation_config)
+                .await?;
+        let string_obligation = StringObligationModule::init(
+            private_key.clone(),
+            rpc_url.clone(),
+            string_obligation_config,
+        )
+        .await?;
         let arbiters =
-            ArbitersModule::init(private_key.clone(), rpc_url.clone(), config.clone()).await?;
-        let oracle = OracleModule::init(private_key.clone(), rpc_url.clone(), config).await?;
+            ArbitersModule::init(private_key.clone(), rpc_url.clone(), arbiters_config).await?;
+        let oracle =
+            OracleModule::init(private_key.clone(), rpc_url.clone(), oracle_config).await?;
 
         Ok(BaseExtensions {
             erc20,

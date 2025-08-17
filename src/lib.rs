@@ -112,13 +112,13 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
     pub async fn new(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        addresses: Option<DefaultExtensionConfig>,
+        config: Option<Extensions::Config>,
     ) -> eyre::Result<Self> {
         let wallet_provider =
             utils::get_wallet_provider(private_key.clone(), rpc_url.clone()).await?;
         let public_provider = utils::get_public_provider(rpc_url.clone()).await?;
 
-        let extensions = Extensions::init(private_key.clone(), rpc_url.clone(), addresses).await?;
+        let extensions = Extensions::init(private_key.clone(), rpc_url.clone(), config).await?;
 
         Ok(AlkahestClient {
             wallet_provider,
@@ -129,6 +129,16 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
             rpc_url: rpc_url.to_string(),
             extension_configs: std::collections::HashMap::new(),
         })
+    }
+
+    /// Create a client with the default BaseExtensions using DefaultExtensionConfig
+    /// This is a convenience method for the common case
+    pub async fn with_base_extensions(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+        config: Option<DefaultExtensionConfig>,
+    ) -> eyre::Result<AlkahestClient<BaseExtensions>> {
+        AlkahestClient::<BaseExtensions>::new(private_key, rpc_url, config).await
     }
 
     /// Get the address of a specific ERC20 contract
@@ -255,10 +265,10 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
         }
     }
 
-    /// Add an extension using a custom config type
-    pub async fn with_extension<NewExt: AlkahestExtension, A: Clone + Send + Sync + 'static>(
+    /// Add an extension using its specific config type
+    pub async fn with_extension<NewExt: AlkahestExtension>(
         mut self,
-        config: Option<A>,
+        config: Option<NewExt::Config>,
     ) -> eyre::Result<AlkahestClient<extensions::JoinExtension<Extensions, NewExt>>> {
         // Store the config for later use if provided
         if let Some(ref cfg) = config {
@@ -268,8 +278,7 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
         }
 
         let new_extension =
-            NewExt::init_with_config(self.private_key.clone(), self.rpc_url.clone(), config)
-                .await?;
+            NewExt::init(self.private_key.clone(), self.rpc_url.clone(), config).await?;
 
         let joined_extensions = extensions::JoinExtension {
             left: self.extensions,

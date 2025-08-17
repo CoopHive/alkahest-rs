@@ -1,5 +1,4 @@
 use std::{
-    any::Any,
     collections::HashMap,
     marker::PhantomData,
     sync::Arc,
@@ -26,7 +25,6 @@ use tokio::{sync::RwLock, time::Duration};
 use tracing;
 
 use crate::{
-    DefaultExtensionConfig,
     addresses::BASE_SEPOLIA_ADDRESSES,
     contracts::{
         IEAS::{self, Attestation},
@@ -204,40 +202,14 @@ impl<F> AsyncEscrowArbitration<F> {
 }
 
 impl AlkahestExtension for OracleModule {
+    type Config = OracleAddresses;
+
     async fn init(
         private_key: PrivateKeySigner,
         rpc_url: impl ToString + Clone + Send,
-        config: Option<DefaultExtensionConfig>,
+        config: Option<Self::Config>,
     ) -> eyre::Result<Self> {
-        Self::new(
-            private_key,
-            rpc_url,
-            config.map(|c| OracleAddresses {
-                eas: c.arbiters_addresses.eas,
-                trusted_oracle_arbiter: c.arbiters_addresses.trusted_oracle_arbiter,
-            }),
-        )
-        .await
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to OracleAddresses first
-        let oracle_addresses = if let Some(addr) = config {
-            let addr_any: &dyn Any = &addr;
-            if let Some(oracle_addr) = addr_any.downcast_ref::<OracleAddresses>() {
-                Some(oracle_addr.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        Self::new(private_key, rpc_url, oracle_addresses).await
+        Self::new(private_key, rpc_url, config).await
     }
 }
 
