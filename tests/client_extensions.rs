@@ -1,7 +1,7 @@
 use alkahest_rs::{
-    AlkahestClient, DefaultExtensionConfig,
+    AlkahestClient,
     clients::erc20::{Erc20Addresses, Erc20Module},
-    extensions::{AlkahestExtension, HasErc20, NoExtension},
+    extensions::{AlkahestExtension, HasErc20},
     utils::setup_test_environment,
 };
 use alloy::{primitives::address, signers::local::PrivateKeySigner};
@@ -23,13 +23,19 @@ pub struct CustomTrackerConfig {
     pub metadata: Option<String>,
 }
 
-impl CustomTrackerExtension {
-    pub fn new(config: Option<CustomTrackerConfig>) -> Self {
-        let config = config.unwrap_or_else(|| CustomTrackerConfig {
+impl Default for CustomTrackerConfig {
+    fn default() -> Self {
+        CustomTrackerConfig {
             name: "default_tracker".to_string(),
             initial_counter: 0,
             metadata: None,
-        });
+        }
+    }
+}
+
+impl CustomTrackerExtension {
+    pub fn new(config: Option<CustomTrackerConfig>) -> Self {
+        let config = config.unwrap_or_default();
 
         Self {
             name: config.name,
@@ -52,31 +58,13 @@ impl CustomTrackerExtension {
 }
 
 impl AlkahestExtension for CustomTrackerExtension {
+    type Config = CustomTrackerConfig;
+
     async fn init(
         _private_key: PrivateKeySigner,
         _rpc_url: impl ToString + Clone + Send,
-        _config: Option<DefaultExtensionConfig>,
+        config: Option<Self::Config>,
     ) -> eyre::Result<Self> {
-        Ok(CustomTrackerExtension::new(None))
-    }
-
-    async fn init_with_config<A: Clone + Send + Sync + 'static>(
-        _private_key: PrivateKeySigner,
-        _rpc_url: impl ToString + Clone + Send,
-        config: Option<A>,
-    ) -> eyre::Result<Self> {
-        // Try to downcast to CustomTrackerConfig
-        let config = if let Some(addr) = config {
-            let addr_any: &dyn std::any::Any = &addr;
-            if let Some(tracker_config) = addr_any.downcast_ref::<CustomTrackerConfig>() {
-                Some(tracker_config.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
         Ok(CustomTrackerExtension::new(config))
     }
 }
@@ -97,91 +85,63 @@ async fn test_custom_tracker_extension() -> Result<()> {
         metadata: None,
     };
 
-    // Start with a client that has no extensions
-    let client =
-        AlkahestClient::<NoExtension>::new(test_context.alice.clone(), &rpc_url, None).await?;
+    // Start with a minimal client (no extensions)
+    let client = AlkahestClient::new(test_context.alice.clone(), &rpc_url).await?;
 
     // Add custom tracker extension with custom config
     let client_with_tracker = client
-        .with_extension::<CustomTrackerExtension, CustomTrackerConfig>(Some(custom_config.clone()))
+        .with_extension::<CustomTrackerExtension>(Some(custom_config.clone()))
         .await?;
 
+    // Access the tracker through find_client
+    let tracker = client_with_tracker
+        .extensions
+        .find_client::<CustomTrackerExtension>()
+        .expect("CustomTrackerExtension should be present");
+
     // Test initial state
-    assert_eq!(
-        client_with_tracker
-            .extensions
-            .get_client::<CustomTrackerExtension>()
-            .get_counter(),
-        10
-    );
-    assert_eq!(
-        client_with_tracker
-            .extensions
-            .get_client::<CustomTrackerExtension>()
-            .metadata,
-        None
-    );
+    assert_eq!(tracker.get_counter(), 10);
+    assert_eq!(tracker.name, "mutation_tracker");
+    assert_eq!(tracker.metadata, None);
 
     Ok(())
 }
 
-/// Test retrieving stored extension config
+/// Test using custom tracker extension with default config
 #[tokio::test]
 #[serial]
-async fn test_get_extension_config() -> Result<()> {
+async fn test_custom_tracker_with_default() -> Result<()> {
     let test_context = setup_test_environment().await?;
 
     // Get the RPC URL from the anvil instance
     let rpc_url = test_context.anvil.ws_endpoint();
 
-    // Create custom tracker config with initial values
-    let custom_config = CustomTrackerConfig {
-        name: "config_test_tracker".to_string(),
-        initial_counter: 42,
-        metadata: Some("test metadata".to_string()),
-    };
+    // Start with a minimal client
+    let client = AlkahestClient::new(test_context.alice.clone(), &rpc_url).await?;
 
-    // Start with a client that has no extensions
-    let client =
-        AlkahestClient::<NoExtension>::new(test_context.alice.clone(), &rpc_url, None).await?;
-
-    // Add custom tracker extension with custom config
+    // Add custom tracker extension with default config
     let client_with_tracker = client
-        .with_extension::<CustomTrackerExtension, CustomTrackerConfig>(Some(custom_config.clone()))
+        .with_extension_default::<CustomTrackerExtension>()
         .await?;
 
-    // Test retrieving the stored config
-    let retrieved_config =
-        client_with_tracker.get_extension_config::<CustomTrackerExtension, CustomTrackerConfig>();
+    // Access the tracker through find_client
+    let tracker = client_with_tracker
+        .extensions
+        .find_client::<CustomTrackerExtension>()
+        .expect("CustomTrackerExtension should be present");
 
-    assert!(
-        retrieved_config.is_some(),
-        "Config should be stored and retrievable"
-    );
-
-    let config = retrieved_config.unwrap();
-    assert_eq!(config.name, "config_test_tracker");
-    assert_eq!(config.initial_counter, 42);
-    assert_eq!(config.metadata, Some("test metadata".to_string()));
-
-    // Test that has_extension_config works
-    assert!(client_with_tracker.has_extension_config::<CustomTrackerExtension>());
-
-    // Test that wrong type returns None
-    let wrong_config =
-        client_with_tracker.get_extension_config::<CustomTrackerExtension, Erc20Addresses>();
-    assert!(
-        wrong_config.is_none(),
-        "Wrong config type should return None"
-    );
+    // Test default values
+    assert_eq!(tracker.get_counter(), 0);
+    assert_eq!(tracker.name, "default_tracker");
+    assert_eq!(tracker.metadata, None);
 
     Ok(())
 }
 
-/// Test using ERC20 extension with custom addresses (original test)
+/// Test using ERC20 extension with custom addresses
 #[tokio::test]
 #[serial]
-async fn test_client_with_extension() -> Result<()> {
+async fn test_client_with_erc20_extension() -> Result<()> {
     let test_context = setup_test_environment().await?;
 
     // Get the RPC URL from the anvil instance
@@ -195,13 +155,12 @@ async fn test_client_with_extension() -> Result<()> {
         barter_utils: address!("0x4567890123456789012345678901234567890123"),
     };
 
-    // Start with a client that has no extensions
-    let client =
-        AlkahestClient::<NoExtension>::new(test_context.alice.clone(), &rpc_url, None).await?;
+    // Start with a minimal client
+    let client = AlkahestClient::new(test_context.alice.clone(), &rpc_url).await?;
 
     // Add ERC20 extension with custom addresses
     let client_with_erc20 = client
-        .with_extension::<Erc20Module, Erc20Addresses>(Some(custom_erc20_addresses.clone()))
+        .with_extension::<Erc20Module>(Some(custom_erc20_addresses.clone()))
         .await?;
 
     // Verify the custom addresses are used
@@ -220,97 +179,149 @@ async fn test_client_with_extension() -> Result<()> {
         custom_erc20_addresses.barter_utils
     );
 
-    // Test retrieving the stored ERC20 config
-    let retrieved_config = client_with_erc20.get_extension_config::<Erc20Module, Erc20Addresses>();
-
-    assert!(
-        retrieved_config.is_some(),
-        "ERC20 config should be stored and retrievable"
-    );
-
-    let config = retrieved_config.unwrap();
-    assert_eq!(config.eas, custom_erc20_addresses.eas);
-    assert_eq!(
-        config.payment_obligation,
-        custom_erc20_addresses.payment_obligation
-    );
-    assert_eq!(
-        config.escrow_obligation,
-        custom_erc20_addresses.escrow_obligation
-    );
-    assert_eq!(config.barter_utils, custom_erc20_addresses.barter_utils);
-
-    // Test that has_extension_config works for ERC20
-    assert!(client_with_erc20.has_extension_config::<Erc20Module>());
-
     Ok(())
 }
 
-/// Test config retrieval when no config is provided
+/// Test chaining multiple extensions
 #[tokio::test]
 #[serial]
-async fn test_no_config_provided() -> Result<()> {
+async fn test_chaining_multiple_extensions() -> Result<()> {
     let test_context = setup_test_environment().await?;
 
     // Get the RPC URL from the anvil instance
     let rpc_url = test_context.anvil.ws_endpoint();
 
-    // Start with a client that has no extensions
-    let client =
-        AlkahestClient::<NoExtension>::new(test_context.alice.clone(), &rpc_url, None).await?;
+    // Create custom configurations
+    let custom_erc20_addresses = Erc20Addresses {
+        eas: address!("0x1234567890123456789012345678901234567890"),
+        payment_obligation: address!("0x2345678901234567890123456789012345678901"),
+        escrow_obligation: address!("0x3456789012345678901234567890123456789012"),
+        barter_utils: address!("0x4567890123456789012345678901234567890123"),
+    };
 
-    // Add custom tracker extension WITHOUT config
-    let client_with_tracker = client
-        .with_extension::<CustomTrackerExtension, CustomTrackerConfig>(None)
+    let custom_tracker_config = CustomTrackerConfig {
+        name: "chained_tracker".to_string(),
+        initial_counter: 42,
+        metadata: Some("test metadata".to_string()),
+    };
+
+    // Start with a minimal client and chain extensions
+    let client = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
+        .await?
+        .with_extension::<Erc20Module>(Some(custom_erc20_addresses.clone()))
+        .await?
+        .with_extension::<CustomTrackerExtension>(Some(custom_tracker_config.clone()))
         .await?;
 
-    // Test that no config is stored when None is provided
-    let retrieved_config =
-        client_with_tracker.get_extension_config::<CustomTrackerExtension, CustomTrackerConfig>();
+    // Verify both extensions are present and accessible
+    let erc20_client = client.erc20();
+    assert_eq!(erc20_client.addresses.eas, custom_erc20_addresses.eas);
 
-    assert!(
-        retrieved_config.is_none(),
-        "No config should be stored when None is provided"
-    );
-
-    // Test that has_extension_config returns false
-    assert!(!client_with_tracker.has_extension_config::<CustomTrackerExtension>());
-
-    // But the extension should still work with default values
-    let tracker_client = client_with_tracker
+    let tracker = client
         .extensions
-        .get_client::<CustomTrackerExtension>();
-    assert_eq!(tracker_client.name, "default_tracker");
-    assert_eq!(tracker_client.counter, 0);
-    assert_eq!(tracker_client.metadata, None);
+        .find_client::<CustomTrackerExtension>()
+        .expect("CustomTrackerExtension should be present");
+    assert_eq!(tracker.name, "chained_tracker");
+    assert_eq!(tracker.counter, 42);
+    assert_eq!(tracker.metadata, Some("test metadata".to_string()));
 
     Ok(())
 }
 
-/// Test using with_initialized_extension method (original test)
+/// Test mixing custom config and default config
 #[tokio::test]
 #[serial]
-async fn test_client_with_initialized_extension() -> Result<()> {
+async fn test_mixed_config_extensions() -> Result<()> {
     let test_context = setup_test_environment().await?;
 
     // Get the RPC URL from the anvil instance
     let rpc_url = test_context.anvil.ws_endpoint();
 
-    // Create client with no extensions
-    let client =
-        AlkahestClient::<NoExtension>::new(test_context.alice.clone(), &rpc_url, None).await?;
+    // Start with a minimal client and add extensions with mixed configs
+    let client = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
+        .await?
+        .with_extension_default::<Erc20Module>() // Use default ERC20 config
+        .await?
+        .with_extension::<CustomTrackerExtension>(Some(CustomTrackerConfig {
+            name: "mixed_config_tracker".to_string(),
+            initial_counter: 100,
+            metadata: Some("mixed".to_string()),
+        })) // Use custom tracker config
+        .await?;
 
-    // Initialize an extension separately
-    let erc20_extension = Erc20Module::init(test_context.alice.clone(), &rpc_url, None).await?;
+    // Verify ERC20 has default addresses (from BASE_SEPOLIA_ADDRESSES)
+    let erc20_client = client.erc20();
+    assert_ne!(
+        erc20_client.addresses.eas,
+        address!("0x0000000000000000000000000000000000000000")
+    );
 
-    // Add the pre-initialized extension
-    let client_with_erc20 = client.with_initialized_extension(erc20_extension);
+    // Verify tracker has custom config
+    let tracker = client
+        .extensions
+        .find_client::<CustomTrackerExtension>()
+        .expect("CustomTrackerExtension should be present");
+    assert_eq!(tracker.name, "mixed_config_tracker");
+    assert_eq!(tracker.counter, 100);
 
-    // Verify the extension was added
-    assert!(client_with_erc20.extensions.has_client::<Erc20Module>());
+    Ok(())
+}
 
-    // Test accessing the module
-    let _erc20_module = client_with_erc20.erc20();
+/// Test that find_client returns None for non-existent extensions
+#[tokio::test]
+#[serial]
+async fn test_find_client_not_found() -> Result<()> {
+    let test_context = setup_test_environment().await?;
+
+    // Get the RPC URL from the anvil instance
+    let rpc_url = test_context.anvil.ws_endpoint();
+
+    // Create a client with only ERC20 extension
+    let client = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
+        .await?
+        .with_extension_default::<Erc20Module>()
+        .await?;
+
+    // Try to find a non-existent extension
+    let tracker = client.extensions.find_client::<CustomTrackerExtension>();
+    assert!(
+        tracker.is_none(),
+        "find_client should return None for non-existent extensions"
+    );
+
+    // But ERC20 should be found
+    let erc20 = client.extensions.find_client::<Erc20Module>();
+    assert!(
+        erc20.is_some(),
+        "find_client should return Some for existing extensions"
+    );
+
+    Ok(())
+}
+
+/// Test using with_base_extensions for convenience
+#[tokio::test]
+#[serial]
+async fn test_with_base_extensions() -> Result<()> {
+    let test_context = setup_test_environment().await?;
+
+    // Get the RPC URL from the anvil instance
+    let rpc_url = test_context.anvil.ws_endpoint();
+
+    // Create a client with all base extensions
+    let client = AlkahestClient::with_base_extensions(
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
+    )
+    .await?;
+
+    // Verify we can access the ERC20 module (part of base extensions)
+    let erc20_client = client.erc20();
+    assert_eq!(
+        erc20_client.addresses.eas,
+        test_context.addresses.erc20_addresses.eas
+    );
 
     Ok(())
 }
