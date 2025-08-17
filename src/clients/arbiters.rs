@@ -1428,6 +1428,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_wait_for_trusted_oracle_arbitration() -> eyre::Result<()> {
         // Setup test environment
         let test = setup_test_environment().await?;
