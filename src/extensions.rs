@@ -28,6 +28,17 @@ pub trait AlkahestExtension: Clone + Send + Sync + 'static {
         config: Option<Self::Config>,
     ) -> impl std::future::Future<Output = eyre::Result<Self>> + Send;
 
+    /// Initialize with default configuration (when Config implements Default)
+    fn init_default(
+        private_key: PrivateKeySigner,
+        rpc_url: impl ToString + Clone + Send,
+    ) -> impl std::future::Future<Output = eyre::Result<Self>> + Send
+    where
+        Self::Config: Default,
+    {
+        Self::init(private_key, rpc_url, Some(Self::Config::default()))
+    }
+
     /// Recursively search for a client by type - this is the main method
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {
         // Default implementation - try to downcast self
@@ -50,12 +61,8 @@ pub trait AlkahestExtension: Clone + Send + Sync + 'static {
 #[derive(Clone)]
 pub struct NoExtension;
 
-/// Empty configuration for NoExtension
-#[derive(Clone)]
-pub struct NoConfig;
-
 impl AlkahestExtension for NoExtension {
-    type Config = NoConfig;
+    type Config = ();
 
     async fn init(
         _private_key: PrivateKeySigner,
@@ -75,29 +82,28 @@ pub struct JoinExtension<A: AlkahestExtension, B: AlkahestExtension> {
     pub right: B,
 }
 
-/// Configuration for JoinExtension combines both extension configs
-#[derive(Clone)]
-pub struct JoinConfig<AC: Clone + Send + Sync + 'static, BC: Clone + Send + Sync + 'static> {
-    pub left_config: Option<AC>,
-    pub right_config: Option<BC>,
+impl<A: AlkahestExtension, B: AlkahestExtension> JoinExtension<A, B> {
+    /// Create a new JoinExtension from two already-initialized extensions
+    pub fn new(left: A, right: B) -> Self {
+        JoinExtension { left, right }
+    }
 }
 
 impl<A: AlkahestExtension, B: AlkahestExtension> AlkahestExtension for JoinExtension<A, B> {
-    type Config = JoinConfig<A::Config, B::Config>;
+    // JoinExtension doesn't have its own config - it's created from already-initialized extensions
+    type Config = ();
 
     async fn init(
-        private_key: PrivateKeySigner,
-        rpc_url: impl ToString + Clone + Send,
-        config: Option<Self::Config>,
+        _private_key: PrivateKeySigner,
+        _rpc_url: impl ToString + Clone + Send,
+        _config: Option<Self::Config>,
     ) -> eyre::Result<Self> {
-        let (left_config, right_config) = match config {
-            Some(c) => (c.left_config, c.right_config),
-            None => (None, None),
-        };
-
-        let left = A::init(private_key.clone(), rpc_url.clone(), left_config).await?;
-        let right = B::init(private_key, rpc_url, right_config).await?;
-        Ok(JoinExtension { left, right })
+        // This method is not meant to be called directly.
+        // JoinExtension is created internally by AlkahestClient::with_extension()
+        // from already-initialized extensions.
+        unreachable!(
+            "JoinExtension::init should never be called. Use AlkahestClient::with_extension() instead."
+        )
     }
 
     fn find_client<T: Clone + Send + Sync + 'static>(&self) -> Option<&T> {

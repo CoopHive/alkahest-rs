@@ -21,19 +21,23 @@ async fn main() -> Result<()> {
 
     // When None is passed, the default (Base Sepolia) addresses are used
     let client_with_default: DefaultAlkahestClient =
-        AlkahestClient::new(private_key.clone(), rpc_url, None).await?;
+        AlkahestClient::with_base_extensions(private_key.clone(), rpc_url, None).await?;
     println!("Created client with default Base Sepolia addresses");
 
     // Example 2: Explicitly using Base Sepolia configuration
     println!("\nExample 2: Explicitly using Base Sepolia configuration");
-    let client_with_base: DefaultAlkahestClient =
-        AlkahestClient::new(private_key.clone(), rpc_url, Some(BASE_SEPOLIA_ADDRESSES)).await?;
+    let client_with_base: DefaultAlkahestClient = AlkahestClient::with_base_extensions(
+        private_key.clone(),
+        rpc_url,
+        Some(BASE_SEPOLIA_ADDRESSES),
+    )
+    .await?;
     println!("Created client with explicit Base Sepolia addresses");
 
     // Example 3: Using Filecoin Calibration configuration
     println!("\nExample 3: Using Filecoin Calibration configuration");
     let filecoin_rpc_url = "https://api.calibration.node.glif.io/rpc/v1";
-    let client_with_filecoin: DefaultAlkahestClient = AlkahestClient::new(
+    let client_with_filecoin: DefaultAlkahestClient = AlkahestClient::with_base_extensions(
         private_key.clone(),
         filecoin_rpc_url,
         Some(FILECOIN_CALIBRATION_ADDRESSES),
@@ -67,14 +71,15 @@ async fn main() -> Result<()> {
     };
 
     let client_with_custom: DefaultAlkahestClient =
-        AlkahestClient::new(private_key.clone(), rpc_url, Some(custom_config)).await?;
+        AlkahestClient::with_base_extensions(private_key.clone(), rpc_url, Some(custom_config))
+            .await?;
     println!("Created client with custom configuration");
 
     // Example 5: Using Default::default() to get Base Sepolia configuration
     println!("\nExample 5: Using Default trait");
     let default_config = DefaultExtensionConfig::default();
     let client_with_default_trait: DefaultAlkahestClient =
-        AlkahestClient::new(private_key, rpc_url, Some(default_config)).await?;
+        AlkahestClient::with_base_extensions(private_key, rpc_url, Some(default_config)).await?;
     println!("Created client using Default trait (equivalent to Base Sepolia)");
 
     println!("\nAll examples completed successfully!");

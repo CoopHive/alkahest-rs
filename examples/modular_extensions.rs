@@ -1,25 +1,22 @@
 //! Example demonstrating the modular extension system in Alkahest SDK
 //!
 //! This example shows various ways to configure and use extensions:
-//! - Using individual modules
-//! - Combining multiple modules
-//! - Custom configurations
-//! - Builder patterns
+//! - Starting with no extensions and adding them via chaining
+//! - Using specific module configurations
 //! - Creating custom extensions
+//! - Using default configurations
 
 use alkahest_rs::{
-    AlkahestClient, DefaultExtensionConfig,
+    AlkahestClient,
     addresses::BASE_SEPOLIA_ADDRESSES,
-    builders::{AlkahestClientBuilder, presets},
     clients::{
-        attestation::{AttestationAddresses, AttestationModule},
+        attestation::AttestationModule,
         erc20::{Erc20Addresses, Erc20Module},
-        erc721::{Erc721Addresses, Erc721Module},
+        erc721::Erc721Module,
+        erc1155::Erc1155Module,
+        token_bundle::TokenBundleModule,
     },
-    extensions::{
-        AlkahestExtension, BaseExtensions, HasErc20, HasErc721, JoinConfig, JoinExtension,
-        NoExtension,
-    },
+    extensions::{AlkahestExtension, HasErc20, HasErc721},
 };
 use alloy::signers::local::PrivateKeySigner;
 use eyre::Result;
@@ -33,48 +30,51 @@ async fn main() -> Result<()> {
 
     println!("🧩 Modular Extension System Examples\n");
 
-    // Example 1: Minimal client with no extensions
-    println!("1️⃣ Minimal client (no extensions):");
-    let minimal_client =
-        AlkahestClient::<NoExtension>::new(private_key.clone(), rpc_url, None).await?;
+    // Example 1: Start with no extensions and chain them
+    println!("1️⃣ Building client by chaining extensions:");
+    let client = AlkahestClient::new(private_key.clone(), rpc_url).await?;
     println!(
         "   ✅ Created minimal client with address: {}",
-        minimal_client.address
+        client.address
     );
-    println!();
 
-    // Example 2: Client with single module
-    println!("2️⃣ Single module (ERC20 only):");
-    let erc20_config = Some(BASE_SEPOLIA_ADDRESSES.erc20_addresses.clone());
-    let erc20_client =
-        AlkahestClient::<Erc20Module>::new(private_key.clone(), rpc_url, erc20_config).await?;
-    println!("   ✅ Created ERC20-only client");
-    println!("   EAS address: {}", erc20_client.erc20().addresses.eas);
-    println!();
+    // Add ERC20 module with custom config
+    let erc20_config = BASE_SEPOLIA_ADDRESSES.erc20_addresses.clone();
+    let client_with_erc20 = client
+        .with_extension::<Erc20Module>(Some(erc20_config))
+        .await?;
+    println!("   ✅ Added ERC20 module");
+    println!(
+        "   EAS address: {}",
+        client_with_erc20.erc20().addresses.eas
+    );
 
-    // Example 3: Combining two modules with JoinExtension
-    println!("3️⃣ Combining modules (ERC20 + ERC721):");
-    let join_config = JoinConfig {
-        left_config: Some(BASE_SEPOLIA_ADDRESSES.erc20_addresses.clone()),
-        right_config: Some(BASE_SEPOLIA_ADDRESSES.erc721_addresses.clone()),
-    };
-    let combined_client = AlkahestClient::<JoinExtension<Erc20Module, Erc721Module>>::new(
-        private_key.clone(),
-        rpc_url,
-        Some(join_config),
-    )
-    .await?;
-    println!("   ✅ Created client with ERC20 and ERC721 modules");
-    println!("   ERC20 EAS: {}", combined_client.erc20().addresses.eas);
+    // Add ERC721 module
+    let erc721_config = BASE_SEPOLIA_ADDRESSES.erc721_addresses.clone();
+    let client_with_both = client_with_erc20
+        .with_extension::<Erc721Module>(Some(erc721_config))
+        .await?;
+    println!("   ✅ Added ERC721 module");
     println!(
         "   ERC721 Utils: {}",
-        combined_client.erc721().addresses.barter_utils
+        client_with_both.erc721().addresses.barter_utils
     );
     println!();
 
-    // Example 4: Using all base extensions (traditional approach)
-    println!("4️⃣ All base extensions:");
-    let full_client = AlkahestClient::<BaseExtensions>::new(
+    // Example 2: Using default configurations
+    println!("2️⃣ Using default configurations:");
+    let client_defaults = AlkahestClient::new(private_key.clone(), rpc_url)
+        .await?
+        .with_extension_default::<Erc20Module>()
+        .await?
+        .with_extension_default::<Erc721Module>()
+        .await?;
+    println!("   ✅ Created client with ERC20 and ERC721 using defaults");
+    println!();
+
+    // Example 3: Start with all base extensions
+    println!("3️⃣ Starting with all base extensions:");
+    let full_client = AlkahestClient::with_base_extensions(
         private_key.clone(),
         rpc_url,
         Some(BASE_SEPOLIA_ADDRESSES),
@@ -82,53 +82,36 @@ async fn main() -> Result<()> {
     .await?;
     println!("   ✅ Created client with all base extensions");
     println!(
-        "   Available modules: ERC20, ERC721, ERC1155, TokenBundle, Attestation, StringObligation, Arbiters, Oracle"
+        "   Available: ERC20, ERC721, ERC1155, TokenBundle, Attestation, StringObligation, Arbiters, Oracle"
     );
     println!();
 
-    // Example 5: Using the builder pattern
-    println!("5️⃣ Using AlkahestClientBuilder:");
-
-    let builder = AlkahestClientBuilder::new(private_key.clone(), rpc_url);
-
-    // Build ERC20-only client
-    let builder_erc20 = AlkahestClientBuilder::new(private_key.clone(), rpc_url)
-        .build_erc20_only(Some(BASE_SEPOLIA_ADDRESSES.erc20_addresses.clone()))
+    // Example 4: Chain multiple extensions with mixed configurations
+    println!("4️⃣ Chaining multiple extensions with mixed configs:");
+    let multi_client = AlkahestClient::new(private_key.clone(), rpc_url)
+        .await?
+        .with_extension::<Erc20Module>(Some(BASE_SEPOLIA_ADDRESSES.erc20_addresses.clone()))
+        .await?
+        .with_extension_default::<Erc721Module>()
+        .await?
+        .with_extension::<Erc1155Module>(Some(BASE_SEPOLIA_ADDRESSES.erc1155_addresses.clone()))
+        .await?
+        .with_extension::<TokenBundleModule>(Some(
+            BASE_SEPOLIA_ADDRESSES.token_bundle_addresses.clone(),
+        ))
         .await?;
-    println!("   ✅ Built ERC20-only client");
-
-    // Build client with all token modules
-    let builder_tokens = AlkahestClientBuilder::new(private_key.clone(), rpc_url)
-        .build_all_tokens(
-            Some(BASE_SEPOLIA_ADDRESSES.erc20_addresses.clone()),
-            Some(BASE_SEPOLIA_ADDRESSES.erc721_addresses.clone()),
-            Some(BASE_SEPOLIA_ADDRESSES.erc1155_addresses.clone()),
-            Some(BASE_SEPOLIA_ADDRESSES.token_bundle_addresses.clone()),
-        )
-        .await?;
-    println!("   ✅ Built client with all token modules");
+    println!("   ✅ Built client with multiple token modules via chaining");
     println!();
 
-    // Example 6: Using preset configurations
-    println!("6️⃣ Using preset configurations:");
-    let preset_client = presets::base_sepolia_client(private_key.clone(), rpc_url).await?;
-    println!("   ✅ Created Base Sepolia client from preset");
-
-    let preset_erc20 = presets::base_sepolia_erc20_client(private_key.clone(), rpc_url).await?;
-    println!("   ✅ Created Base Sepolia ERC20-only client from preset");
-    println!();
-
-    // Example 7: Custom configuration
-    println!("7️⃣ Custom configuration:");
+    // Example 5: Custom configuration
+    println!("5️⃣ Custom configuration:");
     let mut custom_erc20_addresses = BASE_SEPOLIA_ADDRESSES.erc20_addresses.clone();
     custom_erc20_addresses.eas = "0x1234567890123456789012345678901234567890".parse()?;
 
-    let custom_client = AlkahestClient::<Erc20Module>::new(
-        private_key.clone(),
-        rpc_url,
-        Some(custom_erc20_addresses.clone()),
-    )
-    .await?;
+    let custom_client = AlkahestClient::new(private_key.clone(), rpc_url)
+        .await?
+        .with_extension::<Erc20Module>(Some(custom_erc20_addresses.clone()))
+        .await?;
     println!("   ✅ Created client with custom ERC20 addresses");
     println!(
         "   Custom EAS address: {}",
@@ -136,8 +119,8 @@ async fn main() -> Result<()> {
     );
     println!();
 
-    // Example 8: Implementing a custom extension
-    println!("8️⃣ Custom extension implementation:");
+    // Example 6: Implementing a custom extension
+    println!("6️⃣ Custom extension implementation:");
 
     // Define a custom extension
     #[derive(Clone)]
@@ -198,47 +181,54 @@ async fn main() -> Result<()> {
         erc20_addresses: BASE_SEPOLIA_ADDRESSES.erc20_addresses.clone(),
     };
 
-    let custom_ext_client =
-        AlkahestClient::<MyCustomExtension>::new(private_key.clone(), rpc_url, Some(custom_config))
-            .await?;
+    // Add custom extension to an existing client
+    let base_client = AlkahestClient::new(private_key.clone(), rpc_url).await?;
+    let custom_ext_client = base_client
+        .with_extension::<MyCustomExtension>(Some(custom_config))
+        .await?;
 
-    println!("   ✅ Created client with custom extension");
-    println!("   Custom data: {}", custom_ext_client.extensions.my_data);
+    println!("   ✅ Added custom extension to client");
+    // Note: When using with_extension, the custom extension is wrapped in JoinExtension
+    // To access custom fields, you'd need to implement trait methods or use find_client
+    println!("   ✅ Custom extension added (contains custom data and nested ERC20)");
     println!("   ERC20 EAS: {}", custom_ext_client.erc20().addresses.eas);
     println!();
 
-    // Example 9: Dynamic module selection based on runtime conditions
-    println!("9️⃣ Dynamic module selection:");
+    // Example 7: Dynamic module selection based on runtime conditions
+    println!("7️⃣ Dynamic module selection:");
 
     let use_attestation = true; // This could be from config, env var, etc.
 
+    let mut dynamic_client = AlkahestClient::new(private_key.clone(), rpc_url).await?;
+
     if use_attestation {
-        let attestation_client = AlkahestClient::<AttestationModule>::new(
-            private_key.clone(),
-            rpc_url,
-            Some(BASE_SEPOLIA_ADDRESSES.attestation_addresses.clone()),
-        )
-        .await?;
-        println!("   ✅ Created client with Attestation module (based on runtime condition)");
-        println!(
-            "   Attestation EAS: {}",
-            attestation_client.extensions.addresses.eas
-        );
+        let client_with_attestation = dynamic_client
+            .with_extension::<AttestationModule>(Some(
+                BASE_SEPOLIA_ADDRESSES.attestation_addresses.clone(),
+            ))
+            .await?;
+        println!("   ✅ Added Attestation module based on runtime condition");
+        // Use find_client to access the AttestationModule within the JoinExtension
+        if let Some(attestation) = client_with_attestation
+            .extensions
+            .find_client::<AttestationModule>()
+        {
+            println!("   Attestation EAS: {}", attestation.addresses.eas);
+        }
     } else {
-        let minimal =
-            AlkahestClient::<NoExtension>::new(private_key.clone(), rpc_url, None).await?;
-        println!("   ✅ Created minimal client (attestation not needed)");
+        println!("   ✅ Keeping minimal client (attestation not needed)");
     }
     println!();
 
     println!("✅ All examples completed successfully!");
     println!("\n📝 Key takeaways:");
-    println!("   - Extensions are modular and can be used individually");
+    println!("   - Start with a minimal client and chain extensions as needed");
+    println!("   - Use .with_extension() for specific configurations");
+    println!("   - Use .with_extension_default() when the extension config implements Default");
     println!("   - Each extension has its own configuration type");
-    println!("   - Extensions can be combined using JoinExtension");
-    println!("   - The builder pattern provides convenient presets");
-    println!("   - Custom extensions can be easily implemented");
+    println!("   - Custom extensions can be easily implemented and added");
     println!("   - Module selection can be dynamic based on runtime needs");
+    println!("   - Use AlkahestClient::with_base_extensions() for the common case of all modules");
 
     Ok(())
 }

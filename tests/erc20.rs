@@ -22,11 +22,13 @@ use eyre::Result;
 async fn test_trade_erc20_for_erc20() -> Result<()> {
     let alice: PrivateKeySigner = env::var("PRIVKEY_ALICE")?.parse()?;
     let client_buyer =
-        DefaultAlkahestClient::new(alice, env::var("RPC_URL")?.as_str(), None).await?;
+        DefaultAlkahestClient::with_base_extensions(alice, env::var("RPC_URL")?.as_str(), None)
+            .await?;
 
     let bob = env::var("PRIVKEY_BOB")?.parse()?;
     let client_seller =
-        DefaultAlkahestClient::new(bob, env::var("RPC_URL")?.as_str(), None).await?;
+        DefaultAlkahestClient::with_base_extensions(bob, env::var("RPC_URL")?.as_str(), None)
+            .await?;
 
     let usdc = address!("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
     let eurc = address!("0x808456652fdb597867f38412077A9182bf77359F");
@@ -72,11 +74,13 @@ async fn test_trade_erc20_for_erc20() -> Result<()> {
 async fn test_trade_erc20_for_custom() -> Result<()> {
     let alice: PrivateKeySigner = env::var("PRIVKEY_ALICE")?.parse()?;
     let client_buyer =
-        DefaultAlkahestClient::new(alice, env::var("RPC_URL")?.as_str(), None).await?;
+        DefaultAlkahestClient::with_base_extensions(alice, env::var("RPC_URL")?.as_str(), None)
+            .await?;
 
     let bob: PrivateKeySigner = env::var("PRIVKEY_BOB")?.parse()?;
     let client_seller =
-        DefaultAlkahestClient::new(bob, env::var("RPC_URL")?.as_str(), None).await?;
+        DefaultAlkahestClient::with_base_extensions(bob, env::var("RPC_URL")?.as_str(), None)
+            .await?;
     // the example will use JobResultObligation to demand a string to be capitalized
     // but JobResultObligation is generic enough to represent much more (a db query, a Dockerfile...)
     // see https://github.com/CoopHive/alkahest-mocks/blob/main/src/Statements/JobResultObligation.sol

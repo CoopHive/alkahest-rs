@@ -390,13 +390,13 @@ pub async fn setup_test_environment() -> eyre::Result<TestContext> {
         },
     };
 
-    let alice_client = AlkahestClient::new(
+    let alice_client = AlkahestClient::with_base_extensions(
         alice.clone(),
         anvil.ws_endpoint_url(),
         Some(addresses.clone()),
     )
     .await?;
-    let bob_client = AlkahestClient::new(
+    let bob_client = AlkahestClient::with_base_extensions(
         bob.clone(),
         anvil.ws_endpoint_url(),
         Some(addresses.clone()),
@@ -429,8 +429,8 @@ pub struct TestContext {
     pub bob: PrivateKeySigner,
     pub god: PrivateKeySigner,
     pub god_provider: WalletProvider,
-    pub alice_client: AlkahestClient,
-    pub bob_client: AlkahestClient,
+    pub alice_client: AlkahestClient<crate::extensions::BaseExtensions>,
+    pub bob_client: AlkahestClient<crate::extensions::BaseExtensions>,
     pub addresses: DefaultExtensionConfig,
     pub mock_addresses: MockAddresses,
 }

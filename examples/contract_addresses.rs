@@ -24,7 +24,8 @@ async fn main() -> Result<()> {
     let rpc_url = std::env::var("RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string());
 
     // Create client with default configuration (Base Sepolia addresses)
-    let client = DefaultAlkahestClient::new(private_key.clone(), rpc_url, None).await?;
+    let client =
+        DefaultAlkahestClient::with_base_extensions(private_key.clone(), rpc_url, None).await?;
 
     println!("🔍 Contract Address Examples\n");
 
@@ -129,7 +130,7 @@ async fn main() -> Result<()> {
     // You can use different network configurations
     use alkahest_rs::addresses::FILECOIN_CALIBRATION_ADDRESSES;
 
-    let filecoin_client = DefaultAlkahestClient::new(
+    let filecoin_client = DefaultAlkahestClient::with_base_extensions(
         private_key,
         "http://localhost:8545", // Would be actual Filecoin RPC in production
         Some(FILECOIN_CALIBRATION_ADDRESSES),
