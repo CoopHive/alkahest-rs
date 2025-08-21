@@ -29,3 +29,4 @@ tracing = "0.1.41"
 
 [dev-dependencies]
 serial_test = "2"
+tempfile = "3"
