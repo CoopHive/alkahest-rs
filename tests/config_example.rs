@@ -6,6 +6,7 @@ use alkahest_rs::{
         erc721::Erc721Addresses, erc1155::Erc1155Addresses,
         string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses,
     },
+    extensions::{HasArbiters as _, HasErc20 as _, HasErc721 as _},
 };
 use alloy::primitives::address;
 use alloy::signers::k256::ecdsa::SigningKey;
@@ -23,7 +24,10 @@ async fn test_default_configuration() -> Result<()> {
         AlkahestClient::with_base_extensions(private_key.clone(), rpc_url, None).await?;
 
     // Verify client was created successfully
-    assert_ne!(client_with_default.address, alloy::primitives::Address::ZERO);
+    assert_ne!(
+        client_with_default.address,
+        alloy::primitives::Address::ZERO
+    );
 
     // Verify it uses Base Sepolia addresses by default
     assert_eq!(
@@ -121,9 +125,12 @@ async fn test_custom_configuration() -> Result<()> {
         string_obligation_addresses: BASE_SEPOLIA_ADDRESSES.string_obligation_addresses,
     };
 
-    let client_with_custom: DefaultAlkahestClient =
-        AlkahestClient::with_base_extensions(private_key.clone(), rpc_url, Some(custom_config.clone()))
-            .await?;
+    let client_with_custom: DefaultAlkahestClient = AlkahestClient::with_base_extensions(
+        private_key.clone(),
+        rpc_url,
+        Some(custom_config.clone()),
+    )
+    .await?;
 
     // Verify custom addresses are used
     assert_eq!(
@@ -135,7 +142,10 @@ async fn test_custom_configuration() -> Result<()> {
         custom_config.erc20_addresses.barter_utils
     );
     assert_eq!(
-        client_with_custom.arbiters().addresses.trusted_party_arbiter,
+        client_with_custom
+            .arbiters()
+            .addresses
+            .trusted_party_arbiter,
         custom_config.arbiters_addresses.trusted_party_arbiter
     );
 
@@ -156,7 +166,8 @@ async fn test_default_trait_configuration() -> Result<()> {
 
     let default_config = DefaultExtensionConfig::default();
     let client_with_default_trait: DefaultAlkahestClient =
-        AlkahestClient::with_base_extensions(private_key, rpc_url, Some(default_config.clone())).await?;
+        AlkahestClient::with_base_extensions(private_key, rpc_url, Some(default_config.clone()))
+            .await?;
 
     // Verify it uses Base Sepolia addresses (the default)
     assert_eq!(
@@ -185,7 +196,8 @@ async fn test_mixed_network_configuration() -> Result<()> {
     };
 
     let client_with_mixed: DefaultAlkahestClient =
-        AlkahestClient::with_base_extensions(private_key, rpc_url, Some(mixed_config.clone())).await?;
+        AlkahestClient::with_base_extensions(private_key, rpc_url, Some(mixed_config.clone()))
+            .await?;
 
     // Verify the mixed configuration is applied correctly
     assert_eq!(

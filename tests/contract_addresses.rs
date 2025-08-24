@@ -4,7 +4,7 @@
 //! contract addresses in the Alkahest SDK.
 
 use alkahest_rs::{
-    DefaultAlkahestClient, contracts,
+    ContractModule as _, DefaultAlkahestClient, contracts,
     extensions::{HasArbiters, HasErc20, HasErc721},
     registry::{ArbitersContract, Erc20Contract, Erc721Contract},
 };

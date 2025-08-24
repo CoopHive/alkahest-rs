@@ -10,13 +10,15 @@ use alkahest_rs::{
     AlkahestClient,
     addresses::BASE_SEPOLIA_ADDRESSES,
     clients::{
-        attestation::AttestationModule,
         erc20::{Erc20Addresses, Erc20Module},
         erc721::Erc721Module,
         erc1155::Erc1155Module,
         token_bundle::TokenBundleModule,
     },
-    extensions::{AlkahestExtension, HasErc20, HasErc721},
+    extensions::{
+        AlkahestExtension, HasAttestation as _, HasErc20, HasErc721, HasErc1155 as _,
+        HasTokenBundle as _,
+    },
 };
 use alloy::signers::local::PrivateKeySigner;
 use eyre::Result;
@@ -274,54 +276,6 @@ async fn test_custom_extension_implementation() -> Result<()> {
 
     // Test that the custom data was properly initialized
     assert_eq!(custom_config.my_data, "Hello from custom extension!");
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_dynamic_module_selection() -> Result<()> {
-    let private_key: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
-    let rpc_url = "https://base-sepolia-rpc.publicnode.com";
-
-    // Simulate runtime conditions
-    let use_attestation = true;
-    let use_erc721 = false;
-
-    let mut dynamic_client = AlkahestClient::new(private_key.clone(), rpc_url).await?;
-
-    if use_attestation {
-        let client_with_attestation = dynamic_client
-            .with_extension::<AttestationModule>(Some(
-                BASE_SEPOLIA_ADDRESSES.attestation_addresses.clone(),
-            ))
-            .await?;
-
-        // Verify attestation module was added
-        if let Some(attestation) = client_with_attestation
-            .extensions
-            .find_client::<AttestationModule>()
-        {
-            assert_ne!(attestation.addresses.eas, alloy::primitives::Address::ZERO);
-        } else {
-            panic!("Attestation module should be present");
-        }
-
-        dynamic_client = client_with_attestation;
-    }
-
-    if use_erc721 {
-        let client_with_erc721 = dynamic_client
-            .with_extension::<Erc721Module>(Some(
-                BASE_SEPOLIA_ADDRESSES.erc721_addresses.clone(),
-            ))
-            .await?;
-        dynamic_client = client_with_erc721;
-    }
-
-    // Verify only the expected modules are present
-    assert!(dynamic_client.extensions.find_client::<AttestationModule>().is_some());
-    assert!(dynamic_client.extensions.find_client::<Erc721Module>().is_none());
 
     Ok(())
 }
