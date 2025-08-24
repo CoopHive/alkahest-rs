@@ -1,13 +1,15 @@
 use std::env;
 
 use alkahest_rs::{
-    AlkahestClient, DefaultAlkahestClient,
+    DefaultAlkahestClient,
     clients::{
         arbiters::{ArbitersModule, TrustedPartyArbiter},
         erc20::Erc20Module,
     },
     extensions::{HasArbiters, HasAttestation, HasErc20},
+    fixtures::MockERC20Permit,
     types::{ApprovalPurpose, ArbiterData, Erc20Data},
+    utils::setup_test_environment,
 };
 
 use alloy::{
@@ -20,35 +22,44 @@ use eyre::Result;
 
 #[tokio::test]
 async fn test_trade_erc20_for_erc20() -> Result<()> {
-    let alice: PrivateKeySigner = env::var("PRIVKEY_ALICE")?.parse()?;
-    let client_buyer =
-        DefaultAlkahestClient::with_base_extensions(alice, env::var("RPC_URL")?.as_str(), None)
-            .await?;
+    // test setup
+    let test = setup_test_environment().await?;
 
-    let bob = env::var("PRIVKEY_BOB")?.parse()?;
-    let client_seller =
-        DefaultAlkahestClient::with_base_extensions(bob, env::var("RPC_URL")?.as_str(), None)
-            .await?;
+    // give alice some erc20_a tokens for bidding
+    let mock_erc20_a = MockERC20Permit::new(test.mock_addresses.erc20_a, &test.god_provider);
+    mock_erc20_a
+        .transfer(test.alice.address(), 10.try_into()?)
+        .send()
+        .await?
+        .get_receipt()
+        .await?;
 
-    let usdc = address!("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
-    let eurc = address!("0x808456652fdb597867f38412077A9182bf77359F");
+    // give bob some erc20_b tokens for fulfillment
+    let mock_erc20_b = MockERC20Permit::new(test.mock_addresses.erc20_b, &test.god_provider);
+    mock_erc20_b
+        .transfer(test.bob.address(), 10.try_into()?)
+        .send()
+        .await?
+        .get_receipt()
+        .await?;
 
     let bid = Erc20Data {
-        address: usdc,
+        address: test.mock_addresses.erc20_a,
         value: 10.try_into()?,
     };
     let ask = Erc20Data {
-        address: eurc,
+        address: test.mock_addresses.erc20_b,
         value: 10.try_into()?,
     };
 
-    client_buyer
+    test.alice_client
         .erc20()
         .approve(&bid, ApprovalPurpose::Escrow)
         .await?;
 
-    // buy 10 eurc for 10 usdc
-    let receipt = client_buyer
+    // buy 10 erc20_b for 10 erc20_a
+    let receipt = test
+        .alice_client
         .erc20()
         .buy_erc20_for_erc20(&bid, &ask, 0)
         .await?;
@@ -56,12 +67,13 @@ async fn test_trade_erc20_for_erc20() -> Result<()> {
     let attested = DefaultAlkahestClient::get_attested_event(receipt)?;
     println!("{:?}", attested);
 
-    client_seller
+    test.bob_client
         .erc20()
         .approve(&ask, ApprovalPurpose::Payment)
         .await?;
 
-    let receipt = client_seller
+    let receipt = test
+        .bob_client
         .erc20()
         .pay_erc20_for_erc20(attested.uid)
         .await?;
