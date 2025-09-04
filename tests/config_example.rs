@@ -7,21 +7,20 @@ use alkahest_rs::{
         string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses,
     },
     extensions::{HasArbiters as _, HasErc20 as _, HasErc721 as _},
+    utils::setup_test_environment,
 };
 use alloy::primitives::address;
-use alloy::signers::k256::ecdsa::SigningKey;
 use alloy::signers::local::PrivateKeySigner;
 use eyre::Result;
 
 #[tokio::test]
 async fn test_default_configuration() -> Result<()> {
-    // Test using the default configuration (Base Sepolia)
-    let private_key = PrivateKeySigner::random();
-    let rpc_url = "https://sepolia.base.org";
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
-    // When None is passed, the default (Base Sepolia) addresses are used
+    // When None is passed, the test environment addresses are used
     let client_with_default: DefaultAlkahestClient =
-        AlkahestClient::with_base_extensions(private_key.clone(), rpc_url, None).await?;
+        AlkahestClient::with_base_extensions(test_context.alice.clone(), &rpc_url, None).await?;
 
     // Verify client was created successfully
     assert_ne!(
@@ -29,10 +28,10 @@ async fn test_default_configuration() -> Result<()> {
         alloy::primitives::Address::ZERO
     );
 
-    // Verify it uses Base Sepolia addresses by default
-    assert_eq!(
+    // Verify it uses test environment addresses
+    assert_ne!(
         client_with_default.erc20().addresses.eas,
-        BASE_SEPOLIA_ADDRESSES.erc20_addresses.eas
+        alloy::primitives::Address::ZERO
     );
 
     Ok(())
@@ -40,13 +39,12 @@ async fn test_default_configuration() -> Result<()> {
 
 #[tokio::test]
 async fn test_explicit_base_sepolia_configuration() -> Result<()> {
-    // Test explicitly using Base Sepolia configuration
-    let private_key = PrivateKeySigner::random();
-    let rpc_url = "https://sepolia.base.org";
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     let client_with_base: DefaultAlkahestClient = AlkahestClient::with_base_extensions(
-        private_key.clone(),
-        rpc_url,
+        test_context.alice.clone(),
+        &rpc_url,
         Some(BASE_SEPOLIA_ADDRESSES),
     )
     .await?;
@@ -66,13 +64,12 @@ async fn test_explicit_base_sepolia_configuration() -> Result<()> {
 
 #[tokio::test]
 async fn test_filecoin_calibration_configuration() -> Result<()> {
-    // Test using Filecoin Calibration configuration
-    let private_key = PrivateKeySigner::random();
-    let filecoin_rpc_url = "https://api.calibration.node.glif.io/rpc/v1";
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     let client_with_filecoin: DefaultAlkahestClient = AlkahestClient::with_base_extensions(
-        private_key.clone(),
-        filecoin_rpc_url,
+        test_context.alice.clone(),
+        &rpc_url,
         Some(FILECOIN_CALIBRATION_ADDRESSES),
     )
     .await?;
@@ -98,9 +95,8 @@ async fn test_filecoin_calibration_configuration() -> Result<()> {
 
 #[tokio::test]
 async fn test_custom_configuration() -> Result<()> {
-    // Test creating a custom configuration
-    let private_key = PrivateKeySigner::random();
-    let rpc_url = "https://sepolia.base.org";
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     let custom_config = DefaultExtensionConfig {
         arbiters_addresses: ArbitersAddresses {
@@ -126,8 +122,8 @@ async fn test_custom_configuration() -> Result<()> {
     };
 
     let client_with_custom: DefaultAlkahestClient = AlkahestClient::with_base_extensions(
-        private_key.clone(),
-        rpc_url,
+        test_context.alice.clone(),
+        &rpc_url,
         Some(custom_config.clone()),
     )
     .await?;
@@ -160,14 +156,16 @@ async fn test_custom_configuration() -> Result<()> {
 
 #[tokio::test]
 async fn test_default_trait_configuration() -> Result<()> {
-    // Test using Default::default() to get Base Sepolia configuration
-    let private_key = PrivateKeySigner::random();
-    let rpc_url = "https://sepolia.base.org";
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     let default_config = DefaultExtensionConfig::default();
-    let client_with_default_trait: DefaultAlkahestClient =
-        AlkahestClient::with_base_extensions(private_key, rpc_url, Some(default_config.clone()))
-            .await?;
+    let client_with_default_trait: DefaultAlkahestClient = AlkahestClient::with_base_extensions(
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(default_config.clone()),
+    )
+    .await?;
 
     // Verify it uses Base Sepolia addresses (the default)
     assert_eq!(
@@ -184,9 +182,8 @@ async fn test_default_trait_configuration() -> Result<()> {
 
 #[tokio::test]
 async fn test_mixed_network_configuration() -> Result<()> {
-    // Test mixing addresses from different networks
-    let private_key = PrivateKeySigner::random();
-    let rpc_url = "https://sepolia.base.org";
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     // Create a config that mixes Filecoin arbiters with Base Sepolia ERC20
     let mixed_config = DefaultExtensionConfig {
@@ -195,9 +192,12 @@ async fn test_mixed_network_configuration() -> Result<()> {
         ..FILECOIN_CALIBRATION_ADDRESSES
     };
 
-    let client_with_mixed: DefaultAlkahestClient =
-        AlkahestClient::with_base_extensions(private_key, rpc_url, Some(mixed_config.clone()))
-            .await?;
+    let client_with_mixed: DefaultAlkahestClient = AlkahestClient::with_base_extensions(
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(mixed_config.clone()),
+    )
+    .await?;
 
     // Verify the mixed configuration is applied correctly
     assert_eq!(

@@ -7,21 +7,23 @@ use alkahest_rs::{
     ArbitersContract, ContractModule as _, DefaultAlkahestClient, Erc20Contract, Erc721Contract,
     contracts,
     extensions::{HasArbiters, HasErc20, HasErc721},
+    utils::setup_test_environment,
 };
 use alloy::signers::local::PrivateKeySigner;
 use eyre::Result;
 
 #[tokio::test]
 async fn test_type_safe_address_getters() -> Result<()> {
-    // Setup client with test private key
-    let private_key: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
-    let rpc_url = "http://localhost:8545";
-
-    // Create client with default configuration (Base Sepolia addresses)
-    let client =
-        DefaultAlkahestClient::with_base_extensions(private_key.clone(), rpc_url, None).await?;
+    // Create client with test environment configuration
+    let client = DefaultAlkahestClient::with_base_extensions(
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
+    )
+    .await?;
 
     // Get ERC20 contract addresses
     let erc20_escrow = client.erc20_address(Erc20Contract::EscrowObligation);
@@ -49,12 +51,15 @@ async fn test_type_safe_address_getters() -> Result<()> {
 
 #[tokio::test]
 async fn test_enum_imports_for_cleaner_code() -> Result<()> {
-    let private_key: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
-    let client =
-        DefaultAlkahestClient::with_base_extensions(private_key, "http://localhost:8545", None)
-            .await?;
+    let client = DefaultAlkahestClient::with_base_extensions(
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
+    )
+    .await?;
 
     // Import enum variants for cleaner code
     use Erc20Contract::*;
@@ -83,12 +88,15 @@ async fn test_enum_imports_for_cleaner_code() -> Result<()> {
 
 #[tokio::test]
 async fn test_direct_access_compatibility() -> Result<()> {
-    let private_key: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
-    let client =
-        DefaultAlkahestClient::with_base_extensions(private_key, "http://localhost:8545", None)
-            .await?;
+    let client = DefaultAlkahestClient::with_base_extensions(
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
+    )
+    .await?;
 
     // Get address using the new API
     let erc20_escrow_via_method = client.erc20_address(Erc20Contract::EscrowObligation);
@@ -110,12 +118,15 @@ async fn test_direct_access_compatibility() -> Result<()> {
 
 #[tokio::test]
 async fn test_contract_instance_creation() -> Result<()> {
-    let private_key: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
-    let client =
-        DefaultAlkahestClient::with_base_extensions(private_key, "http://localhost:8545", None)
-            .await?;
+    let client = DefaultAlkahestClient::with_base_extensions(
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
+    )
+    .await?;
 
     // Get an address using the new API
     let escrow_addr = client.erc20_address(Erc20Contract::EscrowObligation);
@@ -141,21 +152,21 @@ async fn test_contract_instance_creation() -> Result<()> {
 async fn test_custom_network_configuration() -> Result<()> {
     use alkahest_rs::addresses::{BASE_SEPOLIA_ADDRESSES, FILECOIN_CALIBRATION_ADDRESSES};
 
-    let private_key: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     // Create client with Base Sepolia addresses
     let base_client = DefaultAlkahestClient::with_base_extensions(
-        private_key.clone(),
-        "http://localhost:8545",
+        test_context.alice.clone(),
+        &rpc_url,
         Some(BASE_SEPOLIA_ADDRESSES),
     )
     .await?;
 
     // Create client with Filecoin Calibration addresses
     let filecoin_client = DefaultAlkahestClient::with_base_extensions(
-        private_key,
-        "http://localhost:8545",
+        test_context.alice.clone(),
+        &rpc_url,
         Some(FILECOIN_CALIBRATION_ADDRESSES),
     )
     .await?;
@@ -184,12 +195,15 @@ async fn test_custom_network_configuration() -> Result<()> {
 
 #[tokio::test]
 async fn test_address_consistency_across_access_methods() -> Result<()> {
-    let private_key: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
-    let client =
-        DefaultAlkahestClient::with_base_extensions(private_key, "http://localhost:8545", None)
-            .await?;
+    let client = DefaultAlkahestClient::with_base_extensions(
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
+    )
+    .await?;
 
     // Test that all three ways of accessing addresses give the same result
     let erc20_module = client.erc20();
@@ -212,12 +226,15 @@ async fn test_address_consistency_across_access_methods() -> Result<()> {
 
 #[tokio::test]
 async fn test_different_contract_types_have_different_addresses() -> Result<()> {
-    let private_key: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
-    let client =
-        DefaultAlkahestClient::with_base_extensions(private_key, "http://localhost:8545", None)
-            .await?;
+    let client = DefaultAlkahestClient::with_base_extensions(
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
+    )
+    .await?;
 
     // Get addresses for different contract types
     let erc20_escrow = client.erc20_address(Erc20Contract::EscrowObligation);
@@ -226,11 +243,15 @@ async fn test_different_contract_types_have_different_addresses() -> Result<()> 
     // Even though they have similar names, they should be different contracts
     assert_ne!(erc20_escrow, erc721_escrow);
 
-    // Similarly for EAS contracts
+    // For EAS contracts, they should be the same since there's only one EAS contract
+    // that handles all attestations
     let erc20_eas = client.erc20_address(Erc20Contract::Eas);
     let erc721_eas = client.erc721_address(Erc721Contract::Eas);
 
-    assert_ne!(erc20_eas, erc721_eas);
+    assert_eq!(
+        erc20_eas, erc721_eas,
+        "EAS contract should be the same for all modules"
+    );
 
     Ok(())
 }

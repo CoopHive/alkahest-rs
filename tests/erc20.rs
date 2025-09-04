@@ -1,5 +1,3 @@
-use std::env;
-
 use alkahest_rs::{
     DefaultAlkahestClient,
     clients::{
@@ -14,7 +12,6 @@ use alkahest_rs::{
 
 use alloy::{
     primitives::{FixedBytes, address},
-    signers::local::PrivateKeySigner,
     sol,
     sol_types::SolValue,
 };
@@ -84,15 +81,24 @@ async fn test_trade_erc20_for_erc20() -> Result<()> {
 
 #[tokio::test]
 async fn test_trade_erc20_for_custom() -> Result<()> {
-    let alice: PrivateKeySigner = env::var("PRIVKEY_ALICE")?.parse()?;
-    let client_buyer =
-        DefaultAlkahestClient::with_base_extensions(alice, env::var("RPC_URL")?.as_str(), None)
-            .await?;
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
-    let bob: PrivateKeySigner = env::var("PRIVKEY_BOB")?.parse()?;
-    let client_seller =
-        DefaultAlkahestClient::with_base_extensions(bob, env::var("RPC_URL")?.as_str(), None)
-            .await?;
+    // Create clients using test environment
+    let client_buyer = DefaultAlkahestClient::with_base_extensions(
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
+    )
+    .await?;
+
+    let client_seller = DefaultAlkahestClient::with_base_extensions(
+        test_context.bob.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
+    )
+    .await?;
+
     // the example will use JobResultObligation to demand a string to be capitalized
     // but JobResultObligation is generic enough to represent much more (a db query, a Dockerfile...)
     // see https://github.com/CoopHive/alkahest-mocks/blob/main/src/Statements/JobResultObligation.sol
@@ -136,9 +142,9 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
         });
 
     // approve escrow contract to spend tokens
-    let usdc = address!("0x036CbD53842c5426634e7929541eC2318f3dCF7e");
+    // Use mock ERC20 token from test environment instead of real USDC
     let bid = Erc20Data {
-        address: usdc,
+        address: test_context.mock_addresses.erc20_a,
         value: 10.try_into()?,
     };
     let ask = ArbiterData {
@@ -180,32 +186,28 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
     println!("result: {}", result);
 
     // manually make result obligation
+    // In test environment, we'll use the StringObligation contract that's already deployed
+    // instead of trying to use a specific JobResultObligation address
+    let string_obligation_addr = test_context
+        .addresses
+        .string_obligation_addresses
+        .obligation;
+
     sol!(
         #[allow(missing_docs)]
         #[sol(rpc)]
         #[derive(Debug)]
-        JobResultObligation,
-        "src/contracts/JobResultObligation.json"
+        StringObligation,
+        "src/contracts/StringObligation.json"
     );
 
-    // JobResultObligation.StatementData:
-    // struct StatementData {
-    //     string result;
-    // }
-    //
-    // JobResultObligation.makeStatement
-    // function makeStatement(
-    //     StatementData calldata data,
-    //     bytes32 refUID
-    // ) public returns (bytes32)
-    let job_result_obligation = address!("0x823a06994B4e817a5127c042dBd2742CcFdF2076");
-    let job_result_obligation =
-        JobResultObligation::new(job_result_obligation, &client_seller.wallet_provider);
+    let string_obligation =
+        StringObligation::new(string_obligation_addr, &client_seller.wallet_provider);
 
-    let result = job_result_obligation
-        .makeStatement(
-            JobResultObligation::StatementData {
-                result: result.to_string(),
+    let result = string_obligation
+        .doObligation(
+            StringObligation::ObligationData {
+                item: result.to_string(),
             },
             FixedBytes::<32>::ZERO,
         )
@@ -240,8 +242,8 @@ async fn test_trade_erc20_for_custom() -> Result<()> {
         .get_attestation(fulfillment.fulfillment)
         .await?;
 
-    let result = JobResultObligation::StatementData::abi_decode(fulfillment.data.as_ref());
-    println!("result: {}", result?.result);
+    let result = StringObligation::ObligationData::abi_decode(fulfillment.data.as_ref());
+    println!("result: {}", result?.item);
 
     Ok(())
 }

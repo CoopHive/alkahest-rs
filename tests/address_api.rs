@@ -7,19 +7,22 @@ use alkahest_rs::{
     ArbitersContract, AttestationContract, ContractModule, DefaultAlkahestClient, Erc20Contract,
     Erc721Contract,
     extensions::{HasArbiters, HasAttestation, HasErc20, HasErc721},
+    utils::setup_test_environment,
 };
 use alloy::signers::local::PrivateKeySigner;
+use eyre::Result;
 
 #[tokio::test]
-async fn test_address_api_with_base_extensions() -> eyre::Result<()> {
+async fn test_address_api_with_base_extensions() -> Result<()> {
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
+
     // Create a client with the default extensions (BaseExtensions)
     // This includes all standard modules
-    let private_key: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
     let client = DefaultAlkahestClient::with_base_extensions(
-        private_key,
-        "https://eth-sepolia.g.alchemy.com/v2/your-api-key",
-        None, // Use default config
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
     )
     .await?;
 
@@ -76,13 +79,14 @@ async fn test_address_api_with_base_extensions() -> eyre::Result<()> {
 }
 
 #[tokio::test]
-async fn test_address_api_different_contract_types() -> eyre::Result<()> {
-    let private_key: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
+async fn test_address_api_different_contract_types() -> Result<()> {
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
+
     let client = DefaultAlkahestClient::with_base_extensions(
-        private_key,
-        "https://eth-sepolia.g.alchemy.com/v2/your-api-key",
-        None,
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
     )
     .await?;
 
@@ -102,22 +106,22 @@ async fn test_address_api_different_contract_types() -> eyre::Result<()> {
 }
 
 #[tokio::test]
-async fn test_address_api_consistency() -> eyre::Result<()> {
-    let private_key: PrivateKeySigner =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse()?;
+async fn test_address_api_consistency() -> Result<()> {
+    let test_context = setup_test_environment().await?;
+    let rpc_url = test_context.anvil.ws_endpoint();
 
     // Create two clients with the same configuration
     let client1 = DefaultAlkahestClient::with_base_extensions(
-        private_key.clone(),
-        "https://eth-sepolia.g.alchemy.com/v2/your-api-key",
-        None,
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
     )
     .await?;
 
     let client2 = DefaultAlkahestClient::with_base_extensions(
-        private_key,
-        "https://eth-sepolia.g.alchemy.com/v2/your-api-key",
-        None,
+        test_context.alice.clone(),
+        &rpc_url,
+        Some(test_context.addresses.clone()),
     )
     .await?;
 
