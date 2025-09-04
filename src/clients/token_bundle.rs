@@ -6,6 +6,7 @@ use std::collections::HashSet;
 
 use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::{self, IERC20, IERC721, IERC1155};
+use crate::extensions::ContractModule;
 use crate::types::{ArbiterData, DecodedAttestation, TokenBundleData};
 use crate::{
     extensions::AlkahestExtension,
@@ -40,6 +41,32 @@ pub struct TokenBundleModule {
 impl Default for TokenBundleAddresses {
     fn default() -> Self {
         BASE_SEPOLIA_ADDRESSES.token_bundle_addresses
+    }
+}
+
+/// Available contracts in the TokenBundle module
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenBundleContract {
+    /// EAS (Ethereum Attestation Service) contract
+    Eas,
+    /// Barter utilities contract for token bundles
+    BarterUtils,
+    /// Escrow obligation contract for token bundles
+    EscrowObligation,
+    /// Payment obligation contract for token bundles
+    PaymentObligation,
+}
+
+impl ContractModule for TokenBundleModule {
+    type Contract = TokenBundleContract;
+
+    fn address(&self, contract: Self::Contract) -> Address {
+        match contract {
+            TokenBundleContract::Eas => self.addresses.eas,
+            TokenBundleContract::BarterUtils => self.addresses.barter_utils,
+            TokenBundleContract::EscrowObligation => self.addresses.escrow_obligation,
+            TokenBundleContract::PaymentObligation => self.addresses.payment_obligation,
+        }
     }
 }
 

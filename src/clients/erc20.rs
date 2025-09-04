@@ -12,6 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::{self, ERC20Permit};
 use crate::extensions::AlkahestExtension;
+use crate::extensions::ContractModule;
 use crate::types::{
     ApprovalPurpose, ArbiterData, DecodedAttestation, Erc20Data, Erc721Data, Erc1155Data,
     TokenBundleData,
@@ -45,6 +46,32 @@ pub struct Erc20Module {
 impl Default for Erc20Addresses {
     fn default() -> Self {
         BASE_SEPOLIA_ADDRESSES.erc20_addresses
+    }
+}
+
+/// Available contracts in the ERC20 module
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Erc20Contract {
+    /// EAS (Ethereum Attestation Service) contract
+    Eas,
+    /// Barter utilities contract for ERC20 tokens
+    BarterUtils,
+    /// Escrow obligation contract for ERC20 tokens
+    EscrowObligation,
+    /// Payment obligation contract for ERC20 tokens
+    PaymentObligation,
+}
+
+impl ContractModule for Erc20Module {
+    type Contract = Erc20Contract;
+
+    fn address(&self, contract: Self::Contract) -> Address {
+        match contract {
+            Erc20Contract::Eas => self.addresses.eas,
+            Erc20Contract::BarterUtils => self.addresses.barter_utils,
+            Erc20Contract::EscrowObligation => self.addresses.escrow_obligation,
+            Erc20Contract::PaymentObligation => self.addresses.payment_obligation,
+        }
     }
 }
 

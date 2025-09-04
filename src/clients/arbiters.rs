@@ -1,7 +1,7 @@
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
     contracts,
-    extensions::AlkahestExtension,
+    extensions::{AlkahestExtension, ContractModule},
     types::{PublicProvider, WalletProvider},
     utils,
 };
@@ -80,6 +80,38 @@ pub struct ArbitersModule {
 impl Default for ArbitersAddresses {
     fn default() -> Self {
         BASE_SEPOLIA_ADDRESSES.arbiters_addresses
+    }
+}
+
+/// Available contracts in the Arbiters module
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArbitersContract {
+    /// EAS (Ethereum Attestation Service) contract
+    Eas,
+    /// Specific attestation arbiter
+    SpecificAttestationArbiter,
+    /// Trusted party arbiter
+    TrustedPartyArbiter,
+    /// Trivial arbiter (always accepts)
+    TrivialArbiter,
+    /// Trusted oracle arbiter
+    TrustedOracleArbiter,
+    // Add more as needed - there are many arbiter contracts
+}
+
+impl ContractModule for ArbitersModule {
+    type Contract = ArbitersContract;
+
+    fn address(&self, contract: Self::Contract) -> Address {
+        match contract {
+            ArbitersContract::Eas => self.addresses.eas,
+            ArbitersContract::SpecificAttestationArbiter => {
+                self.addresses.specific_attestation_arbiter
+            }
+            ArbitersContract::TrustedPartyArbiter => self.addresses.trusted_party_arbiter,
+            ArbitersContract::TrivialArbiter => self.addresses.trivial_arbiter,
+            ArbitersContract::TrustedOracleArbiter => self.addresses.trusted_oracle_arbiter,
+        }
     }
 }
 

@@ -4,8 +4,9 @@ use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
 
 use crate::addresses::BASE_SEPOLIA_ADDRESSES;
-use crate::contracts;
+use crate::contracts::{self};
 use crate::extensions::AlkahestExtension;
+use crate::extensions::ContractModule;
 use crate::types::{
     ApprovalPurpose, ArbiterData, DecodedAttestation, Erc20Data, Erc721Data, Erc1155Data,
     TokenBundleData,
@@ -39,6 +40,32 @@ pub struct Erc721Module {
 impl Default for Erc721Addresses {
     fn default() -> Self {
         BASE_SEPOLIA_ADDRESSES.erc721_addresses
+    }
+}
+
+/// Available contracts in the ERC721 module
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Erc721Contract {
+    /// EAS (Ethereum Attestation Service) contract
+    Eas,
+    /// Barter utilities contract for ERC721 tokens
+    BarterUtils,
+    /// Escrow obligation contract for ERC721 tokens
+    EscrowObligation,
+    /// Payment obligation contract for ERC721 tokens
+    PaymentObligation,
+}
+
+impl ContractModule for Erc721Module {
+    type Contract = Erc721Contract;
+
+    fn address(&self, contract: Self::Contract) -> Address {
+        match contract {
+            Erc721Contract::Eas => self.addresses.eas,
+            Erc721Contract::BarterUtils => self.addresses.barter_utils,
+            Erc721Contract::EscrowObligation => self.addresses.escrow_obligation,
+            Erc721Contract::PaymentObligation => self.addresses.payment_obligation,
+        }
     }
 }
 

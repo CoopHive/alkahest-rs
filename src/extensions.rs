@@ -1,3 +1,4 @@
+use alloy::primitives::Address;
 use alloy::signers::local::PrivateKeySigner;
 use std::any::Any;
 
@@ -16,6 +17,15 @@ pub use crate::clients::{
 };
 
 use crate::{AlkahestClient, DefaultExtensionConfig};
+
+/// Trait that modules implement to expose their contract addresses
+pub trait ContractModule {
+    /// The enum type representing available contracts for this module
+    type Contract: Copy;
+
+    /// Get the address of a specific contract
+    fn address(&self, contract: Self::Contract) -> Address;
+}
 
 pub trait AlkahestExtension: Clone + Send + Sync + 'static {
     /// The configuration type for this extension

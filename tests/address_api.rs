@@ -4,11 +4,9 @@
 //! which are only available when the corresponding modules are loaded.
 
 use alkahest_rs::{
-    DefaultAlkahestClient,
+    ArbitersContract, AttestationContract, ContractModule, DefaultAlkahestClient, Erc20Contract,
+    Erc721Contract,
     extensions::{HasArbiters, HasAttestation, HasErc20, HasErc721},
-    registry::{
-        ArbitersContract, AttestationContract, ContractModule, Erc20Contract, Erc721Contract,
-    },
 };
 use alloy::signers::local::PrivateKeySigner;
 
@@ -130,8 +128,12 @@ async fn test_address_api_consistency() -> eyre::Result<()> {
     );
 
     assert_eq!(
-        client1.arbiters().address(ArbitersContract::TrustedPartyArbiter),
-        client2.arbiters().address(ArbitersContract::TrustedPartyArbiter)
+        client1
+            .arbiters()
+            .address(ArbitersContract::TrustedPartyArbiter),
+        client2
+            .arbiters()
+            .address(ArbitersContract::TrustedPartyArbiter)
     );
 
     Ok(())

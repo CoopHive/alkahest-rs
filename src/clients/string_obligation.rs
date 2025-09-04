@@ -1,7 +1,7 @@
 use crate::{
     addresses::BASE_SEPOLIA_ADDRESSES,
     contracts,
-    extensions::AlkahestExtension,
+    extensions::{AlkahestExtension, ContractModule},
     types::{DecodedAttestation, WalletProvider},
 };
 use alloy::providers::Provider;
@@ -30,6 +30,26 @@ pub struct StringObligationModule {
 impl Default for StringObligationAddresses {
     fn default() -> Self {
         BASE_SEPOLIA_ADDRESSES.string_obligation_addresses
+    }
+}
+
+/// Available contracts in the StringObligation module
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StringObligationContract {
+    /// EAS (Ethereum Attestation Service) contract
+    Eas,
+    /// String obligation contract
+    Obligation,
+}
+
+impl ContractModule for StringObligationModule {
+    type Contract = StringObligationContract;
+
+    fn address(&self, contract: Self::Contract) -> Address {
+        match contract {
+            StringObligationContract::Eas => self.addresses.eas,
+            StringObligationContract::Obligation => self.addresses.obligation,
+        }
     }
 }
 

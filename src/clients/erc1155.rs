@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, Bytes, FixedBytes};
+use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use alloy::rpc::types::TransactionReceipt;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolValue as _;
@@ -6,6 +6,7 @@ use alloy::sol_types::SolValue as _;
 use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts;
 use crate::extensions::AlkahestExtension;
+use crate::extensions::ContractModule;
 use crate::types::{
     ApprovalPurpose, ArbiterData, DecodedAttestation, Erc20Data, Erc721Data, Erc1155Data,
     TokenBundleData,
@@ -39,6 +40,32 @@ pub struct Erc1155Module {
 impl Default for Erc1155Addresses {
     fn default() -> Self {
         BASE_SEPOLIA_ADDRESSES.erc1155_addresses
+    }
+}
+
+/// Available contracts in the ERC1155 module
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Erc1155Contract {
+    /// EAS (Ethereum Attestation Service) contract
+    Eas,
+    /// Barter utilities contract for ERC1155 tokens
+    BarterUtils,
+    /// Escrow obligation contract for ERC1155 tokens
+    EscrowObligation,
+    /// Payment obligation contract for ERC1155 tokens
+    PaymentObligation,
+}
+
+impl ContractModule for Erc1155Module {
+    type Contract = Erc1155Contract;
+
+    fn address(&self, contract: Self::Contract) -> Address {
+        match contract {
+            Erc1155Contract::Eas => self.addresses.eas,
+            Erc1155Contract::BarterUtils => self.addresses.barter_utils,
+            Erc1155Contract::EscrowObligation => self.addresses.escrow_obligation,
+            Erc1155Contract::PaymentObligation => self.addresses.payment_obligation,
+        }
     }
 }
 

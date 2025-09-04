@@ -4,9 +4,9 @@
 //! contract addresses in the Alkahest SDK.
 
 use alkahest_rs::{
-    ContractModule as _, DefaultAlkahestClient, contracts,
+    ArbitersContract, ContractModule as _, DefaultAlkahestClient, Erc20Contract, Erc721Contract,
+    contracts,
     extensions::{HasArbiters, HasErc20, HasErc721},
-    registry::{ArbitersContract, Erc20Contract, Erc721Contract},
 };
 use alloy::signers::local::PrivateKeySigner;
 use eyre::Result;

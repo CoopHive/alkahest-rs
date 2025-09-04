@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::addresses::BASE_SEPOLIA_ADDRESSES;
 use crate::contracts::IEAS::Attestation;
 use crate::contracts::{self, IEAS};
-use crate::extensions::AlkahestExtension;
+use crate::extensions::{AlkahestExtension, ContractModule};
 use crate::types::{ArbiterData, DecodedAttestation};
 use crate::{types::WalletProvider, utils};
 
@@ -32,6 +32,35 @@ pub struct AttestationModule {
 impl Default for AttestationAddresses {
     fn default() -> Self {
         BASE_SEPOLIA_ADDRESSES.attestation_addresses
+    }
+}
+
+/// Available contracts in the Attestation module
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttestationContract {
+    /// EAS (Ethereum Attestation Service) contract
+    Eas,
+    /// EAS Schema Registry contract
+    EasSchemaRegistry,
+    /// Barter utilities contract for attestations
+    BarterUtils,
+    /// Escrow obligation contract for attestations
+    EscrowObligation,
+    /// Alternative escrow obligation contract for attestations
+    EscrowObligation2,
+}
+
+impl ContractModule for AttestationModule {
+    type Contract = AttestationContract;
+
+    fn address(&self, contract: Self::Contract) -> Address {
+        match contract {
+            AttestationContract::Eas => self.addresses.eas,
+            AttestationContract::EasSchemaRegistry => self.addresses.eas_schema_registry,
+            AttestationContract::BarterUtils => self.addresses.barter_utils,
+            AttestationContract::EscrowObligation => self.addresses.escrow_obligation,
+            AttestationContract::EscrowObligation2 => self.addresses.escrow_obligation_2,
+        }
     }
 }
 
