@@ -4,7 +4,6 @@ use alkahest_rs::{
 };
 use serde_json;
 use std::fs;
-use std::path::PathBuf;
 use tempfile::tempdir;
 
 #[test]

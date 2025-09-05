@@ -10,11 +10,7 @@ use alkahest_rs::{
     utils::setup_test_environment,
 };
 
-use alloy::{
-    primitives::{FixedBytes, address},
-    sol,
-    sol_types::SolValue,
-};
+use alloy::{primitives::FixedBytes, sol, sol_types::SolValue};
 use eyre::Result;
 
 #[tokio::test]

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use alkahest_rs::{
-        AlkahestClient, DefaultAlkahestClient,
+        DefaultAlkahestClient,
         clients::oracle::{ArbitrateOptions, AttestationFilter, EscrowParams, FulfillmentParams},
         contracts::StringObligation,
         extensions::{HasErc20, HasOracle, HasStringObligation},
@@ -11,10 +11,8 @@ mod tests {
     };
     use alloy::{
         eips::BlockNumberOrTag,
-        primitives::{Address, Bytes, FixedBytes, bytes},
-        providers::{Provider as _, ext::AnvilApi},
+        primitives::{FixedBytes, bytes},
         rpc::types::{FilterBlockOption, ValueOrArray},
-        sol,
         sol_types::SolValue,
     };
     use std::{
@@ -23,13 +21,7 @@ mod tests {
     };
 
     use {
-        alkahest_rs::clients::arbiters::{
-            ArbitersModule, IntrinsicsArbiter2, MultiArbiter, RecipientArbiterNonComposing,
-            SpecificAttestationArbiter, TrustedOracleArbiter, TrustedPartyArbiter,
-            UidArbiterComposing,
-        },
-        alkahest_rs::clients::oracle::OracleModule,
-        alkahest_rs::contracts,
+        alkahest_rs::clients::arbiters::{ArbitersModule, TrustedOracleArbiter},
         alkahest_rs::utils::setup_test_environment,
     };
 

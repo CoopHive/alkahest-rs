@@ -460,7 +460,7 @@ mod tests {
     use crate::{
         DefaultAlkahestClient,
         contracts::token_bundle::{TokenBundleEscrowObligation, TokenBundlePaymentObligation},
-        extensions::{HasErc20, HasErc721, HasErc1155, HasTokenBundle},
+        extensions::HasTokenBundle,
         fixtures::{MockERC20Permit, MockERC721, MockERC1155},
         types::{
             ApprovalPurpose, ArbiterData, Erc20Data, Erc721Data, Erc1155Data, TokenBundleData,

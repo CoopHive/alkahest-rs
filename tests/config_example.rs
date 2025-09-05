@@ -1,16 +1,11 @@
 use alkahest_rs::{
     AlkahestClient, DefaultAlkahestClient, DefaultExtensionConfig,
     addresses::{BASE_SEPOLIA_ADDRESSES, FILECOIN_CALIBRATION_ADDRESSES},
-    clients::{
-        arbiters::ArbitersAddresses, attestation::AttestationAddresses, erc20::Erc20Addresses,
-        erc721::Erc721Addresses, erc1155::Erc1155Addresses,
-        string_obligation::StringObligationAddresses, token_bundle::TokenBundleAddresses,
-    },
+    clients::{arbiters::ArbitersAddresses, erc20::Erc20Addresses},
     extensions::{HasArbiters as _, HasErc20 as _, HasErc721 as _},
     utils::setup_test_environment,
 };
 use alloy::primitives::address;
-use alloy::signers::local::PrivateKeySigner;
 use eyre::Result;
 
 #[tokio::test]

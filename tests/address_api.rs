@@ -9,7 +9,6 @@ use alkahest_rs::{
     extensions::{HasArbiters, HasAttestation, HasErc20, HasErc721},
     utils::setup_test_environment,
 };
-use alloy::signers::local::PrivateKeySigner;
 use eyre::Result;
 
 #[tokio::test]

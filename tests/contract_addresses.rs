@@ -6,10 +6,9 @@
 use alkahest_rs::{
     ArbitersContract, ContractModule as _, DefaultAlkahestClient, Erc20Contract, Erc721Contract,
     contracts,
-    extensions::{HasArbiters, HasErc20, HasErc721},
+    extensions::{HasArbiters, HasErc20},
     utils::setup_test_environment,
 };
-use alloy::signers::local::PrivateKeySigner;
 use eyre::Result;
 
 #[tokio::test]
