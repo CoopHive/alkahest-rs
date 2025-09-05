@@ -90,7 +90,7 @@ async fn test_custom_tracker_extension() -> Result<()> {
 
     // Add custom tracker extension with custom config
     let client_with_tracker = client
-        .with_extension::<CustomTrackerExtension>(Some(custom_config.clone()))
+        .extend::<CustomTrackerExtension>(Some(custom_config.clone()))
         .await?;
 
     // Access the tracker through find_client
@@ -120,9 +120,7 @@ async fn test_custom_tracker_with_default() -> Result<()> {
     let client = AlkahestClient::new(test_context.alice.clone(), &rpc_url).await?;
 
     // Add custom tracker extension with default config
-    let client_with_tracker = client
-        .with_extension_default::<CustomTrackerExtension>()
-        .await?;
+    let client_with_tracker = client.extend_default::<CustomTrackerExtension>().await?;
 
     // Access the tracker through find_client
     let tracker = client_with_tracker
@@ -160,7 +158,7 @@ async fn test_client_with_erc20_extension() -> Result<()> {
 
     // Add ERC20 extension with custom addresses
     let client_with_erc20 = client
-        .with_extension::<Erc20Module>(Some(custom_erc20_addresses.clone()))
+        .extend::<Erc20Module>(Some(custom_erc20_addresses.clone()))
         .await?;
 
     // Verify the custom addresses are used
@@ -208,9 +206,9 @@ async fn test_chaining_multiple_extensions() -> Result<()> {
     // Start with a minimal client and chain extensions
     let client = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
         .await?
-        .with_extension::<Erc20Module>(Some(custom_erc20_addresses.clone()))
+        .extend::<Erc20Module>(Some(custom_erc20_addresses.clone()))
         .await?
-        .with_extension::<CustomTrackerExtension>(Some(custom_tracker_config.clone()))
+        .extend::<CustomTrackerExtension>(Some(custom_tracker_config.clone()))
         .await?;
 
     // Verify both extensions are present and accessible
@@ -240,9 +238,9 @@ async fn test_mixed_config_extensions() -> Result<()> {
     // Start with a minimal client and add extensions with mixed configs
     let client = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
         .await?
-        .with_extension_default::<Erc20Module>() // Use default ERC20 config
+        .extend_default::<Erc20Module>() // Use default ERC20 config
         .await?
-        .with_extension::<CustomTrackerExtension>(Some(CustomTrackerConfig {
+        .extend::<CustomTrackerExtension>(Some(CustomTrackerConfig {
             name: "mixed_config_tracker".to_string(),
             initial_counter: 100,
             metadata: Some("mixed".to_string()),
@@ -279,7 +277,7 @@ async fn test_find_client_not_found() -> Result<()> {
     // Create a client with only ERC20 extension
     let client = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
         .await?
-        .with_extension_default::<Erc20Module>()
+        .extend_default::<Erc20Module>()
         .await?;
 
     // Try to find a non-existent extension

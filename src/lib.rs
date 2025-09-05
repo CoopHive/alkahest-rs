@@ -158,7 +158,7 @@ impl AlkahestClient<BaseExtensions> {
 
 impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
     /// Add an extension with a specific configuration
-    pub async fn with_extension<NewExt: AlkahestExtension>(
+    pub async fn extend<NewExt: AlkahestExtension>(
         self,
         config: Option<NewExt::Config>,
     ) -> eyre::Result<AlkahestClient<extensions::JoinExtension<Extensions, NewExt>>> {
@@ -181,14 +181,13 @@ impl<Extensions: AlkahestExtension> AlkahestClient<Extensions> {
     }
 
     /// Add an extension using its default configuration
-    pub async fn with_extension_default<NewExt: AlkahestExtension>(
+    pub async fn extend_default<NewExt: AlkahestExtension>(
         self,
     ) -> eyre::Result<AlkahestClient<extensions::JoinExtension<Extensions, NewExt>>>
     where
         NewExt::Config: Default,
     {
-        self.with_extension::<NewExt>(Some(NewExt::Config::default()))
-            .await
+        self.extend::<NewExt>(Some(NewExt::Config::default())).await
     }
 
     /// Get the address of a specific ERC20 contract

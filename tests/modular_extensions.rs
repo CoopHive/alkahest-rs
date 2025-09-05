@@ -35,9 +35,7 @@ async fn test_building_client_by_chaining_extensions() -> Result<()> {
 
     // Add ERC20 module with custom config
     let erc20_config = test_context.addresses.erc20_addresses.clone();
-    let client_with_erc20 = client
-        .with_extension::<Erc20Module>(Some(erc20_config))
-        .await?;
+    let client_with_erc20 = client.extend::<Erc20Module>(Some(erc20_config)).await?;
 
     // Verify ERC20 module is accessible
     assert_ne!(
@@ -48,7 +46,7 @@ async fn test_building_client_by_chaining_extensions() -> Result<()> {
     // Add ERC721 module
     let erc721_config = test_context.addresses.erc721_addresses.clone();
     let client_with_both = client_with_erc20
-        .with_extension::<Erc721Module>(Some(erc721_config))
+        .extend::<Erc721Module>(Some(erc721_config))
         .await?;
 
     // Verify both modules are accessible
@@ -71,9 +69,9 @@ async fn test_using_default_configurations() -> Result<()> {
 
     let client_defaults = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
         .await?
-        .with_extension_default::<Erc20Module>()
+        .extend_default::<Erc20Module>()
         .await?
-        .with_extension_default::<Erc721Module>()
+        .extend_default::<Erc721Module>()
         .await?;
 
     // Verify modules were added with default configs
@@ -146,15 +144,13 @@ async fn test_chaining_multiple_extensions_with_mixed_configs() -> Result<()> {
 
     let multi_client = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
         .await?
-        .with_extension::<Erc20Module>(Some(test_context.addresses.erc20_addresses.clone()))
+        .extend::<Erc20Module>(Some(test_context.addresses.erc20_addresses.clone()))
         .await?
-        .with_extension_default::<Erc721Module>()
+        .extend_default::<Erc721Module>()
         .await?
-        .with_extension::<Erc1155Module>(Some(test_context.addresses.erc1155_addresses.clone()))
+        .extend::<Erc1155Module>(Some(test_context.addresses.erc1155_addresses.clone()))
         .await?
-        .with_extension::<TokenBundleModule>(Some(
-            test_context.addresses.token_bundle_addresses.clone(),
-        ))
+        .extend::<TokenBundleModule>(Some(test_context.addresses.token_bundle_addresses.clone()))
         .await?;
 
     // Verify all added modules are accessible
@@ -189,7 +185,7 @@ async fn test_custom_configuration() -> Result<()> {
 
     let custom_client = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
         .await?
-        .with_extension::<Erc20Module>(Some(custom_erc20_addresses.clone()))
+        .extend::<Erc20Module>(Some(custom_erc20_addresses.clone()))
         .await?;
 
     // Verify custom address is used
@@ -267,7 +263,7 @@ async fn test_custom_extension_implementation() -> Result<()> {
     // Add custom extension to an existing client
     let base_client = AlkahestClient::new(test_context.alice.clone(), &rpc_url).await?;
     let custom_ext_client = base_client
-        .with_extension::<MyCustomExtension>(Some(custom_config.clone()))
+        .extend::<MyCustomExtension>(Some(custom_config.clone()))
         .await?;
 
     // Verify the custom extension provides ERC20 functionality
@@ -290,12 +286,12 @@ async fn test_extension_isolation() -> Result<()> {
     // Create two separate clients with different extensions
     let client1 = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
         .await?
-        .with_extension_default::<Erc20Module>()
+        .extend_default::<Erc20Module>()
         .await?;
 
     let client2 = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
         .await?
-        .with_extension_default::<Erc721Module>()
+        .extend_default::<Erc721Module>()
         .await?;
 
     // Client 1 should have ERC20 but not ERC721
@@ -321,16 +317,16 @@ async fn test_extension_ordering() -> Result<()> {
     // Test that extension order doesn't affect functionality
     let client_order1 = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
         .await?
-        .with_extension_default::<Erc20Module>()
+        .extend_default::<Erc20Module>()
         .await?
-        .with_extension_default::<Erc721Module>()
+        .extend_default::<Erc721Module>()
         .await?;
 
     let client_order2 = AlkahestClient::new(test_context.alice.clone(), &rpc_url)
         .await?
-        .with_extension_default::<Erc721Module>()
+        .extend_default::<Erc721Module>()
         .await?
-        .with_extension_default::<Erc20Module>()
+        .extend_default::<Erc20Module>()
         .await?;
 
     // Both clients should have the same addresses regardless of order
